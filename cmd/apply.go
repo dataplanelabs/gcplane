@@ -1,10 +1,18 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
 
+	"github.com/dataplanelabs/gcplane/internal/display"
+	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
+	"github.com/dataplanelabs/gcplane/internal/reconciler"
 	"github.com/spf13/cobra"
 )
+
+var autoApprove bool
 
 var applyCmd = &cobra.Command{
 	Use:   "apply",
@@ -14,8 +22,53 @@ operations against GoClaw to reconcile the actual state.
 
 Only manages declared resources — UI-created objects are untouched.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: implement apply
-		fmt.Println("gcplane apply: not yet implemented")
+		m, err := loadAndValidateManifest()
+		if err != nil {
+			return err
+		}
+
+		ep, tok, err := resolveConnection(m)
+		if err != nil {
+			return err
+		}
+
+		provider := goclaw.New(ep, tok)
+		defer provider.Close()
+
+		engine := reconciler.NewEngine(provider)
+
+		// Show plan first
+		plan, _ := engine.Reconcile(m, true)
+		display.PrintPlan(plan, verbose)
+
+		if plan.Creates == 0 && plan.Updates == 0 {
+			fmt.Println("\nNo changes to apply.")
+			return nil
+		}
+
+		// Confirm unless auto-approve
+		if !autoApprove {
+			fmt.Print("\nApply these changes? [y/N] ")
+			reader := bufio.NewReader(os.Stdin)
+			answer, _ := reader.ReadString('\n')
+			answer = strings.TrimSpace(strings.ToLower(answer))
+			if answer != "y" && answer != "yes" {
+				fmt.Println("Apply cancelled.")
+				return nil
+			}
+		}
+
+		// Apply
+		_, result := engine.Reconcile(m, false)
+		display.PrintApplyResult(result)
+
+		if result.Failed > 0 {
+			return fmt.Errorf("%d resource(s) failed to apply", result.Failed)
+		}
 		return nil
 	},
+}
+
+func init() {
+	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, "skip confirmation prompt")
 }
