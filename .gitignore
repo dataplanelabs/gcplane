@@ -13,6 +13,9 @@ gcplane
 # OS
 .DS_Store
 
+# Plans (local only)
+plans/
+
 # Secrets (never commit)
 .env
 .env.*
