@@ -1,7 +1,7 @@
 apiVersion: gcplane.io/v1
 kind: Manifest
 metadata:
-  name: minimal-example
+  name: local-dev
   environment: dev
 
 connection:
@@ -11,12 +11,12 @@ connection:
 resources:
   # --- LLM Provider ---
   - kind: Provider
-    key: anthropic
+    key: zai-coding
     spec:
-      displayName: "Anthropic"
-      providerType: anthropic_native
-      apiBase: https://api.anthropic.com
-      apiKey: ${ANTHROPIC_API_KEY}
+      displayName: "Z.ai Coding Plan"
+      providerType: zai_coding
+      apiBase: https://api.z.ai/api/coding/paas/v4
+      apiKey: ${GOCLAW_ZAI_CODING_API_KEY}
       enabled: true
 
   # --- Agent ---
@@ -24,9 +24,10 @@ resources:
     key: assistant
     spec:
       displayName: "Assistant"
-      provider: anthropic
-      model: claude-sonnet-4-20250514
+      provider: zai-coding
+      model: glm-5
       agentType: open
       status: active
+      isDefault: true
       toolsConfig:
         profile: coding

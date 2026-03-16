@@ -16,18 +16,19 @@ resources:
     key: anthropic
     spec:
       displayName: "Anthropic"
-      baseUrl: https://api.anthropic.com
+      providerType: anthropic_native
+      apiBase: https://api.anthropic.com
       apiKey: ${ANTHROPIC_API_KEY}
-      models:
-        - claude-sonnet-4-20250514
-        - claude-haiku-4-5-20251001
+      enabled: true
 
   - kind: Provider
     key: openai
     spec:
       displayName: "OpenAI"
-      baseUrl: https://api.openai.com/v1
+      providerType: openai_compat
+      apiBase: https://api.openai.com/v1
       apiKey: ${OPENAI_API_KEY}
+      enabled: true
 
   # ============================================================
   # Agents

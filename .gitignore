@@ -19,4 +19,7 @@ plans/
 # Secrets (never commit)
 .env
 .env.*
+!.env.example
 *.key
+
+coverage.out
