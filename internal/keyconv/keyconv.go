@@ -44,18 +44,27 @@ func transformValue(v any, fn func(string) string) any {
 }
 
 // camelToSnake converts a single camelCase key to snake_case.
-// Examples: "displayName" → "display_name", "apiKey" → "api_key"
+// Handles acronyms: "userID" → "user_id", "apiKey" → "api_key"
 func camelToSnake(s string) string {
 	if s == "" {
 		return s
 	}
 
+	runes := []rune(s)
 	var b strings.Builder
-	b.Grow(len(s) + 4) // pre-allocate for underscores
+	b.Grow(len(s) + 4)
 
-	for i, r := range s {
+	for i, r := range runes {
 		if unicode.IsUpper(r) && i > 0 {
-			b.WriteByte('_')
+			prev := runes[i-1]
+			// Insert _ when: prev is lowercase/digit, OR prev is upper but next is lower
+			// "userID" → "user_id": _ before I (prev='r' lowercase)
+			// "getHTTPResponse" → "get_http_response": _ before H, _ before R
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) {
+				b.WriteByte('_')
+			} else if unicode.IsUpper(prev) && i+1 < len(runes) && unicode.IsLower(runes[i+1]) {
+				b.WriteByte('_')
+			}
 		}
 		b.WriteRune(unicode.ToLower(r))
 	}
