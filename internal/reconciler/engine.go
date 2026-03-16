@@ -56,8 +56,9 @@ func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResu
 				plan.Noops++
 			}
 
-			// If error during observe/compare, record and skip
-			if change.Action == ActionNoop && len(plan.Errors) > 0 {
+			// If error during observe, record and skip execution
+			if change.Error != "" {
+				plan.Errors = append(plan.Errors, fmt.Sprintf("%s/%s: %s", res.Kind, res.Key, change.Error))
 				continue
 			}
 
