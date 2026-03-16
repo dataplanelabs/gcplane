@@ -26,7 +26,7 @@ func (p *Provider) observeTeam(key string) (map[string]any, error) {
 
 	for _, team := range resp.Teams {
 		if strVal(team, "name") == key {
-			return team, nil
+			return translateResult(team), nil
 		}
 	}
 	return nil, nil
@@ -38,7 +38,7 @@ func (p *Provider) createTeam(key string, spec map[string]any) error {
 		return fmt.Errorf("ws connect for teams: %w", err)
 	}
 
-	params := copyMap(spec)
+	params := translateSpec(spec)
 	params["name"] = key
 
 	_, err := p.ws.Call(context.Background(), "teams.create", params)
@@ -69,7 +69,7 @@ func (p *Provider) updateTeam(key string, spec map[string]any) error {
 
 	params := map[string]any{
 		"teamId": teamID,
-		"patch":  spec,
+		"patch":  translateSpec(spec),
 	}
 
 	_, err = p.ws.Call(context.Background(), "teams.update", params)

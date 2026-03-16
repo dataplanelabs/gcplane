@@ -23,7 +23,7 @@ func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
 
 	for _, t := range resp.Tools {
 		if strVal(t, "name") == key {
-			return t, nil
+			return translateResult(t), nil
 		}
 	}
 	return nil, nil
@@ -31,7 +31,7 @@ func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
 
 // createCustomTool creates a new custom tool in GoClaw.
 func (p *Provider) createCustomTool(key string, spec map[string]any) error {
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	body["name"] = key
 
 	_, err := p.http.Post(context.Background(), "/v1/tools/custom", body)
@@ -56,7 +56,7 @@ func (p *Provider) updateCustomTool(key string, spec map[string]any) error {
 		return fmt.Errorf("custom tool %s: missing id", key)
 	}
 
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	_, err = p.http.Put(context.Background(), "/v1/tools/custom/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("custom tool %s (id=%s) not found: %w", key, id, err)

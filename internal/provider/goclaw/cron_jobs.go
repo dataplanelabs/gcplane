@@ -26,7 +26,7 @@ func (p *Provider) observeCronJob(key string) (map[string]any, error) {
 
 	for _, job := range resp.Jobs {
 		if strVal(job, "name") == key {
-			return job, nil
+			return translateResult(job), nil
 		}
 	}
 	return nil, nil
@@ -38,7 +38,7 @@ func (p *Provider) createCronJob(key string, spec map[string]any) error {
 		return fmt.Errorf("ws connect for cron: %w", err)
 	}
 
-	params := copyMap(spec)
+	params := translateSpec(spec)
 	params["name"] = key
 
 	_, err := p.ws.Call(context.Background(), "cron.create", params)
@@ -69,7 +69,7 @@ func (p *Provider) updateCronJob(key string, spec map[string]any) error {
 
 	params := map[string]any{
 		"jobId": jobID,
-		"patch": spec,
+		"patch": translateSpec(spec),
 	}
 
 	_, err = p.ws.Call(context.Background(), "cron.update", params)

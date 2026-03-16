@@ -23,7 +23,7 @@ func (p *Provider) observeMCPServer(key string) (map[string]any, error) {
 
 	for _, s := range resp.Servers {
 		if strVal(s, "key") == key {
-			return s, nil
+			return translateResult(s), nil
 		}
 	}
 	return nil, nil
@@ -31,7 +31,7 @@ func (p *Provider) observeMCPServer(key string) (map[string]any, error) {
 
 // createMCPServer creates a new MCP server in GoClaw.
 func (p *Provider) createMCPServer(key string, spec map[string]any) error {
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	body["key"] = key
 
 	_, err := p.http.Post(context.Background(), "/v1/mcp/servers", body)
@@ -56,7 +56,7 @@ func (p *Provider) updateMCPServer(key string, spec map[string]any) error {
 		return fmt.Errorf("mcp server %s: missing id", key)
 	}
 
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	_, err = p.http.Put(context.Background(), "/v1/mcp/servers/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("mcp server %s (id=%s) not found: %w", key, id, err)

@@ -23,7 +23,7 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 
 	for _, inst := range resp.Instances {
 		if strVal(inst, "name") == key {
-			return inst, nil
+			return translateResult(inst), nil
 		}
 	}
 	return nil, nil
@@ -31,7 +31,7 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 
 // createChannelInstance creates a new channel instance in GoClaw.
 func (p *Provider) createChannelInstance(key string, spec map[string]any) error {
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	body["name"] = key
 
 	_, err := p.http.Post(context.Background(), "/v1/channels/instances", body)
@@ -56,7 +56,7 @@ func (p *Provider) updateChannelInstance(key string, spec map[string]any) error 
 		return fmt.Errorf("channel instance %s: missing id", key)
 	}
 
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	_, err = p.http.Put(context.Background(), "/v1/channels/instances/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("channel instance %s (id=%s) not found: %w", key, id, err)

@@ -22,8 +22,8 @@ func (p *Provider) observeAgent(key string) (map[string]any, error) {
 	}
 
 	for _, a := range resp.Agents {
-		if strVal(a, "agentKey") == key {
-			return a, nil
+		if strVal(a, "agent_key") == key {
+			return translateResult(a), nil
 		}
 	}
 	return nil, nil
@@ -31,8 +31,8 @@ func (p *Provider) observeAgent(key string) (map[string]any, error) {
 
 // createAgent creates a new agent in GoClaw.
 func (p *Provider) createAgent(key string, spec map[string]any) error {
-	body := copyMap(spec)
-	body["agentKey"] = key
+	body := translateSpec(spec)
+	body["agent_key"] = key
 
 	_, err := p.http.Post(context.Background(), "/v1/agents", body)
 	if err != nil {
@@ -51,12 +51,13 @@ func (p *Provider) updateAgent(key string, spec map[string]any) error {
 		return fmt.Errorf("agent %s not found for update", key)
 	}
 
+	// current is already camelCase from observeAgent; extract id before translation
 	id, ok := current["id"].(string)
 	if !ok {
 		return fmt.Errorf("agent %s: missing id", key)
 	}
 
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	_, err = p.http.Put(context.Background(), "/v1/agents/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("agent %s (id=%s) not found: %w", key, id, err)

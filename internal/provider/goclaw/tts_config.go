@@ -25,7 +25,7 @@ func (p *Provider) observeTTSConfig(_ string) (map[string]any, error) {
 	if len(config) == 0 {
 		return nil, nil
 	}
-	return config, nil
+	return translateResult(config), nil
 }
 
 // createTTSConfig sets the global TTS config via WS RPC (same as update).
@@ -39,7 +39,7 @@ func (p *Provider) updateTTSConfig(_ string, spec map[string]any) error {
 		return fmt.Errorf("ws connect for tts: %w", err)
 	}
 
-	_, err := p.ws.Call(context.Background(), "tts.set", spec)
+	_, err := p.ws.Call(context.Background(), "tts.set", translateSpec(spec))
 	if err != nil {
 		return fmt.Errorf("tts.set: %w", err)
 	}

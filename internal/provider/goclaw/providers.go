@@ -24,9 +24,7 @@ func (p *Provider) observeProvider(key string) (map[string]any, error) {
 
 	for _, prov := range resp.Providers {
 		if strVal(prov, "name") == key {
-			// Mask apiKey — never compare masked values
-			delete(prov, "apiKey")
-			return prov, nil
+			return translateResult(prov), nil
 		}
 	}
 	return nil, nil
@@ -34,7 +32,7 @@ func (p *Provider) observeProvider(key string) (map[string]any, error) {
 
 // createProvider creates a new LLM provider in GoClaw.
 func (p *Provider) createProvider(key string, spec map[string]any) error {
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	body["name"] = key
 
 	_, err := p.http.Post(context.Background(), "/v1/providers", body)
@@ -60,7 +58,7 @@ func (p *Provider) updateProvider(key string, spec map[string]any) error {
 		return fmt.Errorf("provider %s: missing id", key)
 	}
 
-	body := copyMap(spec)
+	body := translateSpec(spec)
 	body["name"] = key
 
 	_, err = p.http.Put(context.Background(), "/v1/providers/"+id, body)
