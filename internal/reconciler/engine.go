@@ -90,6 +90,7 @@ func (e *Engine) reconcileOne(res manifest.Resource) Change {
 	current, err := e.provider.Observe(res.Kind, res.Key)
 	if err != nil {
 		change.Action = ActionNoop
+		change.Error = fmt.Sprintf("observe failed: %v", err)
 		return change
 	}
 

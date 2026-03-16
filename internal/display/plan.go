@@ -66,6 +66,10 @@ func printUpdate(c reconciler.Change) {
 }
 
 func printNoop(c reconciler.Change) {
+	if c.Error != "" {
+		fmt.Printf("%s! %s/%s (skipped: %s)%s\n", colorRed, c.Kind, c.Key, c.Error, colorReset)
+		return
+	}
 	fmt.Printf("%s= %s/%s (no changes)%s\n", colorDim, c.Kind, c.Key, colorReset)
 }
 

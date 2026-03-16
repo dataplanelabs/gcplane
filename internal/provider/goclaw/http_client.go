@@ -23,6 +23,7 @@ type HTTPClient struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
+	headers    map[string]string // extra headers to send with every request
 }
 
 // NewHTTPClient creates a new authenticated HTTP client for GoClaw.
@@ -31,6 +32,9 @@ func NewHTTPClient(baseURL, token string) *HTTPClient {
 		baseURL:    baseURL,
 		token:      token,
 		httpClient: &http.Client{},
+		headers: map[string]string{
+			"X-GoClaw-User-Id": "gcplane", // required by agent/session endpoints
+		},
 	}
 }
 
@@ -78,6 +82,9 @@ func (c *HTTPClient) do(ctx context.Context, method, path string, body io.Reader
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	for k, v := range c.headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

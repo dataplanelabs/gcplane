@@ -18,6 +18,7 @@ type Change struct {
 	Key    string                `json:"key"`
 	Action Action                `json:"action"`
 	Diff   map[string]FieldDiff  `json:"diff,omitempty"`
+	Error  string                `json:"error,omitempty"`
 }
 
 // FieldDiff shows the before/after for a single field.
