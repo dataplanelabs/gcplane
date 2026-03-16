@@ -1,0 +1,136 @@
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: production
+  environment: prod
+
+connection:
+  endpoint: https://goclaw.example.com
+  token: ${GCPLANE_TOKEN}
+
+resources:
+  # ============================================================
+  # LLM Providers
+  # ============================================================
+  - kind: Provider
+    key: anthropic
+    spec:
+      displayName: "Anthropic"
+      baseUrl: https://api.anthropic.com
+      apiKey: ${ANTHROPIC_API_KEY}
+      models:
+        - claude-sonnet-4-20250514
+        - claude-haiku-4-5-20251001
+
+  - kind: Provider
+    key: openai
+    spec:
+      displayName: "OpenAI"
+      baseUrl: https://api.openai.com/v1
+      apiKey: ${OPENAI_API_KEY}
+
+  # ============================================================
+  # Agents
+  # ============================================================
+  - kind: Agent
+    key: support-bot
+    spec:
+      displayName: "Support Bot"
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: coding
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a support bot for our platform.
+            Be helpful, concise, and professional.
+
+  - kind: Agent
+    key: data-analyst
+    spec:
+      displayName: "Data Analyst"
+      provider: openai
+      model: gpt-4o
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: minimal
+
+  # ============================================================
+  # Channel Instances
+  # ============================================================
+  - kind: ChannelInstance
+    key: telegram-support
+    spec:
+      channelType: telegram
+      agentKey: support-bot
+      botToken: ${TELEGRAM_BOT_TOKEN}
+      config:
+        dmPolicy: allow
+
+  - kind: ChannelInstance
+    key: discord-community
+    spec:
+      channelType: discord
+      agentKey: support-bot
+      botToken: ${DISCORD_BOT_TOKEN}
+
+  # ============================================================
+  # Cron Jobs
+  # ============================================================
+  - kind: CronJob
+    key: daily-report
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 9 * * *"
+        tz: Asia/Saigon
+      message: "Generate daily status report and send to #reports channel"
+      agentKey: support-bot
+      enabled: true
+
+  - kind: CronJob
+    key: weekly-digest
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 10 * * 1"
+        tz: Asia/Saigon
+      message: "Create weekly digest of all support conversations"
+      agentKey: support-bot
+      enabled: true
+
+  # ============================================================
+  # MCP Servers
+  # ============================================================
+  - kind: MCPServer
+    key: github-mcp
+    spec:
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-github"]
+      env:
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+      grants:
+        agents: [support-bot, data-analyst]
+
+  # ============================================================
+  # TTS Config
+  # ============================================================
+  - kind: TTSConfig
+    key: global
+    spec:
+      mode: "off"
+      provider: edge
+      voice: en-US-AriaNeural
+
+  # ============================================================
+  # Teams
+  # ============================================================
+  - kind: Team
+    key: platform-team
+    spec:
+      displayName: "Platform Team"

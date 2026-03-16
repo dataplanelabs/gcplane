@@ -1,0 +1,33 @@
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: minimal-example
+  environment: dev
+
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}
+
+resources:
+  # --- LLM Provider ---
+  - kind: Provider
+    key: anthropic
+    spec:
+      displayName: "Anthropic"
+      baseUrl: https://api.anthropic.com
+      apiKey: ${ANTHROPIC_API_KEY}
+      models:
+        - claude-sonnet-4-20250514
+        - claude-haiku-4-5-20251001
+
+  # --- Agent ---
+  - kind: Agent
+    key: assistant
+    spec:
+      displayName: "Assistant"
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      agentType: open
+      status: active
+      toolsConfig:
+        profile: coding
