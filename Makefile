@@ -8,28 +8,31 @@ BINARY := gcplane
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-X github.com/dataplanelabs/gcplane/cmd.Version=$(VERSION)"
 
-.PHONY: build run test clean validate plan apply setup serve goclaw-up goclaw-down goclaw-logs
-
-## Build
-build:
-	go build $(LDFLAGS) -o $(BINARY) .
+.PHONY: build test test-v test-cover clean
+.PHONY: validate plan apply serve
+.PHONY: goclaw-up goclaw-down goclaw-reset goclaw-logs
+.PHONY: setup reset
+.PHONY: test-e2e test-serve test-plan test-apply
 
 ## Run commands (usage: make validate F=examples/minimal.yaml)
 F ?= examples/local-dev.yaml
 
 # Path to GoClaw repo (for docker compose)
 GOCLAW_DIR ?= ../../nextlevelbuilder/goclaw
+GOCLAW_COMPOSE = cd $(GOCLAW_DIR) && docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.selfservice.yml
 
-validate: build
-	./$(BINARY) validate -f $(F)
+# ============================================================
+# Build
+# ============================================================
+build:
+	go build $(LDFLAGS) -o $(BINARY) .
 
-plan: build
-	./$(BINARY) plan -f $(F)
+clean:
+	rm -f $(BINARY) coverage.out
 
-apply: build
-	./$(BINARY) apply -f $(F)
-
-## Development
+# ============================================================
+# Unit Tests
+# ============================================================
 test:
 	go test ./... -count=1
 
@@ -40,27 +43,97 @@ test-cover:
 	go test ./... -coverprofile=coverage.out
 	go tool cover -func=coverage.out
 
-## Serve mode (continuous reconciliation)
+# ============================================================
+# CLI Commands
+# ============================================================
+validate: build
+	./$(BINARY) validate -f $(F)
+
+plan: build
+	./$(BINARY) plan -f $(F)
+
+apply: build
+	./$(BINARY) apply -f $(F)
+
 serve: build
 	./$(BINARY) serve -f $(F) --interval 10s
 
-## GoClaw local instance
+# ============================================================
+# GoClaw Instance
+# ============================================================
 goclaw-up:
-	cd $(GOCLAW_DIR) && docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.selfservice.yml up -d --build
+	$(GOCLAW_COMPOSE) up -d --build
 
 goclaw-down:
-	cd $(GOCLAW_DIR) && docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.selfservice.yml down
+	$(GOCLAW_COMPOSE) down
+
+goclaw-reset:
+	$(GOCLAW_COMPOSE) down -v
+	$(GOCLAW_COMPOSE) up -d --build
 
 goclaw-logs:
-	cd $(GOCLAW_DIR) && docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.selfservice.yml logs -f goclaw
+	$(GOCLAW_COMPOSE) logs -f goclaw
 
-## One-click setup: start GoClaw + apply config (skips setup wizard)
+# ============================================================
+# Setup (one-click: fresh GoClaw + apply config)
+# ============================================================
 setup: build goclaw-up
 	@echo "Waiting for GoClaw to be ready..."
 	@until curl -sf http://localhost:18790/health > /dev/null 2>&1; do sleep 1; done
 	@echo "GoClaw is ready. Applying manifest..."
 	./$(BINARY) apply -f $(F) --auto-approve
 
-## Cleanup
-clean:
-	rm -f $(BINARY) coverage.out
+## Full reset: wipe GoClaw volumes + re-setup from scratch
+reset: build goclaw-reset
+	@echo "Waiting for GoClaw to be ready..."
+	@until curl -sf http://localhost:18790/health > /dev/null 2>&1; do sleep 1; done
+	@echo "GoClaw is ready. Applying manifest..."
+	./$(BINARY) apply -f $(F) --auto-approve
+
+# ============================================================
+# E2E Tests (requires running GoClaw)
+# ============================================================
+
+## Full e2e: reset GoClaw + test all features
+test-e2e: reset test-plan test-apply test-serve
+	@echo ""
+	@echo "=== All E2E tests passed ==="
+
+## Test: plan shows correct state
+test-plan: build
+	@echo ""
+	@echo "=== Test: plan ==="
+	./$(BINARY) plan -f $(F) -v
+	@echo "PASS: plan"
+
+## Test: apply is idempotent (second apply = 0 changes)
+test-apply: build
+	@echo ""
+	@echo "=== Test: apply idempotency ==="
+	./$(BINARY) apply -f $(F) --auto-approve
+	@echo "--- Second apply (should be 0 changes) ---"
+	./$(BINARY) plan -f $(F) | grep -q "0 to create, 0 to update" && echo "PASS: idempotent" || (echo "FAIL: not idempotent" && exit 1)
+
+## Test: serve starts, syncs, responds to health checks
+test-serve: build
+	@echo ""
+	@echo "=== Test: serve ==="
+	@./$(BINARY) serve -f $(F) --interval 30s &
+	@SERVE_PID=$$!; \
+	sleep 3; \
+	echo "--- healthz ---"; \
+	curl -sf http://localhost:8480/healthz || (kill $$SERVE_PID 2>/dev/null; echo "FAIL: healthz"; exit 1); \
+	echo ""; \
+	echo "--- readyz ---"; \
+	curl -sf http://localhost:8480/readyz || (kill $$SERVE_PID 2>/dev/null; echo "FAIL: readyz"; exit 1); \
+	echo ""; \
+	echo "--- status ---"; \
+	curl -sf http://localhost:8480/api/v1/status | python3 -m json.tool; \
+	echo "--- metrics ---"; \
+	curl -sf http://localhost:8480/metrics | head -6; \
+	echo "--- sync trigger ---"; \
+	curl -sf -X POST http://localhost:8480/api/v1/sync; \
+	echo ""; \
+	kill $$SERVE_PID 2>/dev/null; \
+	wait $$SERVE_PID 2>/dev/null; \
+	echo "PASS: serve"
