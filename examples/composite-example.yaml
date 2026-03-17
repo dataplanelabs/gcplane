@@ -1,0 +1,49 @@
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: composite-demo
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}
+resources:
+  # Provider (needed by agents)
+  - kind: Provider
+    name: zai-coding
+    spec:
+      displayName: "Z.ai Coding"
+      providerType: zai_coding
+      apiBase: https://api.z.ai/api/coding/paas/v4
+      apiKey: ${GOCLAW_ZAI_CODING_API_KEY}
+      enabled: true
+
+  # Define a composite type: one Agent + one Channel
+  - kind: CompositeDefinition
+    name: ChatBot
+    spec:
+      resources:
+        - kind: Agent
+          name: "{{ .name }}"
+          spec:
+            displayName: "{{ .displayName }}"
+            provider: "{{ .provider }}"
+            model: "{{ .model }}"
+            agentType: predefined
+            status: active
+        - kind: Channel
+          name: "{{ .name }}-channel"
+          spec:
+            displayName: "{{ .displayName }} Channel"
+            channelType: "{{ .channelType }}"
+            agentKey: "{{ .name }}"
+            botToken: "{{ .botToken }}"
+            enabled: true
+
+  # Instantiate the composite — expands into Agent + Channel at load time
+  - kind: ChatBot
+    name: support-bot
+    spec:
+      displayName: "Support Bot"
+      provider: zai-coding
+      model: glm-5
+      channelType: telegram
+      botToken: ${GOCLAW_TELEGRAM_TOKEN}

@@ -41,6 +41,10 @@ func loadFile(path string) (*Manifest, error) {
 		m.Kind = "Manifest"
 	}
 
+	if err := ExpandComposites(&m); err != nil {
+		return nil, fmt.Errorf("expand composites in %s: %w", path, err)
+	}
+
 	return &m, nil
 }
 
@@ -87,6 +91,10 @@ func loadDir(dir string) (*Manifest, error) {
 			seen[key] = true
 			merged.Resources = append(merged.Resources, r)
 		}
+	}
+
+	if err := ExpandComposites(merged); err != nil {
+		return nil, fmt.Errorf("expand composites in %s: %w", dir, err)
 	}
 
 	return merged, nil
