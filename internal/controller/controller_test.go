@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,11 +17,11 @@ type mockSource struct {
 	manifest *manifest.Manifest
 	hash     string
 	err      error
-	calls    int
+	calls    atomic.Int64
 }
 
 func (m *mockSource) Fetch() (*manifest.Manifest, string, error) {
-	m.calls++
+	m.calls.Add(1)
 	return m.manifest, m.hash, m.err
 }
 
@@ -139,8 +140,8 @@ func TestReconcileOnce_HashSkip_NoSecondReconcile(t *testing.T) {
 	ctrl.reconcileOnce() // sets lastHash
 	ctrl.reconcileOnce() // should skip because hash unchanged
 
-	if src.calls != 2 {
-		t.Errorf("expected Fetch called twice, got %d", src.calls)
+	if src.calls.Load() != 2 {
+		t.Errorf("expected Fetch called twice, got %d", src.calls.Load())
 	}
 	// Only first call does real work; metrics should show 1 success
 	snap := ctrl.metrics.Snapshot()
@@ -312,7 +313,7 @@ func TestController_Run_TriggerFiresImmediateReconcile(t *testing.T) {
 
 	// Give initial reconcile time to run
 	time.Sleep(10 * time.Millisecond)
-	initialCalls := src.calls
+	initialCalls := src.calls.Load()
 
 	// Trigger an immediate reconcile
 	ctrl.Trigger()
@@ -321,8 +322,8 @@ func TestController_Run_TriggerFiresImmediateReconcile(t *testing.T) {
 	close(done)
 	time.Sleep(10 * time.Millisecond)
 
-	if src.calls <= initialCalls {
-		t.Errorf("expected Fetch to be called again after Trigger, calls before=%d after=%d", initialCalls, src.calls)
+	if src.calls.Load() <= initialCalls {
+		t.Errorf("expected Fetch to be called again after Trigger, calls before=%d after=%d", initialCalls, src.calls.Load())
 	}
 }
 
