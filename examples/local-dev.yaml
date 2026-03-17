@@ -48,7 +48,7 @@ resources:
       enabled: true
 
   # ============================================================
-  # Agents — Data Team
+  # General Purpose Agent
   # ============================================================
   - kind: Agent
     name: assistant
@@ -62,6 +62,9 @@ resources:
       toolsConfig:
         profile: coding
 
+  # ============================================================
+  # Data Team — pipeline, analysis, reporting
+  # ============================================================
   - kind: Agent
     name: data-engineer
     spec:
@@ -75,9 +78,13 @@ resources:
       contextFiles:
         - name: IDENTITY.md
           content: |
-            You are a data engineer. You build data pipelines,
-            ETL processes, and manage data infrastructure.
-            Focus on reliability, scalability, and data quality.
+            You are a senior data engineer at DataPlane Labs.
+            Responsibilities:
+            - Build and maintain ETL/ELT pipelines
+            - Manage data warehouse schemas and migrations
+            - Monitor data quality metrics and alerting
+            - Optimize query performance
+            Tech stack: PostgreSQL, dbt, Airflow, Python.
 
   - kind: Agent
     name: data-analyst
@@ -92,9 +99,13 @@ resources:
       contextFiles:
         - name: IDENTITY.md
           content: |
-            You are a data analyst. You analyze datasets,
-            create visualizations, and produce insights.
-            Use SQL, Python, and statistical methods.
+            You are a data analyst at DataPlane Labs.
+            Responsibilities:
+            - Analyze datasets and produce actionable insights
+            - Create dashboards and visualizations
+            - Run A/B test analysis and statistical modeling
+            - Answer ad-hoc data questions from stakeholders
+            Tools: SQL, Python (pandas, matplotlib), Metabase.
 
   - kind: Agent
     name: report-builder
@@ -109,12 +120,16 @@ resources:
       contextFiles:
         - name: IDENTITY.md
           content: |
-            You are a report builder. You create executive summaries,
-            dashboards, and data reports. Make data actionable
-            and easy to understand for stakeholders.
+            You are a report builder at DataPlane Labs.
+            Responsibilities:
+            - Generate weekly/monthly executive summaries
+            - Create data-driven presentations
+            - Compile KPI dashboards and trend analysis
+            - Format reports for different audiences (C-level, teams, external)
+            Output: Markdown reports, PDF exports, slide decks.
 
   # ============================================================
-  # Agents — Product Team
+  # Product Team — research, planning, development
   # ============================================================
   - kind: Agent
     name: market-researcher
@@ -129,9 +144,13 @@ resources:
       contextFiles:
         - name: IDENTITY.md
           content: |
-            You are a market researcher. You analyze competitors,
-            identify trends, and evaluate market opportunities.
-            Provide data-driven recommendations.
+            You are a market researcher at DataPlane Labs.
+            Responsibilities:
+            - Analyze competitor products and positioning
+            - Identify market trends and opportunities
+            - Conduct user research synthesis
+            - Evaluate pricing and go-to-market strategies
+            Focus: AI infrastructure, developer tools, cloud-native platforms.
 
   - kind: Agent
     name: product-planner
@@ -146,9 +165,13 @@ resources:
       contextFiles:
         - name: IDENTITY.md
           content: |
-            You are a product planner. You write PRDs,
-            prioritize features, and create roadmaps.
-            Balance user needs with technical feasibility.
+            You are a product planner at DataPlane Labs.
+            Responsibilities:
+            - Write PRDs and feature specifications
+            - Prioritize backlog using RICE/ICE scoring
+            - Create product roadmaps and release plans
+            - Coordinate between engineering, design, and stakeholders
+            Products: GoClaw (AI gateway), GCPlane (GitOps control plane).
 
   - kind: Agent
     name: dev-lead
@@ -163,9 +186,58 @@ resources:
       contextFiles:
         - name: IDENTITY.md
           content: |
-            You are a dev lead. You review architecture decisions,
-            mentor engineers, and coordinate implementation.
-            Focus on code quality and team velocity.
+            You are a dev lead at DataPlane Labs.
+            Responsibilities:
+            - Review architecture decisions and PRs
+            - Mentor engineers and run code reviews
+            - Coordinate sprint planning and execution
+            - Manage technical debt and system reliability
+            Stack: Go, TypeScript, PostgreSQL, Kubernetes, Docker.
+
+  # ============================================================
+  # Support & Ops
+  # ============================================================
+  - kind: Agent
+    name: support-bot
+    spec:
+      displayName: "Support Bot"
+      provider: zai-coding
+      model: glm-5
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: minimal
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are the DataPlane Labs support bot.
+            Responsibilities:
+            - Answer customer questions about GoClaw and GCPlane
+            - Troubleshoot deployment and configuration issues
+            - Escalate complex issues to the engineering team
+            - Maintain FAQ and knowledge base
+            Tone: helpful, concise, professional.
+
+  - kind: Agent
+    name: devops-engineer
+    spec:
+      displayName: "DevOps Engineer"
+      provider: zai-coding
+      model: glm-5
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: coding
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a DevOps engineer at DataPlane Labs.
+            Responsibilities:
+            - Monitor Kubernetes clusters and infrastructure health
+            - Manage CI/CD pipelines and deployments
+            - Handle incident response and post-mortems
+            - Optimize resource usage and costs
+            Tools: kubectl, Helm, Terraform, GitHub Actions, Prometheus, Grafana.
 
   # ============================================================
   # Channels
@@ -207,7 +279,7 @@ resources:
       url: https://mcp.dataplanelabs.com/k8s/mcp
       enabled: true
       grants:
-        agents: [assistant, data-engineer]
+        agents: [assistant, devops-engineer, data-engineer]
 
   - kind: MCPServer
     name: gws-mcp
@@ -229,8 +301,8 @@ resources:
         kind: cron
         expr: "0 9 * * 1-5"
         tz: Asia/Saigon
-      message: "Check Huly for today's tasks and summarize what needs attention"
-      agentKey: assistant
+      message: "Check Huly for today's tasks, summarize blockers and priorities for the team"
+      agentKey: product-planner
       enabled: true
 
   - kind: CronJob
@@ -240,12 +312,23 @@ resources:
         kind: cron
         expr: "0 10 * * 1"
         tz: Asia/Saigon
-      message: "Generate weekly data quality and pipeline health report"
+      message: "Generate weekly data quality and pipeline health report. Include error rates, latency trends, and storage growth."
       agentKey: report-builder
       enabled: true
 
+  - kind: CronJob
+    name: daily-infra-check
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 8 * * *"
+        tz: Asia/Saigon
+      message: "Check k8s cluster health: pod restarts, resource usage, pending alerts. Report issues."
+      agentKey: devops-engineer
+      enabled: true
+
   # ============================================================
-  # Teams
+  # Agent Teams
   # ============================================================
   - kind: AgentTeam
     name: data-team
@@ -260,3 +343,10 @@ resources:
       displayName: "Product Team"
       lead: product-planner
       members: [market-researcher, dev-lead]
+
+  - kind: AgentTeam
+    name: ops-team
+    spec:
+      displayName: "Ops Team"
+      lead: devops-engineer
+      members: [support-bot]
