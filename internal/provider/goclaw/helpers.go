@@ -44,8 +44,10 @@ func (p *Provider) resolveAgentID(agentKey string) (string, error) {
 
 // internalFields are API response fields not present in manifests.
 // Stripping them prevents phantom diffs during comparison.
+// Note: "id" is intentionally excluded — update/delete paths need it to resolve
+// the resource UUID before issuing PUT/DELETE requests.
 var internalFields = []string{
-	"id", "created_at", "updated_at", "created_by", "owner_id",
+	"created_at", "updated_at", "created_by", "owner_id",
 	"restrict_to_workspace", "workspace",
 	"context_window", "max_tool_iterations",
 	"compaction_config", "memory_config", "context_pruning",
