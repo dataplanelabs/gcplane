@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"github.com/dataplanelabs/gcplane/internal/display"
+	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 	"github.com/spf13/cobra"
 )
 
 var planPrune bool
+var planLabelSelector string
 
 var planCmd = &cobra.Command{
 	Use:   "plan",
@@ -20,6 +22,11 @@ Similar to 'terraform plan'.`,
 		m, err := loadAndValidateManifest()
 		if err != nil {
 			return err
+		}
+
+		if planLabelSelector != "" {
+			selector := manifest.ParseLabelSelector(planLabelSelector)
+			m.Resources = manifest.FilterByLabels(m.Resources, selector)
 		}
 
 		ep, tok, err := resolveConnection(m)
@@ -40,4 +47,5 @@ Similar to 'terraform plan'.`,
 
 func init() {
 	planCmd.Flags().BoolVar(&planPrune, "prune", false, "include deletion of gcplane-owned resources not in manifest")
+	planCmd.Flags().StringVarP(&planLabelSelector, "label", "l", "", "filter resources by label (key=value,key2=value2)")
 }

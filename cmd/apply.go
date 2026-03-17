@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dataplanelabs/gcplane/internal/display"
+	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 
 var autoApprove bool
 var applyPrune bool
+var applyLabelSelector string
 
 var applyCmd = &cobra.Command{
 	Use:   "apply",
@@ -26,6 +28,11 @@ Only manages declared resources — UI-created objects are untouched.`,
 		m, err := loadAndValidateManifest()
 		if err != nil {
 			return err
+		}
+
+		if applyLabelSelector != "" {
+			selector := manifest.ParseLabelSelector(applyLabelSelector)
+			m.Resources = manifest.FilterByLabels(m.Resources, selector)
 		}
 
 		ep, tok, err := resolveConnection(m)
@@ -80,4 +87,5 @@ Only manages declared resources — UI-created objects are untouched.`,
 func init() {
 	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, "skip confirmation prompt")
 	applyCmd.Flags().BoolVar(&applyPrune, "prune", false, "delete gcplane-owned resources not present in manifest")
+	applyCmd.Flags().StringVarP(&applyLabelSelector, "label", "l", "", "filter resources by label (key=value,key2=value2)")
 }

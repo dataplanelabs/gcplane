@@ -38,10 +38,12 @@ const (
 )
 
 // Resource is a generic managed resource with kind + name + arbitrary spec.
+// Labels are gcplane-local metadata and are not sent to GoClaw.
 type Resource struct {
-	Kind ResourceKind   `yaml:"kind"`
-	Name string         `yaml:"name"`
-	Spec map[string]any `yaml:"spec"`
+	Kind   ResourceKind      `yaml:"kind"`
+	Name   string            `yaml:"name"`
+	Labels map[string]string `yaml:"labels,omitempty"`
+	Spec   map[string]any    `yaml:"spec"`
 }
 
 // ApplyOrder returns the dependency-ordered resource kinds.

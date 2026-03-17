@@ -67,6 +67,9 @@ resources:
   # ============================================================
   - kind: Agent
     name: data-engineer
+    labels:
+      team: data
+      role: engineer
     spec:
       displayName: "Data Engineer"
       provider: zai-coding
@@ -88,6 +91,9 @@ resources:
 
   - kind: Agent
     name: data-analyst
+    labels:
+      team: data
+      role: analyst
     spec:
       displayName: "Data Analyst"
       provider: openrouter
@@ -109,6 +115,9 @@ resources:
 
   - kind: Agent
     name: report-builder
+    labels:
+      team: data
+      role: reporter
     spec:
       displayName: "Report Builder"
       provider: zai-coding
@@ -133,6 +142,9 @@ resources:
   # ============================================================
   - kind: Agent
     name: market-researcher
+    labels:
+      team: product
+      role: researcher
     spec:
       displayName: "Market Researcher"
       provider: openrouter
@@ -154,6 +166,9 @@ resources:
 
   - kind: Agent
     name: product-planner
+    labels:
+      team: product
+      role: planner
     spec:
       displayName: "Product Planner"
       provider: zai-coding
@@ -175,6 +190,9 @@ resources:
 
   - kind: Agent
     name: dev-lead
+    labels:
+      team: product
+      role: lead
     spec:
       displayName: "Dev Lead"
       provider: zai-coding
@@ -207,6 +225,9 @@ resources:
   # ============================================================
   - kind: Agent
     name: support-bot
+    labels:
+      team: ops
+      role: support
     spec:
       displayName: "Support Bot"
       provider: zai-coding
@@ -228,6 +249,9 @@ resources:
 
   - kind: Agent
     name: devops-engineer
+    labels:
+      team: ops
+      role: engineer
     spec:
       displayName: "DevOps Engineer"
       provider: zai-coding
