@@ -166,7 +166,7 @@ func (c *Controller) reconcileOnce() {
 func buildResourceStatuses(plan *reconciler.Plan, _ *reconciler.ApplyResult) []ResourceStatus {
 	statuses := make([]ResourceStatus, 0, len(plan.Changes))
 	for _, c := range plan.Changes {
-		rs := ResourceStatus{Kind: c.Kind, Key: c.Key}
+		rs := ResourceStatus{Kind: c.Kind, Name: c.Name}
 		switch {
 		case c.Error != "":
 			rs.Status = "Error"

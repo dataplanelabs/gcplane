@@ -58,7 +58,7 @@ func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResu
 
 			// If error during observe, record and skip execution
 			if change.Error != "" {
-				plan.Errors = append(plan.Errors, fmt.Sprintf("%s/%s: %s", res.Kind, res.Key, change.Error))
+				plan.Errors = append(plan.Errors, fmt.Sprintf("%s/%s: %s", res.Kind, res.Name, change.Error))
 				continue
 			}
 
@@ -67,7 +67,7 @@ func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResu
 				err := e.execute(change, res)
 				if err != nil {
 					result.Failed++
-					result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", res.Kind, res.Key, err))
+					result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", res.Kind, res.Name, err))
 				} else {
 					result.Applied++
 				}
@@ -81,14 +81,14 @@ func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResu
 func (e *Engine) reconcileOne(res manifest.Resource) Change {
 	change := Change{
 		Kind: res.Kind,
-		Key:  res.Key,
+		Name: res.Name,
 	}
 
 	// Resolve secrets in spec
 	spec := resolveSpecSecrets(res.Spec)
 
 	// Observe current state
-	current, err := e.provider.Observe(res.Kind, res.Key)
+	current, err := e.provider.Observe(res.Kind, res.Name)
 	if err != nil {
 		change.Action = ActionNoop
 		change.Error = fmt.Sprintf("observe failed: %v", err)
@@ -118,9 +118,9 @@ func (e *Engine) execute(change Change, res manifest.Resource) error {
 
 	switch change.Action {
 	case ActionCreate:
-		return e.provider.Create(res.Kind, res.Key, spec)
+		return e.provider.Create(res.Kind, res.Name, spec)
 	case ActionUpdate:
-		return e.provider.Update(res.Kind, res.Key, spec)
+		return e.provider.Update(res.Kind, res.Name, spec)
 	default:
 		return nil
 	}

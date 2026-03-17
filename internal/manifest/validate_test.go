@@ -9,8 +9,8 @@ func TestValidate_Valid(t *testing.T) {
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
 		Resources: []Resource{
-			{Kind: KindProvider, Key: "anthropic", Spec: map[string]any{"name": "test"}},
-			{Kind: KindAgent, Key: "my-bot", Spec: map[string]any{"model": "test"}},
+			{Kind: KindProvider, Name: "anthropic", Spec: map[string]any{"name": "test"}},
+			{Kind: KindAgent, Name: "my-bot", Spec: map[string]any{"model": "test"}},
 		},
 	}
 
@@ -41,7 +41,7 @@ func TestValidate_InvalidKey(t *testing.T) {
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
 		Resources: []Resource{
-			{Kind: KindAgent, Key: "My_Bot", Spec: map[string]any{"x": 1}},
+			{Kind: KindAgent, Name: "My_Bot", Spec: map[string]any{"x": 1}},
 		},
 	}
 
@@ -56,8 +56,8 @@ func TestValidate_DuplicateResource(t *testing.T) {
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
 		Resources: []Resource{
-			{Kind: KindAgent, Key: "bot", Spec: map[string]any{"x": 1}},
-			{Kind: KindAgent, Key: "bot", Spec: map[string]any{"x": 2}},
+			{Kind: KindAgent, Name: "bot", Spec: map[string]any{"x": 1}},
+			{Kind: KindAgent, Name: "bot", Spec: map[string]any{"x": 2}},
 		},
 	}
 
@@ -72,7 +72,7 @@ func TestValidate_MissingSpec(t *testing.T) {
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
 		Resources: []Resource{
-			{Kind: KindAgent, Key: "bot"},
+			{Kind: KindAgent, Name: "bot"},
 		},
 	}
 

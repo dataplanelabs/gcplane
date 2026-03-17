@@ -28,7 +28,7 @@ type Condition struct {
 // ResourceStatus tracks per-resource sync outcome.
 type ResourceStatus struct {
 	Kind    manifest.ResourceKind `json:"kind"`
-	Key     string                `json:"key"`
+	Name    string                `json:"name"`
 	Status  string                `json:"status"` // InSync, Created, Updated, Error
 	Message string                `json:"message,omitempty"`
 }

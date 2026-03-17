@@ -49,11 +49,11 @@ func PrintPlan(plan *reconciler.Plan, verbose bool) {
 }
 
 func printCreate(c reconciler.Change) {
-	fmt.Printf("%s+ %s/%s%s\n", colorGreen, c.Kind, c.Key, colorReset)
+	fmt.Printf("%s+ %s/%s%s\n", colorGreen, c.Kind, c.Name, colorReset)
 }
 
 func printUpdate(c reconciler.Change) {
-	fmt.Printf("%s~ %s/%s%s\n", colorYellow, c.Kind, c.Key, colorReset)
+	fmt.Printf("%s~ %s/%s%s\n", colorYellow, c.Kind, c.Name, colorReset)
 
 	keys := sortedKeys(c.Diff)
 	for _, k := range keys {
@@ -67,10 +67,10 @@ func printUpdate(c reconciler.Change) {
 
 func printNoop(c reconciler.Change) {
 	if c.Error != "" {
-		fmt.Printf("%s! %s/%s (skipped: %s)%s\n", colorRed, c.Kind, c.Key, c.Error, colorReset)
+		fmt.Printf("%s! %s/%s (skipped: %s)%s\n", colorRed, c.Kind, c.Name, c.Error, colorReset)
 		return
 	}
-	fmt.Printf("%s= %s/%s (no changes)%s\n", colorDim, c.Kind, c.Key, colorReset)
+	fmt.Printf("%s= %s/%s (no changes)%s\n", colorDim, c.Kind, c.Name, colorReset)
 }
 
 // PrintApplyResult renders the result of applying a plan.

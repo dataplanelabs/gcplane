@@ -53,13 +53,13 @@ func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]a
 		return p.observeProvider(key)
 	case manifest.KindAgent:
 		return p.observeAgent(key)
-	case manifest.KindChannelInstance:
+	case manifest.KindChannel:
 		return p.observeChannelInstance(key)
 	case manifest.KindMCPServer:
 		return p.observeMCPServer(key)
 	case manifest.KindSkill:
 		return p.observeSkill(key)
-	case manifest.KindCustomTool:
+	case manifest.KindTool:
 		return p.observeCustomTool(key)
 	case manifest.KindCronJob:
 		return p.observeCronJob(key)
@@ -79,11 +79,11 @@ func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[strin
 		return p.createProvider(key, spec)
 	case manifest.KindAgent:
 		return p.createAgent(key, spec)
-	case manifest.KindChannelInstance:
+	case manifest.KindChannel:
 		return p.createChannelInstance(key, spec)
 	case manifest.KindMCPServer:
 		return p.createMCPServer(key, spec)
-	case manifest.KindCustomTool:
+	case manifest.KindTool:
 		return p.createCustomTool(key, spec)
 	case manifest.KindCronJob:
 		return p.createCronJob(key, spec)
@@ -103,13 +103,13 @@ func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[strin
 		return p.updateProvider(key, spec)
 	case manifest.KindAgent:
 		return p.updateAgent(key, spec)
-	case manifest.KindChannelInstance:
+	case manifest.KindChannel:
 		return p.updateChannelInstance(key, spec)
 	case manifest.KindMCPServer:
 		return p.updateMCPServer(key, spec)
 	case manifest.KindSkill:
 		return p.updateSkill(key, spec)
-	case manifest.KindCustomTool:
+	case manifest.KindTool:
 		return p.updateCustomTool(key, spec)
 	case manifest.KindCronJob:
 		return p.updateCronJob(key, spec)

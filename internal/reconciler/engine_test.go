@@ -47,7 +47,7 @@ func TestReconcile_CreateNew(t *testing.T) {
 
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
-			{Kind: manifest.KindProvider, Key: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
+			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
 		},
 	}
 
@@ -67,7 +67,7 @@ func TestReconcile_UpdateExisting(t *testing.T) {
 	engine := NewEngine(provider)
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
-			{Kind: manifest.KindAgent, Key: "bot", Spec: map[string]any{"model": "new-model"}},
+			{Kind: manifest.KindAgent, Name: "bot", Spec: map[string]any{"model": "new-model"}},
 		},
 	}
 
@@ -84,7 +84,7 @@ func TestReconcile_NoopIdentical(t *testing.T) {
 	engine := NewEngine(provider)
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
-			{Kind: manifest.KindProvider, Key: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
+			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
 		},
 	}
 
@@ -100,7 +100,7 @@ func TestReconcile_ApplyExecutes(t *testing.T) {
 
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
-			{Kind: manifest.KindProvider, Key: "openai", Spec: map[string]any{"name": "OpenAI"}},
+			{Kind: manifest.KindProvider, Name: "openai", Spec: map[string]any{"name": "OpenAI"}},
 		},
 	}
 
@@ -120,8 +120,8 @@ func TestReconcile_DependencyOrder(t *testing.T) {
 	// Agent depends on Provider — Provider should be processed first
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
-			{Kind: manifest.KindAgent, Key: "bot", Spec: map[string]any{"provider": "anthropic"}},
-			{Kind: manifest.KindProvider, Key: "anthropic", Spec: map[string]any{"name": "Anthropic"}},
+			{Kind: manifest.KindAgent, Name: "bot", Spec: map[string]any{"provider": "anthropic"}},
+			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"name": "Anthropic"}},
 		},
 	}
 

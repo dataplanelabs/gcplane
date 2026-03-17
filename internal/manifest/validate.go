@@ -9,15 +9,15 @@ var keyRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // validKinds is the set of supported resource kinds.
 var validKinds = map[ResourceKind]bool{
-	KindProvider:        true,
-	KindAgent:           true,
-	KindChannelInstance: true,
-	KindCronJob:         true,
-	KindMCPServer:       true,
-	KindSkill:           true,
-	KindCustomTool:      true,
-	KindTeam:            true,
-	KindTTSConfig:       true,
+	KindProvider:  true,
+	KindAgent:     true,
+	KindChannel:   true,
+	KindCronJob:   true,
+	KindMCPServer: true,
+	KindSkill:     true,
+	KindTool:      true,
+	KindTeam:      true,
+	KindTTSConfig: true,
 }
 
 // Validate checks the manifest for structural errors.
@@ -40,13 +40,13 @@ func Validate(m *Manifest) []error {
 			errs = append(errs, fmt.Errorf("%s: unknown kind %q", prefix, r.Kind))
 		}
 
-		if r.Key == "" {
-			errs = append(errs, fmt.Errorf("%s: key is required", prefix))
-		} else if !keyRe.MatchString(r.Key) {
-			errs = append(errs, fmt.Errorf("%s: key %q must be kebab-case (a-z0-9, hyphens)", prefix, r.Key))
+		if r.Name == "" {
+			errs = append(errs, fmt.Errorf("%s: name is required", prefix))
+		} else if !keyRe.MatchString(r.Name) {
+			errs = append(errs, fmt.Errorf("%s: name %q must be kebab-case (a-z0-9, hyphens)", prefix, r.Name))
 		}
 
-		uid := fmt.Sprintf("%s/%s", r.Kind, r.Key)
+		uid := fmt.Sprintf("%s/%s", r.Kind, r.Name)
 		if seen[uid] {
 			errs = append(errs, fmt.Errorf("%s: duplicate resource %s", prefix, uid))
 		}

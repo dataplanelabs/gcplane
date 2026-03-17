@@ -11,7 +11,7 @@ connection:
 resources:
   # --- LLM Provider ---
   - kind: Provider
-    key: anthropic
+    name: anthropic
     spec:
       displayName: "Anthropic"
       providerType: anthropic_native
@@ -21,7 +21,7 @@ resources:
 
   # --- Agent ---
   - kind: Agent
-    key: assistant
+    name: assistant
     spec:
       displayName: "Assistant"
       provider: anthropic

@@ -15,7 +15,7 @@ const (
 // Change describes a single planned resource change.
 type Change struct {
 	Kind   manifest.ResourceKind `json:"kind"`
-	Key    string                `json:"key"`
+	Name   string                `json:"name"`
 	Action Action                `json:"action"`
 	Diff   map[string]FieldDiff  `json:"diff,omitempty"`
 	Error  string                `json:"error,omitempty"`

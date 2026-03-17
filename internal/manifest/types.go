@@ -26,22 +26,22 @@ type Connection struct {
 type ResourceKind string
 
 const (
-	KindProvider        ResourceKind = "Provider"
-	KindAgent           ResourceKind = "Agent"
-	KindChannelInstance ResourceKind = "ChannelInstance"
-	KindCronJob         ResourceKind = "CronJob"
-	KindMCPServer       ResourceKind = "MCPServer"
-	KindSkill           ResourceKind = "Skill"
-	KindCustomTool      ResourceKind = "CustomTool"
-	KindTeam            ResourceKind = "Team"
-	KindTTSConfig       ResourceKind = "TTSConfig"
+	KindProvider  ResourceKind = "Provider"
+	KindAgent     ResourceKind = "Agent"
+	KindChannel   ResourceKind = "Channel"
+	KindCronJob   ResourceKind = "CronJob"
+	KindMCPServer ResourceKind = "MCPServer"
+	KindSkill     ResourceKind = "Skill"
+	KindTool      ResourceKind = "Tool"
+	KindTeam      ResourceKind = "Team"
+	KindTTSConfig ResourceKind = "TTSConfig"
 )
 
-// Resource is a generic managed resource with kind + key + arbitrary spec.
+// Resource is a generic managed resource with kind + name + arbitrary spec.
 type Resource struct {
-	Kind ResourceKind           `yaml:"kind"`
-	Key  string                 `yaml:"key"`
-	Spec map[string]any         `yaml:"spec"`
+	Kind ResourceKind   `yaml:"kind"`
+	Name string         `yaml:"name"`
+	Spec map[string]any `yaml:"spec"`
 }
 
 // ApplyOrder returns the dependency-ordered resource kinds.
@@ -52,8 +52,8 @@ func ApplyOrder() []ResourceKind {
 		KindAgent,           // depends on Provider
 		KindSkill,           // depends on Agent for grants
 		KindMCPServer,       // depends on Agent for grants
-		KindCustomTool,      // depends on Agent
-		KindChannelInstance, // depends on Agent
+		KindTool,    // depends on Agent
+		KindChannel, // depends on Agent
 		KindCronJob,         // depends on Agent
 		KindTeam,            // no strict deps
 		KindTTSConfig,       // global, no deps
