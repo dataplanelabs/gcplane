@@ -170,8 +170,9 @@ func (e *Engine) reconcileOne(res manifest.Resource) Change {
 		return change
 	}
 
-	// Compare desired vs current
-	diffs := CompareSpec(spec, current)
+	// Compare desired vs current, skipping write-only fields
+	exclude := manifest.WriteOnlyFields(res.Kind)
+	diffs := CompareSpecExcluding(spec, current, exclude)
 	if len(diffs) == 0 {
 		change.Action = ActionNoop
 		return change

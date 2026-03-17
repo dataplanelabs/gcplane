@@ -41,13 +41,38 @@ func TestCompareSpec_ChangedField(t *testing.T) {
 	}
 }
 
-func TestCompareSpec_MaskedSecretSkipped(t *testing.T) {
+func TestCompareSpec_APImaskedSecretSkipped(t *testing.T) {
+	// API returns "***" for a field it masks (e.g. apiKey on Provider).
+	// CompareSpec should still skip those to avoid false drift.
 	desired := map[string]any{"apiKey": "sk-real-key", "name": "test"}
 	actual := map[string]any{"apiKey": "***", "name": "test"}
 
 	diffs := CompareSpec(desired, actual)
 	if len(diffs) != 0 {
-		t.Errorf("expected masked field skipped, got diffs: %v", diffs)
+		t.Errorf("expected api-masked field skipped, got diffs: %v", diffs)
+	}
+}
+
+func TestCompareSpecExcluding_SkipsExcludedFields(t *testing.T) {
+	desired := map[string]any{"agentKey": "my-agent", "name": "slack", "channel": "#general"}
+	actual := map[string]any{"name": "slack", "channel": "#general"}
+
+	diffs := CompareSpecExcluding(desired, actual, []string{"agentKey"})
+	if len(diffs) != 0 {
+		t.Errorf("expected excluded field skipped, got diffs: %v", diffs)
+	}
+}
+
+func TestCompareSpecExcluding_DetectsDriftOnNonExcluded(t *testing.T) {
+	desired := map[string]any{"agentKey": "my-agent", "channel": "#new"}
+	actual := map[string]any{"channel": "#old"}
+
+	diffs := CompareSpecExcluding(desired, actual, []string{"agentKey"})
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff, got %d: %v", len(diffs), diffs)
+	}
+	if _, ok := diffs["channel"]; !ok {
+		t.Error("expected diff for 'channel'")
 	}
 }
 

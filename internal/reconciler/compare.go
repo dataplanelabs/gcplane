@@ -6,26 +6,36 @@ import (
 )
 
 // CompareSpec deep-compares desired vs actual spec maps.
-// Returns changed fields only. Skips fields where actual value is "***" (masked secrets).
+// Returns changed fields only.
 func CompareSpec(desired, actual map[string]any) map[string]FieldDiff {
+	return CompareSpecExcluding(desired, actual, nil)
+}
+
+// CompareSpecExcluding deep-compares desired vs actual spec maps,
+// skipping top-level keys listed in exclude (write-only fields not returned by the API).
+func CompareSpecExcluding(desired, actual map[string]any, exclude []string) map[string]FieldDiff {
+	excludeSet := make(map[string]bool, len(exclude))
+	for _, f := range exclude {
+		excludeSet[f] = true
+	}
 	diffs := make(map[string]FieldDiff)
-	compareRecursive("", desired, actual, diffs)
+	compareRecursiveExcluding("", desired, actual, diffs, excludeSet)
 	return diffs
 }
 
-func compareRecursive(prefix string, desired, actual map[string]any, diffs map[string]FieldDiff) {
+func compareRecursiveExcluding(prefix string, desired, actual map[string]any, diffs map[string]FieldDiff, excludeSet map[string]bool) {
 	for key, dVal := range desired {
+		// Skip write-only fields at top level
+		if prefix == "" && excludeSet[key] {
+			continue
+		}
+
 		path := key
 		if prefix != "" {
 			path = prefix + "." + key
 		}
 
 		aVal, exists := actual[key]
-
-		// Skip masked secret fields
-		if s, ok := aVal.(string); ok && s == "***" {
-			continue
-		}
 
 		if !exists {
 			diffs[path] = FieldDiff{Old: nil, New: dVal}
@@ -36,7 +46,12 @@ func compareRecursive(prefix string, desired, actual map[string]any, diffs map[s
 		dMap, dIsMap := toMap(dVal)
 		aMap, aIsMap := toMap(aVal)
 		if dIsMap && aIsMap {
-			compareRecursive(path, dMap, aMap, diffs)
+			compareRecursiveExcluding(path, dMap, aMap, diffs, excludeSet)
+			continue
+		}
+
+		// If the API masks a secret field with "***", skip — we cannot compare
+		if aVal == "***" {
 			continue
 		}
 
