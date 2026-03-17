@@ -12,6 +12,8 @@ type ProviderInterface interface {
 	Observe(kind manifest.ResourceKind, key string) (map[string]any, error)
 	Create(kind manifest.ResourceKind, key string, spec map[string]any) error
 	Update(kind manifest.ResourceKind, key string, spec map[string]any) error
+	Delete(kind manifest.ResourceKind, key string) error
+	ListAll(kind manifest.ResourceKind) ([]ResourceInfo, error)
 }
 
 // Engine is the Observe→Compare→Act reconciliation engine.

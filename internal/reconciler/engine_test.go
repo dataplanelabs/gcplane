@@ -41,6 +41,14 @@ func (m *mockProvider) Update(kind manifest.ResourceKind, key string, spec map[s
 	return nil
 }
 
+func (m *mockProvider) Delete(kind manifest.ResourceKind, key string) error {
+	return nil
+}
+
+func (m *mockProvider) ListAll(kind manifest.ResourceKind) ([]ResourceInfo, error) {
+	return nil, nil
+}
+
 func TestReconcile_CreateNew(t *testing.T) {
 	provider := newMockProvider()
 	engine := NewEngine(provider)

@@ -57,5 +57,8 @@ func Validate(m *Manifest) []error {
 		}
 	}
 
+	// Cross-resource reference validation
+	errs = append(errs, validateReferences(m)...)
+
 	return errs
 }

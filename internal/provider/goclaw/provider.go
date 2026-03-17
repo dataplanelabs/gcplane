@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
+	"github.com/dataplanelabs/gcplane/internal/reconciler"
 )
 
 // Provider communicates with a GoClaw instance to observe and mutate resources.
@@ -119,5 +120,55 @@ func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[strin
 		return p.updateTTSConfig(key, spec)
 	default:
 		return fmt.Errorf("update not implemented for kind %s", kind)
+	}
+}
+
+// Delete removes a resource from GoClaw. Idempotent: no-op if already absent.
+func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
+	switch kind {
+	case manifest.KindProvider:
+		return p.deleteProvider(key)
+	case manifest.KindAgent:
+		return p.deleteAgent(key)
+	case manifest.KindChannel:
+		return p.deleteChannelInstance(key)
+	case manifest.KindMCPServer:
+		return p.deleteMCPServer(key)
+	case manifest.KindTool:
+		return p.deleteCustomTool(key)
+	case manifest.KindCronJob:
+		return p.deleteCronJob(key)
+	case manifest.KindTeam:
+		return p.deleteTeam(key)
+	case manifest.KindSkill, manifest.KindTTSConfig:
+		return nil // not deletable
+	default:
+		return fmt.Errorf("delete not implemented for kind %s", kind)
+	}
+}
+
+// ListAll returns lightweight resource references for every remote resource of a given kind.
+func (p *Provider) ListAll(kind manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
+	switch kind {
+	case manifest.KindProvider:
+		return p.listAllProviders()
+	case manifest.KindAgent:
+		return p.listAllAgents()
+	case manifest.KindChannel:
+		return p.listAllChannels()
+	case manifest.KindMCPServer:
+		return p.listAllMCPServers()
+	case manifest.KindTool:
+		return p.listAllCustomTools()
+	case manifest.KindSkill:
+		return p.listAllSkills()
+	case manifest.KindCronJob:
+		return p.listAllCronJobs()
+	case manifest.KindTeam:
+		return p.listAllTeams()
+	case manifest.KindTTSConfig:
+		return nil, nil // global singleton, not enumerable
+	default:
+		return nil, fmt.Errorf("list not implemented for kind %s", kind)
 	}
 }

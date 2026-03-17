@@ -42,3 +42,10 @@ type ApplyResult struct {
 	Failed  int      `json:"failed"`
 	Errors  []string `json:"errors,omitempty"`
 }
+
+// ResourceInfo is a lightweight resource reference for prune discovery.
+type ResourceInfo struct {
+	Kind      manifest.ResourceKind
+	Name      string
+	CreatedBy string
+}
