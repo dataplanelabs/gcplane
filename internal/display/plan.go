@@ -98,6 +98,50 @@ func PrintApplyResult(result *reconciler.ApplyResult) {
 	}
 }
 
+// PrintDiff renders a full drift report showing all field values for changed resources.
+func PrintDiff(plan *reconciler.Plan) {
+	hasDrift := false
+	for _, c := range plan.Changes {
+		if c.Action != reconciler.ActionNoop || c.Error != "" {
+			hasDrift = true
+			break
+		}
+	}
+
+	if !hasDrift {
+		fmt.Println("No drift detected. All resources in sync.")
+		return
+	}
+
+	fmt.Printf("\n%sDrift Report:%s\n\n", colorBold, colorReset)
+	for _, c := range plan.Changes {
+		switch c.Action {
+		case reconciler.ActionCreate:
+			fmt.Printf("%s+ %s/%s (missing in GoClaw)%s\n", colorGreen, c.Kind, c.Name, colorReset)
+		case reconciler.ActionUpdate:
+			fmt.Printf("%s~ %s/%s (drifted)%s\n", colorYellow, c.Kind, c.Name, colorReset)
+			for _, k := range sortedKeys(c.Diff) {
+				d := c.Diff[k]
+				fmt.Printf("    %s%s:%s %s%v%s → %s%v%s\n",
+					colorDim, k, colorReset,
+					colorRed, formatVal(d.Old), colorReset,
+					colorGreen, formatVal(d.New), colorReset)
+			}
+		case reconciler.ActionNoop:
+			if c.Error != "" {
+				fmt.Printf("%s! %s/%s (%s)%s\n", colorRed, c.Kind, c.Name, c.Error, colorReset)
+			}
+			// Skip in-sync resources in diff output
+		case reconciler.ActionDelete:
+			fmt.Printf("%s- %s/%s (orphaned in GoClaw)%s\n", colorRed, c.Kind, c.Name, colorReset)
+		}
+	}
+
+	fmt.Printf("\n%sSummary:%s %d drifted, %d missing, %d in sync\n",
+		colorBold, colorReset,
+		plan.Updates, plan.Creates, plan.Noops)
+}
+
 func sortedKeys(m map[string]reconciler.FieldDiff) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
