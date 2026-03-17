@@ -24,6 +24,7 @@ var (
 	servePath          string
 	servePrune         bool
 	serveWebhookSecret string
+	serveTenantsDir    string
 )
 
 var serveCmd = &cobra.Command{
@@ -60,6 +61,7 @@ func init() {
 	serveCmd.Flags().StringVar(&servePath, "path", "manifest.yaml", "manifest path in repo")
 	serveCmd.Flags().BoolVar(&servePrune, "prune", false, "delete resources not in manifest")
 	serveCmd.Flags().StringVar(&serveWebhookSecret, "webhook-secret", "", "webhook signature verification secret")
+	serveCmd.Flags().StringVar(&serveTenantsDir, "tenants-dir", "", "directory of tenant subdirs (mutually exclusive with -f/--repo)")
 }
 
 func runServe(_ *cobra.Command, _ []string) error {
@@ -69,6 +71,14 @@ func runServe(_ *cobra.Command, _ []string) error {
 	interval, err := time.ParseDuration(serveInterval)
 	if err != nil {
 		return fmt.Errorf("invalid interval %q: %w", serveInterval, err)
+	}
+
+	// Multi-tenant mode
+	if serveTenantsDir != "" {
+		if configFile != "" || serveRepo != "" {
+			return fmt.Errorf("--tenants-dir is mutually exclusive with -f/--file and --repo")
+		}
+		return runMultiTenantServe(logger, interval)
 	}
 
 	// Determine manifest source
@@ -88,7 +98,7 @@ func runServe(_ *cobra.Command, _ []string) error {
 		src = source.NewFileSource(configFile)
 		logger.Info("using file source", "path", configFile)
 	default:
-		return fmt.Errorf("either --file (-f) or --repo is required")
+		return fmt.Errorf("either --file (-f), --repo, or --tenants-dir is required")
 	}
 
 	// Initial fetch to validate config and resolve connection
@@ -164,6 +174,61 @@ func runServe(_ *cobra.Command, _ []string) error {
 	if gitSrc != nil {
 		gitSrc.Cleanup()
 	}
+
+	logger.Info("gcplane serve stopped")
+	return nil
+}
+
+// runMultiTenantServe handles the --tenants-dir mode.
+func runMultiTenantServe(logger *slog.Logger, interval time.Duration) error {
+	logger.Info("multi-tenant mode", "tenants-dir", serveTenantsDir)
+
+	tm, err := controller.NewTenantManager(controller.TenantManagerConfig{
+		TenantsDir: serveTenantsDir,
+		Interval:   interval,
+		Prune:      servePrune,
+		Logger:     logger,
+	})
+	if err != nil {
+		return fmt.Errorf("init tenant manager: %w", err)
+	}
+	defer tm.CloseAll()
+
+	srv := server.New(server.Config{
+		Addr:          serveAddr,
+		TenantManager: tm,
+		Logger:        logger,
+		WebhookSecret: serveWebhookSecret,
+	})
+
+	done := make(chan struct{})
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go tm.RunAll(done)
+
+	srvErrCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err.Error() != "http: Server closed" {
+			srvErrCh <- err
+		}
+	}()
+
+	logger.Info("gcplane serve started (multi-tenant)", "addr", serveAddr, "interval", interval)
+
+	select {
+	case sig := <-sigCh:
+		logger.Info("received signal, shutting down", "signal", sig)
+	case err := <-srvErrCh:
+		logger.Error("http server failed", "error", err)
+		close(done)
+		return fmt.Errorf("http server: %w", err)
+	}
+	close(done)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(shutdownCtx)
 
 	logger.Info("gcplane serve stopped")
 	return nil

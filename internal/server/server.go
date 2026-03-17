@@ -13,6 +13,7 @@ import (
 type Server struct {
 	tracker       *controller.StatusTracker
 	controller    *controller.Controller
+	tenantManager *controller.TenantManager
 	httpServer    *http.Server
 	logger        *slog.Logger
 	webhookSecret string
@@ -23,6 +24,7 @@ type Config struct {
 	Addr          string
 	Tracker       *controller.StatusTracker
 	Controller    *controller.Controller
+	TenantManager *controller.TenantManager
 	Logger        *slog.Logger
 	WebhookSecret string
 }
@@ -32,6 +34,7 @@ func New(cfg Config) *Server {
 	s := &Server{
 		tracker:       cfg.Tracker,
 		controller:    cfg.Controller,
+		tenantManager: cfg.TenantManager,
 		logger:        cfg.Logger,
 		webhookSecret: cfg.WebhookSecret,
 	}
@@ -41,7 +44,9 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /readyz", s.handleReadyz)
 	mux.HandleFunc("GET /metrics", s.handleMetrics)
 	mux.HandleFunc("GET /api/v1/status", s.handleStatus)
+	mux.HandleFunc("GET /api/v1/status/{tenant}", s.handleTenantStatus)
 	mux.HandleFunc("POST /api/v1/sync", s.handleSync)
+	mux.HandleFunc("POST /api/v1/sync/{tenant}", s.handleTenantSync)
 	mux.HandleFunc("POST /api/v1/webhook/git", s.handleWebhook)
 
 	s.httpServer = &http.Server{Addr: cfg.Addr, Handler: mux}

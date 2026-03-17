@@ -84,13 +84,40 @@ gcplane serve --repo git@github.com:org/goclaw-config.git \
 
 Or deploy as k8s Deployments — one per tenant/environment.
 
-## Future: Multi-Tenant Serve
+## Multi-Tenant Serve
 
-Currently `gcplane serve` watches one manifest path. Future enhancement: directory-aware mode that discovers and reconciles all tenants:
+`gcplane serve --tenants-dir` discovers all subdirectories under the given path and starts an independent reconcile loop per tenant. All loops share one HTTP server.
 
 ```bash
-gcplane serve --repo git@github.com:org/goclaw-config.git \
-  --path tenants/ --mode multi-tenant
+gcplane serve --tenants-dir tenants/ --interval 30s --addr :8480
 ```
 
-This would scan `tenants/*/prod/manifest.yaml`, resolve each tenant's connection, and reconcile independently.
+Each subdirectory must contain at least one YAML file with a `connection` block:
+
+```yaml
+# tenants/acme-corp/connection.yaml
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: acme-corp
+connection:
+  endpoint: https://acme-goclaw.example.com
+  token: ${ACME_GOCLAW_TOKEN}
+resources: []
+```
+
+### API endpoints (multi-tenant mode)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/status` | Aggregated status for all tenants |
+| GET | `/api/v1/status/{tenant}` | Status for a single tenant |
+| POST | `/api/v1/sync` | Trigger sync for all tenants |
+| POST | `/api/v1/sync/{tenant}` | Trigger sync for one tenant |
+| GET | `/metrics` | Aggregated Prometheus metrics |
+
+### Isolation
+
+- Each tenant runs in its own goroutine — one tenant failure does not affect others.
+- Each tenant has its own connection token — no cross-tenant leakage.
+- `--tenants-dir` is mutually exclusive with `-f`/`--file` and `--repo`.

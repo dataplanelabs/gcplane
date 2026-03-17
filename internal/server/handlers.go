@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/dataplanelabs/gcplane/internal/controller"
 )
 
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
@@ -19,7 +21,8 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if s.tracker.IsSynced() {
+	ready := s.isReady()
+	if ready {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `{"status":"ready"}`)
 	} else {
@@ -28,16 +31,72 @@ func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// isReady returns true when all tenants (or single tenant) have synced at least once.
+func (s *Server) isReady() bool {
+	if s.tenantManager != nil {
+		for _, inst := range s.tenantManager.All() {
+			if !inst.Tracker.IsSynced() {
+				return false
+			}
+		}
+		return true
+	}
+	return s.tracker.IsSynced()
+}
+
 func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if s.tenantManager != nil {
+		json.NewEncoder(w).Encode(s.tenantManager.AggregatedStatus())
+		return
+	}
 	json.NewEncoder(w).Encode(s.tracker.Get())
 }
 
+func (s *Server) handleTenantStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.tenantManager == nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"error":"multi-tenant not enabled"}`)
+		return
+	}
+	tenant := r.PathValue("tenant")
+	inst, ok := s.tenantManager.Get(tenant)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"error":"tenant %q not found"}`, tenant)
+		return
+	}
+	json.NewEncoder(w).Encode(inst.Tracker.Get())
+}
+
 func (s *Server) handleSync(w http.ResponseWriter, _ *http.Request) {
-	s.controller.Trigger()
-	s.logger.Info("sync triggered via API")
+	if s.tenantManager != nil {
+		s.tenantManager.TriggerAll()
+		s.logger.Info("sync triggered for all tenants via API")
+	} else {
+		s.controller.Trigger()
+		s.logger.Info("sync triggered via API")
+	}
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprint(w, `{"message":"sync triggered"}`)
+}
+
+func (s *Server) handleTenantSync(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.tenantManager == nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"error":"multi-tenant not enabled"}`)
+		return
+	}
+	tenant := r.PathValue("tenant")
+	if !s.tenantManager.Trigger(tenant) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"error":"tenant %q not found"}`, tenant)
+		return
+	}
+	s.logger.Info("sync triggered for tenant via API", "tenant", tenant)
+	fmt.Fprintf(w, `{"message":"sync triggered","tenant":%q}`, tenant)
 }
 
 func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +115,11 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.controller.Trigger()
+	if s.tenantManager != nil {
+		s.tenantManager.TriggerAll()
+	} else {
+		s.controller.Trigger()
+	}
 	s.logger.Info("sync triggered via webhook")
 	w.WriteHeader(http.StatusOK)
 }
@@ -81,7 +144,12 @@ func (s *Server) verifyWebhookSignature(r *http.Request, body []byte) bool {
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
-	snap := s.controller.GetMetrics().Snapshot()
+	var snap controller.Metrics
+	if s.tenantManager != nil {
+		snap = s.tenantManager.AggregatedMetrics()
+	} else {
+		snap = s.controller.GetMetrics().Snapshot()
+	}
 	m := &snap
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 
