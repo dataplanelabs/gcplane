@@ -32,7 +32,7 @@ connection:
 
 resources:
   - kind: Provider
-    key: anthropic
+    name: anthropic
     spec:
       displayName: "Anthropic"
       baseUrl: https://api.anthropic.com
@@ -41,7 +41,7 @@ resources:
         - claude-sonnet-4-20250514
 
   - kind: Agent
-    key: assistant
+    name: assistant
     spec:
       displayName: "Assistant"
       provider: anthropic
@@ -85,9 +85,9 @@ gcplane apply -f gcplane.yaml --auto-approve
 | `validate` | Validate manifest schema (no GoClaw connection) |
 | `plan` | Show changes required (dry-run) |
 | `apply` | Apply manifest to reach desired state |
+| `serve` | Continuous reconciliation service with file/git sources |
 | `diff` | Quick drift detection (coming soon) |
 | `export` | Export GoClaw state as YAML (coming soon) |
-| `serve` | Continuous reconciliation service (coming soon) |
 | `version` | Print version |
 
 ## Global Flags
@@ -101,21 +101,30 @@ gcplane apply -f gcplane.yaml --auto-approve
 
 **Priority**: CLI flags > environment variables > manifest `connection` block.
 
+## Plan & Apply Flags
+
+| Flag | Description |
+|------|-------------|
+| `--prune` | Delete resources removed from manifest (default: false) |
+| `--auto-approve` | Skip confirmation prompt (apply only) |
+
+**Prune Safety**: Prune is opt-in to prevent accidental deletions. Only deletes gcplane-owned resources.
+
 ## Manifest Reference
 
 ### Supported Resource Kinds
 
 | Kind | Transport | Operations |
 |------|-----------|------------|
-| `Provider` | HTTP | create, update |
-| `Agent` | HTTP | create, update |
-| `ChannelInstance` | HTTP | create, update |
-| `MCPServer` | HTTP | create, update |
-| `Skill` | HTTP | update only |
-| `CustomTool` | HTTP | create, update |
-| `CronJob` | WebSocket | create, update |
-| `Team` | WebSocket | create, update |
-| `TTSConfig` | WebSocket | create, update |
+| `Provider` | HTTP | create, update, delete, list |
+| `Agent` | HTTP | create, update, delete, list |
+| `Channel` | HTTP | create, update, delete, list |
+| `MCPServer` | HTTP | create, update, delete, list |
+| `Skill` | HTTP | update only (auto-discovered) |
+| `Tool` | HTTP | create, update, delete, list |
+| `CronJob` | WebSocket | create, update, delete, list |
+| `Team` | WebSocket | create, update, delete, list |
+| `TTSConfig` | WebSocket | update only (GoClaw-managed) |
 
 ### Secret Resolution
 
@@ -157,9 +166,26 @@ Plan: 1 to create, 1 to update, 0 unchanged.
 - `~` (yellow) — resource will be updated, with field diffs
 - `=` (dim) — no changes (verbose mode only)
 
-## State Tracking
+## Serve Mode
 
-GCPlane stores reconciliation state in `.gcplane/state.db` (SQLite). This tracks:
-- External IDs (GoClaw UUIDs)
-- Spec hashes to detect local manifest changes
-- Sync status and timestamps
+Long-running GitOps controller with periodic reconciliation and health endpoints:
+
+```bash
+# Watch local manifest file
+gcplane serve -f manifest.yaml --interval 30s
+
+# Watch git repository (auto-pull on webhook)
+gcplane serve --repo git@github.com:org/config.git \
+  --branch main --path manifest.yaml --interval 30s
+
+# Enable prune in serve mode
+gcplane serve -f manifest.yaml --prune --interval 30s
+```
+
+Exposes HTTP endpoints on `--addr` (default `:8480`):
+- `GET /healthz` — Liveness probe (always 200)
+- `GET /readyz` — Readiness probe (200 after first sync)
+- `GET /metrics` — Prometheus metrics (sync count, duration, last timestamp)
+- `GET /api/v1/status` — Full sync status + per-resource state
+- `POST /api/v1/sync` — Trigger immediate reconcile
+- `POST /api/v1/webhook/git` — Git push webhook trigger (for CI/CD pipelines)
