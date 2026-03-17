@@ -49,6 +49,7 @@ func init() {
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(applyCmd)
 	rootCmd.AddCommand(diffCmd)
+	rootCmd.AddCommand(destroyCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(exportCmd)
 	rootCmd.AddCommand(serveCmd)
