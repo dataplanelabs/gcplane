@@ -25,11 +25,16 @@ type Model struct {
 }
 
 // NewModel creates a Model from a loaded manifest and refresh interval.
+// If m is nil (attach mode), manifestName and endpoint must be set separately.
 func NewModel(m *manifest.Manifest, ep string, interval time.Duration) *Model {
+	name := ""
+	if m != nil {
+		name = m.Metadata.Name
+	}
 	return &Model{
 		manifest:     m,
 		endpoint:     ep,
-		manifestName: m.Metadata.Name,
+		manifestName: name,
 		interval:     interval,
 	}
 }

@@ -7,7 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var topInterval string
+var (
+	topInterval string
+	topAttach   string
+)
 
 var topCmd = &cobra.Command{
 	Use:   "top",
@@ -17,18 +20,36 @@ var topCmd = &cobra.Command{
 Shows resource status, drift detection, and YAML details in an interactive
 terminal dashboard with vim-style keybindings.
 
+Modes:
+  Direct:  gcplane top -f gcplane.yaml          (reads manifest, talks to GoClaw API)
+  Attach:  gcplane top --attach http://host:8480 (polls a running gcplane serve instance)
+
 Examples:
   gcplane top -f gcplane.yaml
   gcplane top --interval 5s
-  gcplane top -f manifest.yaml --endpoint http://localhost:8080`,
+  gcplane top --attach http://localhost:8480`,
 	RunE: runTop,
 }
 
 func init() {
 	topCmd.Flags().StringVar(&topInterval, "interval", "10s", "refresh interval")
+	topCmd.Flags().StringVar(&topAttach, "attach", "", "URL of running gcplane serve instance (attach mode)")
 }
 
 func runTop(_ *cobra.Command, _ []string) error {
+	// Attach mode — no manifest needed
+	if topAttach != "" {
+		app, err := tui.NewApp(tui.Config{
+			Attach:   topAttach,
+			Interval: topInterval,
+		})
+		if err != nil {
+			return err
+		}
+		return app.Run()
+	}
+
+	// Direct mode — requires manifest
 	m, err := loadAndValidateManifest()
 	if err != nil {
 		return err

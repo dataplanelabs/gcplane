@@ -47,6 +47,10 @@ type App struct {
 	Provider ProviderAPI
 	Engine   *reconciler.Engine
 	Manifest *manifest.Manifest
+
+	// Attach mode — poll a running gcplane serve instance
+	attachClient *AttachClient
+	tenant       string // current tenant in multi-tenant attach mode
 }
 
 // Config holds the parameters for creating a new TUI App.
@@ -56,6 +60,7 @@ type Config struct {
 	Provider ProviderAPI
 	Engine   *reconciler.Engine
 	Interval string // e.g. "10s"
+	Attach   string // optional: URL of running gcplane serve instance
 }
 
 // NewApp creates and wires the TUI application.
@@ -67,14 +72,27 @@ func NewApp(cfg Config) (*App, error) {
 
 	app := &App{
 		tapp:      tview.NewApplication(),
-		model:     NewModel(cfg.Manifest, cfg.Endpoint, interval),
 		Provider:  cfg.Provider,
 		Engine:    cfg.Engine,
 		Manifest:  cfg.Manifest,
 		refreshCh: make(chan struct{}, 1),
 	}
-	app.keys = NewKeyHandler(app)
 
+	// Attach mode — connect to running serve instance
+	if cfg.Attach != "" {
+		client := NewAttachClient(cfg.Attach)
+		if err := client.Healthcheck(); err != nil {
+			return nil, err
+		}
+		app.attachClient = client
+		app.Provider = &stubProvider{baseURL: cfg.Attach}
+		app.model = NewModel(nil, cfg.Attach, interval)
+		app.model.manifestName = "attached: " + cfg.Attach
+	} else {
+		app.model = NewModel(cfg.Manifest, cfg.Endpoint, interval)
+	}
+
+	app.keys = NewKeyHandler(app)
 	app.buildLayout()
 	app.tapp.SetInputCapture(app.keys.Handle)
 
@@ -175,7 +193,63 @@ func (a *App) refresh() {
 	}
 	defer a.refreshMu.Unlock()
 
+	if a.attachClient != nil {
+		a.refreshFromServe()
+	} else {
+		a.refreshDirect()
+	}
+}
+
+// refreshDirect does a direct dry-run reconciliation against the GoClaw API.
+func (a *App) refreshDirect() {
 	plan, _ := a.Engine.Reconcile(a.Manifest, reconciler.ReconcileOpts{DryRun: true})
+	a.model.UpdatePlan(plan)
+
+	a.tapp.QueueUpdateDraw(func() {
+		a.table.Refresh(a.model.GetChanges())
+		a.updateHeader()
+	})
+}
+
+// refreshFromServe polls the gcplane serve HTTP API for status.
+func (a *App) refreshFromServe() {
+	var changes []reconciler.Change
+
+	if a.tenant != "" {
+		// Fetch specific tenant status
+		status, err := a.attachClient.FetchTenantStatus(a.tenant)
+		if err != nil {
+			a.model.SetError(err)
+			return
+		}
+		changes = StatusToChanges(status)
+	} else {
+		// Fetch single-tenant or aggregated status
+		status, err := a.attachClient.FetchStatus()
+		if err != nil {
+			a.model.SetError(err)
+			return
+		}
+		changes = StatusToChanges(status)
+	}
+
+	// Build a synthetic plan from the status
+	plan := &reconciler.Plan{Changes: changes}
+	for _, c := range changes {
+		switch c.Action {
+		case reconciler.ActionNoop:
+			plan.Noops++
+		case reconciler.ActionCreate:
+			plan.Creates++
+		case reconciler.ActionUpdate:
+			plan.Updates++
+		case reconciler.ActionDelete:
+			plan.Deletes++
+		}
+		if c.Error != "" {
+			plan.Errors = append(plan.Errors, c.Error)
+		}
+	}
 	a.model.UpdatePlan(plan)
 
 	a.tapp.QueueUpdateDraw(func() {
@@ -232,8 +306,16 @@ func (a *App) updateHeader() {
 		age = fmt.Sprintf(" | %s ago", formatDuration(time.Since(lastRefresh)))
 	}
 
-	text := fmt.Sprintf(" [bold]gcplane[white] | %s | %s | %s%s%s",
-		name, ep, kindLabel, summary, age)
+	mode := ""
+	if a.attachClient != nil {
+		mode = " | [blue]attach[-]"
+		if a.tenant != "" {
+			mode = " | [blue]tenant:" + a.tenant + "[-]"
+		}
+	}
+
+	text := fmt.Sprintf(" [bold]gcplane[white] | %s | %s | %s%s%s%s",
+		name, ep, kindLabel, mode, summary, age)
 	a.header.SetText(text)
 }
 
@@ -354,6 +436,15 @@ func (a *App) executeCommand(cmd string) {
 	case "delete", "del":
 		a.deleteResource()
 		return
+	case "sync":
+		a.triggerRemoteSync()
+		return
+	}
+
+	// Tenant switching: ":tenant <name>" or ":tenant" to clear
+	if strings.HasPrefix(cmd, "tenant") {
+		a.handleTenantCommand(cmd)
+		return
 	}
 
 	// Kind alias lookup
@@ -369,6 +460,53 @@ func (a *App) executeCommand(cmd string) {
 			return
 		}
 	}
+}
+
+// handleTenantCommand processes ":tenant <name>" or ":tenant" to clear.
+func (a *App) handleTenantCommand(cmd string) {
+	if a.attachClient == nil {
+		a.showStatus("[yellow]Tenant switching only available in attach mode (--attach)[-]")
+		return
+	}
+	parts := strings.Fields(cmd)
+	if len(parts) == 1 {
+		// Clear tenant filter
+		a.tenant = ""
+		a.model.manifestName = "attached: " + a.attachClient.baseURL
+		a.showStatus("[green]Showing all tenants[-]")
+	} else {
+		a.tenant = parts[1]
+		a.model.manifestName = "tenant: " + a.tenant
+		a.showStatus(fmt.Sprintf("[green]Switched to tenant: %s[-]", a.tenant))
+	}
+	a.triggerRefresh()
+}
+
+// triggerRemoteSync triggers a sync on the remote serve instance.
+func (a *App) triggerRemoteSync() {
+	if a.attachClient == nil {
+		// In direct mode, just apply
+		a.applyAll()
+		return
+	}
+	go func() {
+		var err error
+		if a.tenant != "" {
+			err = a.attachClient.TriggerTenantSync(a.tenant)
+		} else {
+			err = a.attachClient.TriggerSync()
+		}
+		a.tapp.QueueUpdateDraw(func() {
+			if err != nil {
+				a.showStatus(fmt.Sprintf("[red]Sync trigger failed: %s[-]", err))
+			} else {
+				a.showStatus("[green]Sync triggered[-]")
+			}
+		})
+		// Refresh after a brief delay to let the sync complete
+		time.Sleep(2 * time.Second)
+		a.refresh()
+	}()
 }
 
 // activateSearch switches to search mode with / prefix.
@@ -447,6 +585,9 @@ func helpText() string {
    e           Edit selected resource ($EDITOR)
    :apply      Apply all changes
    :delete     Delete selected resource
+   :sync       Trigger sync (attach mode)
+   :tenant X   Switch to tenant X (attach mode)
+   :tenant     Clear tenant filter
 
  [yellow]Other[white]
    ?           Toggle this help
