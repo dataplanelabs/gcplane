@@ -30,9 +30,20 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 }
 
 // createChannelInstance creates a new channel instance in GoClaw.
+// Resolves agentKey → agent_id UUID before sending.
 func (p *Provider) createChannelInstance(key string, spec map[string]any) error {
 	body := translateSpec(spec)
 	body["name"] = key
+
+	// Resolve agent_key → agent_id (GoClaw expects UUID)
+	if agentKey, ok := body["agent_key"].(string); ok {
+		agentID, err := p.resolveAgentID(agentKey)
+		if err != nil {
+			return fmt.Errorf("channel %s: %w", key, err)
+		}
+		body["agent_id"] = agentID
+		delete(body, "agent_key")
+	}
 
 	_, err := p.http.Post(context.Background(), "/v1/channels/instances", body)
 	if err != nil {
