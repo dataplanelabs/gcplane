@@ -61,6 +61,7 @@ gcplane/
 │   ├── validate.go                  # Schema validation
 │   ├── diff.go                      # Drift detection (stub)
 │   ├── export.go                    # State export (stub)
+│   ├── top.go                       # Interactive TUI for monitoring
 │   └── serve.go                     # Continuous reconciliation (file/git sources)
 ├── internal/
 │   ├── manifest/                    # YAML manifest handling
@@ -102,6 +103,14 @@ gcplane/
 │   │   └── resolver.go              # ${ENV}, file://, SOPS support
 │   ├── display/                     # Terminal output formatting
 │   │   └── plan.go                  # Terraform-style colored diff + prune warnings
+│   └── tui/                         # Interactive terminal UI (k9s-style)
+│       ├── app.go                   # Main app, layout, refresh loop
+│       ├── model.go                 # Thread-safe shared state
+│       ├── keybindings.go           # Vim-style mode dispatch
+│       └── views/
+│           ├── resource_table.go    # Resource list with status coloring
+│           ├── resource_detail.go   # YAML view with syntax highlighting
+│           └── drift_view.go        # Field-level drift diff
 └── examples/
     ├── minimal.yaml                 # Minimal manifest example (camelCase)
     ├── production.yaml              # Production manifest example (camelCase)
@@ -171,3 +180,18 @@ Manifest values support `${ENV_VAR}` substitution and `file://path` references. 
    e. Export Prometheus metrics
 4. Expose status endpoints (/healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git)
 5. Graceful shutdown on SIGINT/SIGTERM
+
+### Top (interactive dashboard)
+1. Load + validate manifest
+2. Resolve connection config (flags > env > manifest)
+3. Create tview app with shared state model (thread-safe)
+4. Start refresh goroutine on `--interval` (default 10s):
+   a. List all resources from GoClaw
+   b. Compute status (InSync, Drifted, Missing, Error, Extra)
+   c. Update shared model (atomic write)
+5. Render resource table with status coloring
+6. Handle vim-style keybindings:
+   - j/k: navigate, g/G: jump, Enter: show YAML, d: show drift, /: search, :: commands
+   - 0-9: filter by kind, r: refresh, ?: help, q: quit
+7. Detail views: YAML syntax highlighting, field-level diff on drift
+8. Graceful shutdown on Ctrl+C (close WS connection, cleanup tview)

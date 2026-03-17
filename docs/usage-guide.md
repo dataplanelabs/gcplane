@@ -89,6 +89,7 @@ gcplane apply -f gcplane.yaml --auto-approve
 | `status` | Quick resource count and sync state summary |
 | `destroy` | Remove all gcplane-managed resources from GoClaw |
 | `serve` | Continuous reconciliation service with file/git sources |
+| `top` | Interactive TUI for monitoring GoClaw resources (k9s-style dashboard) |
 | `diff` | Quick drift detection (coming soon) |
 | `export` | Export GoClaw state as YAML (coming soon) |
 | `version` | Print version |
@@ -208,6 +209,57 @@ Exposes HTTP endpoints on `--addr` (default `:8480`):
 - `GET /api/v1/status` — Full sync status + per-resource state
 - `POST /api/v1/sync` — Trigger immediate reconcile
 - `POST /api/v1/webhook/git` — Git push webhook trigger (for CI/CD pipelines)
+
+## Top (Interactive Dashboard)
+
+k9s-style terminal UI for real-time monitoring of GoClaw resources:
+
+```bash
+# Monitor with default 10s refresh
+gcplane top -f gcplane.yaml
+
+# Custom refresh interval
+gcplane top -f manifest.yaml --interval 5s
+
+# Specify endpoint (overrides manifest)
+gcplane top -f manifest.yaml --endpoint http://localhost:8080
+```
+
+### Features
+
+- **Resource Browser**: Browse all 9 resource kinds (Provider, Agent, Channel, MCPServer, Skill, Tool, CronJob, AgentTeam, TTSConfig)
+- **Status Coloring**: InSync (green), Drifted (yellow), Missing/Error (red), Extra (blue)
+- **YAML View**: Press Enter to view full resource YAML with syntax highlighting
+- **Drift Details**: Press `d` to see field-level drift comparison
+- **Vim Keybindings**: j/k navigate, g/G jump to start/end, q quit, ? help, : commands, / search
+- **Kind Filtering**: Number keys 0-9 or type `:agent`, `:provider`, `:mcp`, `:cron`, `:team`, `:tts`, `:all`
+- **Auto-Refresh**: Configurable interval (default 10s), press `r` for manual refresh
+- **Search**: Press `/` to filter by resource name (case-insensitive)
+
+### Keybindings
+
+| Key | Action |
+|-----|--------|
+| `j`/`k` | Navigate up/down |
+| `g` | Jump to start |
+| `G` | Jump to end |
+| `Enter` | View resource YAML details |
+| `d` | Show drift diff |
+| `r` | Refresh resources |
+| `0-9` | Filter by kind (0=all, 1=provider, 2=agent, etc.) |
+| `:` | Command mode |
+| `/` | Search by name |
+| `?` | Show help |
+| `q` | Quit |
+
+### Top Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-f, --file` | — | Manifest file or directory |
+| `--interval` | `10s` | Refresh interval |
+| `--endpoint` | — | GoClaw endpoint URL (overrides manifest) |
+| `--token` | — | GoClaw auth token (overrides manifest/env) |
 
 ## Deployment
 

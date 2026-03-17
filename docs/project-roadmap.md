@@ -58,13 +58,25 @@
 - Version update notifications: auto-check for new releases
 - Install script for easy setup
 
-## Next: v0.7.0 — Advanced Features
+### v0.7.0 (2026-03-18) — Interactive Monitoring
+- `gcplane top` command: k9s-style TUI for resource monitoring
+- tview integration for interactive terminal dashboard
+- Resource browser for all 9 kinds with status coloring
+- YAML detail view with syntax highlighting
+- Drift diff view with field-level red/green highlighting
+- Vim keybindings (j/k navigate, g/G jump, d for drift, / search, ? help)
+- Kind filtering (number keys or :command mode)
+- Configurable auto-refresh with manual refresh option
+- Context-based clean shutdown
+
+## Next: v0.8.0 — Advanced Features
 
 ### P1: Config File Support
 - Support `GCPLANE_CONFIG` env var for custom config paths
 - Config file validation and schema documentation
 
-### P2: Advanced Audit
+### P2: Advanced Audit & Export
 - Export audit trail as JSON/CSV
 - Integration with external logging systems
 - Audit event filtering and search
+- Enhanced `gcplane export` with filtering options

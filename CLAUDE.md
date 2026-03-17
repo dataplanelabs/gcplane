@@ -14,7 +14,7 @@ Declarative GitOps control plane for GoClaw. Manages AI agents, providers, chann
 
 ## Architecture
 ```
-cmd/              — CLI commands (validate, plan, apply, diff, export, serve, destroy, init, status)
+cmd/              — CLI commands (validate, plan, apply, diff, export, serve, destroy, init, status, top)
 internal/
   manifest/       — YAML loader, validator, composites, labels, field config
   reconciler/     — Observe→Compare→Act engine with ReconcileOpts (DryRun, Prune)
@@ -25,6 +25,7 @@ internal/
   source/         — Manifest sources (file with SHA256, git with clone/fetch)
   display/        — Colored terminal output (plan, diff, prune warning)
   secrets/        — ${ENV_VAR} and file:// resolution
+  tui/            — Interactive terminal UI (k9s-style resource browser with vim keybindings)
 ```
 
 ## Key Patterns
