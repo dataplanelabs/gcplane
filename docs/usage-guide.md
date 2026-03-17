@@ -123,7 +123,7 @@ gcplane apply -f gcplane.yaml --auto-approve
 | `Skill` | HTTP | update only (auto-discovered) |
 | `Tool` | HTTP | create, update, delete, list |
 | `CronJob` | WebSocket | create, update, delete, list |
-| `Team` | WebSocket | create, update, delete, list |
+| `AgentTeam` | WebSocket | create, update, delete, list |
 | `TTSConfig` | WebSocket | update only (GoClaw-managed) |
 
 ### Secret Resolution

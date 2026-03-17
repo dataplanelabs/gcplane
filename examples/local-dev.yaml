@@ -48,7 +48,7 @@ resources:
       enabled: true
 
   # ============================================================
-  # Agents
+  # Agents — Data Team
   # ============================================================
   - kind: Agent
     name: assistant
@@ -63,15 +63,109 @@ resources:
         profile: coding
 
   - kind: Agent
-    name: researcher
+    name: data-engineer
     spec:
-      displayName: "Researcher"
+      displayName: "Data Engineer"
+      provider: zai-coding
+      model: glm-5
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: coding
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a data engineer. You build data pipelines,
+            ETL processes, and manage data infrastructure.
+            Focus on reliability, scalability, and data quality.
+
+  - kind: Agent
+    name: data-analyst
+    spec:
+      displayName: "Data Analyst"
       provider: openrouter
       model: google/gemini-2.5-flash-preview
-      agentType: open
+      agentType: predefined
       status: active
       toolsConfig:
         profile: minimal
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a data analyst. You analyze datasets,
+            create visualizations, and produce insights.
+            Use SQL, Python, and statistical methods.
+
+  - kind: Agent
+    name: report-builder
+    spec:
+      displayName: "Report Builder"
+      provider: zai-coding
+      model: glm-5
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: minimal
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a report builder. You create executive summaries,
+            dashboards, and data reports. Make data actionable
+            and easy to understand for stakeholders.
+
+  # ============================================================
+  # Agents — Product Team
+  # ============================================================
+  - kind: Agent
+    name: market-researcher
+    spec:
+      displayName: "Market Researcher"
+      provider: openrouter
+      model: google/gemini-2.5-flash-preview
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: minimal
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a market researcher. You analyze competitors,
+            identify trends, and evaluate market opportunities.
+            Provide data-driven recommendations.
+
+  - kind: Agent
+    name: product-planner
+    spec:
+      displayName: "Product Planner"
+      provider: zai-coding
+      model: glm-5
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: minimal
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a product planner. You write PRDs,
+            prioritize features, and create roadmaps.
+            Balance user needs with technical feasibility.
+
+  - kind: Agent
+    name: dev-lead
+    spec:
+      displayName: "Dev Lead"
+      provider: zai-coding
+      model: glm-5
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: coding
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a dev lead. You review architecture decisions,
+            mentor engineers, and coordinate implementation.
+            Focus on code quality and team velocity.
 
   # ============================================================
   # Channels
@@ -93,37 +187,37 @@ resources:
         appToken: ${GOCLAW_SLACK_APP_TOKEN}
 
   # ============================================================
-  # MCP Servers (from infra/prod deployment)
+  # MCP Servers
   # ============================================================
   - kind: MCPServer
     name: huly-mcp
     spec:
       displayName: "Huly Project Management"
       transport: sse
-      url: https://mcp.dataplanelabs.com/huly/sse
+      url: https://mcp.dataplanelabs.com/huly/mcp
       enabled: true
       grants:
-        agents: [assistant, researcher]
+        agents: [assistant, product-planner, dev-lead]
 
   - kind: MCPServer
     name: k8s-mcp
     spec:
       displayName: "Kubernetes Monitoring"
       transport: sse
-      url: https://mcp.dataplanelabs.com/k8s/sse
+      url: https://mcp.dataplanelabs.com/k8s/mcp
       enabled: true
       grants:
-        agents: [assistant]
+        agents: [assistant, data-engineer]
 
   - kind: MCPServer
     name: gws-mcp
     spec:
       displayName: "Google Workspace"
       transport: sse
-      url: https://mcp.dataplanelabs.com/gws/sse
+      url: https://mcp.dataplanelabs.com/gws/mcp
       enabled: true
       grants:
-        agents: [assistant]
+        agents: [assistant, report-builder, product-planner]
 
   # ============================================================
   # Cron Jobs
@@ -139,20 +233,30 @@ resources:
       agentKey: assistant
       enabled: true
 
+  - kind: CronJob
+    name: weekly-data-report
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 10 * * 1"
+        tz: Asia/Saigon
+      message: "Generate weekly data quality and pipeline health report"
+      agentKey: report-builder
+      enabled: true
+
   # ============================================================
   # Teams
   # ============================================================
-  - kind: Team
-    name: dev-team
+  - kind: AgentTeam
+    name: data-team
     spec:
-      displayName: "Dev Team"
-      lead: assistant
-      members: [researcher]
+      displayName: "Data Team"
+      lead: data-engineer
+      members: [data-analyst, report-builder]
 
-  # TTS Config — skipped (tts.get WS method not available in all versions)
-  # - kind: TTSConfig
-  #   name: global
-  #   spec:
-  #     mode: "off"
-  #     provider: edge
-  #     voice: en-US-AriaNeural
+  - kind: AgentTeam
+    name: product-team
+    spec:
+      displayName: "Product Team"
+      lead: product-planner
+      members: [market-researcher, dev-lead]

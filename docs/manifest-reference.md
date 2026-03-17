@@ -30,7 +30,7 @@ resources:
 | `Skill` | HTTP | No | Agent skill (update only, auto-discovered, GoClaw-managed) |
 | `Tool` | HTTP | Yes | Custom tool definition |
 | `CronJob` | WebSocket | Yes | Scheduled task |
-| `Team` | WebSocket | Yes | Agent team |
+| `AgentTeam` | WebSocket | Yes | Agent team |
 | `TTSConfig` | WebSocket | No | Text-to-speech settings (GoClaw-managed) |
 
 Resources are applied in dependency order: Provider → Agent → Skill → MCPServer → Tool → Channel → CronJob → Team → TTSConfig. Prune deletes in reverse order.

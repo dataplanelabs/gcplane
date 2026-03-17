@@ -131,7 +131,7 @@ resources:
   # ============================================================
   # Teams
   # ============================================================
-  - kind: Team
+  - kind: AgentTeam
     name: platform-team
     spec:
       displayName: "Platform Team"

@@ -97,7 +97,7 @@ func TestValidateReferences_ValidRefs(t *testing.T) {
 			{Kind: KindMCPServer, Name: "mcp", Spec: map[string]any{
 				"grants": map[string]any{"agents": []any{"bot"}},
 			}},
-			{Kind: KindTeam, Name: "team", Spec: map[string]any{
+			{Kind: KindAgentTeam, Name: "team", Spec: map[string]any{
 				"lead":    "bot",
 				"members": []any{"bot"},
 			}},
@@ -199,7 +199,7 @@ func TestValidateReferences_BrokenTeamLead(t *testing.T) {
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
 		Resources: []Resource{
-			{Kind: KindTeam, Name: "team", Spec: map[string]any{"lead": "ghost"}},
+			{Kind: KindAgentTeam, Name: "team", Spec: map[string]any{"lead": "ghost"}},
 		},
 	}
 	errs := Validate(m)

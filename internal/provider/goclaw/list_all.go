@@ -191,7 +191,7 @@ func (p *Provider) listAllTeams() ([]reconciler.ResourceInfo, error) {
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Teams))
 	for _, team := range resp.Teams {
 		infos = append(infos, reconciler.ResourceInfo{
-			Kind:      manifest.KindTeam,
+			Kind:      manifest.KindAgentTeam,
 			Name:      strVal(team, "name"),
 			CreatedBy: strVal(team, "created_by"),
 		})

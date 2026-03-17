@@ -33,7 +33,7 @@ const (
 	KindMCPServer ResourceKind = "MCPServer"
 	KindSkill     ResourceKind = "Skill"
 	KindTool      ResourceKind = "Tool"
-	KindTeam      ResourceKind = "Team"
+	KindAgentTeam      ResourceKind = "AgentTeam"
 	KindTTSConfig ResourceKind = "TTSConfig"
 )
 
@@ -55,7 +55,7 @@ func ApplyOrder() []ResourceKind {
 		KindTool,    // depends on Agent
 		KindChannel, // depends on Agent
 		KindCronJob,         // depends on Agent
-		KindTeam,            // no strict deps
+		KindAgentTeam,            // no strict deps
 		KindTTSConfig,       // global, no deps
 	}
 }

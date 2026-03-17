@@ -16,7 +16,7 @@ var validKinds = map[ResourceKind]bool{
 	KindMCPServer: true,
 	KindSkill:     true,
 	KindTool:      true,
-	KindTeam:      true,
+	KindAgentTeam:      true,
 	KindTTSConfig: true,
 }
 

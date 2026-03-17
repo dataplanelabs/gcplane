@@ -26,7 +26,7 @@ func (p *Provider) observeTeam(key string) (map[string]any, error) {
 
 	for _, team := range resp.Teams {
 		if strVal(team, "name") == key {
-			// members/lead/displayName are write-only; excluded via WriteOnlyFields(KindTeam).
+			// members/lead/displayName are write-only; excluded via WriteOnlyFields(KindAgentTeam).
 			return translateResult(stripInternal(team)), nil
 		}
 	}

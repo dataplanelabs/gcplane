@@ -5,11 +5,11 @@ package manifest
 // These fields are excluded from comparison during reconciliation.
 var writeOnlyFields = map[ResourceKind][]string{
 	KindProvider:  {},
-	KindAgent:     {},
+	KindAgent:     {"contextFiles"},
 	KindChannel:   {"agentKey", "botToken", "config"},
 	KindMCPServer: {"grants"},
 	KindCronJob:   {"agentKey", "message"},
-	KindTeam:      {"lead", "members", "displayName"},
+	KindAgentTeam:      {"lead", "members", "displayName"},
 	KindTool:      {},
 	KindSkill:     {},
 	KindTTSConfig: {},

@@ -48,7 +48,7 @@ func validateReferences(m *Manifest) []error {
 					}
 				}
 			}
-		case KindTeam:
+		case KindAgentTeam:
 			// spec.lead must reference an Agent
 			if ref := specStr(r.Spec, "lead"); ref != "" {
 				if !index[KindAgent][ref] {

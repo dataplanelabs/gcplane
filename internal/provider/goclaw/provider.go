@@ -64,7 +64,7 @@ func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]a
 		return p.observeCustomTool(key)
 	case manifest.KindCronJob:
 		return p.observeCronJob(key)
-	case manifest.KindTeam:
+	case manifest.KindAgentTeam:
 		return p.observeTeam(key)
 	case manifest.KindTTSConfig:
 		return p.observeTTSConfig(key)
@@ -88,7 +88,7 @@ func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[strin
 		return p.createCustomTool(key, spec)
 	case manifest.KindCronJob:
 		return p.createCronJob(key, spec)
-	case manifest.KindTeam:
+	case manifest.KindAgentTeam:
 		return p.createTeam(key, spec)
 	case manifest.KindTTSConfig:
 		return p.createTTSConfig(key, spec)
@@ -114,7 +114,7 @@ func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[strin
 		return p.updateCustomTool(key, spec)
 	case manifest.KindCronJob:
 		return p.updateCronJob(key, spec)
-	case manifest.KindTeam:
+	case manifest.KindAgentTeam:
 		return p.updateTeam(key, spec)
 	case manifest.KindTTSConfig:
 		return p.updateTTSConfig(key, spec)
@@ -138,7 +138,7 @@ func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
 		return p.deleteCustomTool(key)
 	case manifest.KindCronJob:
 		return p.deleteCronJob(key)
-	case manifest.KindTeam:
+	case manifest.KindAgentTeam:
 		return p.deleteTeam(key)
 	case manifest.KindSkill, manifest.KindTTSConfig:
 		return nil // not deletable
@@ -164,7 +164,7 @@ func (p *Provider) ListAll(kind manifest.ResourceKind) ([]reconciler.ResourceInf
 		return p.listAllSkills()
 	case manifest.KindCronJob:
 		return p.listAllCronJobs()
-	case manifest.KindTeam:
+	case manifest.KindAgentTeam:
 		return p.listAllTeams()
 	case manifest.KindTTSConfig:
 		return nil, nil // global singleton, not enumerable
