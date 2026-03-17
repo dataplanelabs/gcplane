@@ -86,14 +86,80 @@ Priority: CLI flags > env vars > manifest.
 | Env var | `GCPLANE_ENDPOINT` | `GCPLANE_TOKEN` |
 | Manifest | `connection.endpoint` | `connection.token` |
 
+## Config Auto-Discovery
+
+When `-f` / `--file` is not provided and `GCPLANE_CONFIG` env is unset, gcplane searches the working directory for a manifest in this order:
+
+1. `gcplane.yaml`
+2. `gcplane.yml`
+3. `.gcplane.yaml`
+
+This means you can simply run `gcplane plan` in a directory that contains a `gcplane.yaml` without specifying the path explicitly.
+
 ## Commands
 
 ```bash
+gcplane init                         # generate starter manifest interactively
 gcplane validate -f manifest.yaml    # check syntax (offline)
 gcplane plan -f manifest.yaml        # dry-run diff
 gcplane apply -f manifest.yaml       # apply changes
+gcplane status -f manifest.yaml      # quick resource count + sync state
+gcplane destroy                      # remove all gcplane-managed resources
 gcplane serve -f manifest.yaml       # continuous reconciliation
 ```
+
+### init
+
+Interactive wizard that scaffolds a `gcplane.yaml` with basic Provider + Agent and creates `.env.example`.
+
+```bash
+gcplane init
+```
+
+Prompts for deployment name and GoClaw endpoint. Will not overwrite an existing `gcplane.yaml`.
+
+### status
+
+Quick one-shot health check. Shows resource counts and sync state without detailed diffs.
+
+```bash
+gcplane status                    # auto-discovers manifest
+gcplane status -f manifest.yaml   # explicit path
+```
+
+Output:
+
+```
+GCPlane Status — my-deployment
+
+  Resources:  3 total
+  In Sync:    2
+  Drifted:    1
+
+  Provider     1
+  Agent        2
+
+  Run gcplane plan for details.
+```
+
+### destroy
+
+Removes all resources from GoClaw that were created by gcplane (`created_by=gcplane`). Deletes in reverse dependency order. Resources created via the UI or other tools are not affected.
+
+```bash
+gcplane destroy --endpoint http://localhost:18790 --token $GOCLAW_TOKEN
+gcplane destroy -f manifest.yaml              # use manifest for connection
+gcplane destroy -f manifest.yaml --dry-run    # preview without deleting
+gcplane destroy -f manifest.yaml --auto-approve
+gcplane destroy -f manifest.yaml --backup state.yaml --log-file audit.jsonl
+```
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview resources that would be deleted, then exit |
+| `--auto-approve` | Skip interactive confirmation prompt |
+| `--backup <file>` | Export current state to YAML before destroying |
+| `--log-file <file>` | Append JSON audit entry to file after destroy |
 
 ## Prune (Delete Orphaned Resources)
 

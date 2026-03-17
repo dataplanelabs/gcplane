@@ -82,9 +82,12 @@ gcplane apply -f gcplane.yaml --auto-approve
 
 | Command | Description |
 |---------|-------------|
+| `init` | Generate a starter manifest interactively |
 | `validate` | Validate manifest schema (no GoClaw connection) |
 | `plan` | Show changes required (dry-run) |
 | `apply` | Apply manifest to reach desired state |
+| `status` | Quick resource count and sync state summary |
+| `destroy` | Remove all gcplane-managed resources from GoClaw |
 | `serve` | Continuous reconciliation service with file/git sources |
 | `diff` | Quick drift detection (coming soon) |
 | `export` | Export GoClaw state as YAML (coming soon) |

@@ -54,6 +54,7 @@ func init() {
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(exportCmd)
 	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
