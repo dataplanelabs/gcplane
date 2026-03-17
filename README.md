@@ -186,6 +186,16 @@ make test-e2e           # full e2e (reset + plan + apply + serve)
 make serve
 ```
 
+## Compatibility
+
+| GCPlane | GoClaw | Tested |
+|---------|--------|--------|
+| v0.6.x | 0.4.4+ | CI E2E |
+| v0.5.x | 0.4.x | Manual |
+| v0.1.x–v0.4.x | 0.4.x | Manual |
+
+GCPlane is tested against [GoClaw](https://github.com/nextlevelbuilder/goclaw) `0.4.4` in CI. The E2E workflow spins up GoClaw via `ghcr.io/nextlevelbuilder/goclaw:0.4.4` with PostgreSQL and runs validate, plan, apply, diff, export, and destroy commands.
+
 ## License
 
 MIT

@@ -5,6 +5,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  GOCLAW_VERSION: "0.4.4"
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -32,7 +35,7 @@ jobs:
       - name: Build gcplane
         run: go build -o gcplane .
 
-      - name: Start GoClaw
+      - name: Start GoClaw ${{ env.GOCLAW_VERSION }}
         run: |
           docker run -d --name goclaw \
             --network host \
@@ -41,12 +44,11 @@ jobs:
             -e GOCLAW_GATEWAY_TOKEN=test-token-ci \
             -e GOCLAW_ENCRYPTION_KEY=$(openssl rand -hex 32) \
             -e GOCLAW_POSTGRES_DSN=postgres://goclaw:goclaw@localhost:5432/goclaw?sslmode=disable \
-            ghcr.io/nextlevelbuilder/goclaw:latest
+            ghcr.io/nextlevelbuilder/goclaw:${{ env.GOCLAW_VERSION }}
 
-          # Wait for health
           for i in $(seq 1 30); do
             if curl -sf http://localhost:18790/health > /dev/null 2>&1; then
-              echo "GoClaw ready"
+              echo "GoClaw ${{ env.GOCLAW_VERSION }} ready"
               break
             fi
             sleep 2
@@ -56,9 +58,21 @@ jobs:
         run: ./gcplane validate -f examples/minimal.yaml
 
       - name: Test plan
-        env:
-          GOCLAW_TOKEN: test-token-ci
         run: ./gcplane plan -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci
+
+      - name: Test apply + idempotency
+        run: |
+          ./gcplane apply -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci --auto-approve
+          ./gcplane plan -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci | grep -q "0 to create, 0 to update"
+
+      - name: Test diff
+        run: ./gcplane diff -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci
+
+      - name: Test export
+        run: ./gcplane export --endpoint http://localhost:18790 --token test-token-ci
+
+      - name: Test destroy --dry-run
+        run: ./gcplane destroy --endpoint http://localhost:18790 --token test-token-ci --dry-run
 
       - name: Cleanup
         if: always()
