@@ -170,10 +170,11 @@ func (tm *TenantManager) AggregatedStatus() map[string]SyncStatus {
 }
 
 // AggregatedMetrics sums metrics across all tenant controllers.
-func (tm *TenantManager) AggregatedMetrics() Metrics {
+// Returns a pointer to avoid copying the embedded RWMutex.
+func (tm *TenantManager) AggregatedMetrics() *Metrics {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-	var agg Metrics
+	agg := &Metrics{}
 	for _, inst := range tm.tenants {
 		snap := inst.Controller.GetMetrics().Snapshot()
 		agg.SyncSuccess += snap.SyncSuccess

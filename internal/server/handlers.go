@@ -144,13 +144,13 @@ func (s *Server) verifyWebhookSignature(r *http.Request, body []byte) bool {
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
-	var snap controller.Metrics
+	var m *controller.Metrics
 	if s.tenantManager != nil {
-		snap = s.tenantManager.AggregatedMetrics()
+		m = s.tenantManager.AggregatedMetrics()
 	} else {
-		snap = s.controller.GetMetrics().Snapshot()
+		snap := s.controller.GetMetrics().Snapshot()
+		m = &snap
 	}
-	m := &snap
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 
 	fmt.Fprintf(w, "# HELP gcplane_sync_total Total number of sync operations\n")
