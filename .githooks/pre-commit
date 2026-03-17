@@ -1,0 +1,32 @@
+#!/bin/bash
+# Pre-commit hook to detect secrets using gitleaks
+
+if ! command -v gitleaks &> /dev/null; then
+    echo "WARNING: gitleaks not installed. Install with: brew install gitleaks"
+    exit 0
+fi
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" EXIT
+
+for FILE in $STAGED_FILES; do
+    mkdir -p "$TMPDIR/$(dirname "$FILE")"
+    git show ":$FILE" > "$TMPDIR/$FILE" 2>/dev/null || continue
+done
+
+gitleaks detect --source "$TMPDIR" --no-git --verbose
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "Secret detected! Commit blocked."
+    echo "   Review the findings above and remove secrets before committing."
+    echo "   To bypass (use with caution): git commit --no-verify"
+    exit 1
+fi
+
+echo "No secrets detected"

@@ -1,117 +1,111 @@
 # GCPlane
 
-GitOps-style control plane for managing [GoClaw](https://github.com/dataplanelabs/goclaw) deployments.
+[![CI](https://github.com/dataplanelabs/gcplane/actions/workflows/ci.yml/badge.svg)](https://github.com/dataplanelabs/gcplane/actions/workflows/ci.yml)
+[![Release](https://github.com/dataplanelabs/gcplane/actions/workflows/release.yml/badge.svg)](https://github.com/dataplanelabs/gcplane/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dataplanelabs/gcplane)](https://goreportcard.com/report/github.com/dataplanelabs/gcplane)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-GCPlane reads declarative YAML manifests describing your desired GoClaw configuration (agents, providers, channels, cron jobs, MCP servers, etc.) and reconciles them against the actual state via GoClaw's API.
+Declarative GitOps control plane for [GoClaw](https://github.com/dataplanelabs/goclaw) deployments.
 
-## Install
+GCPlane manages GoClaw resources (agents, providers, channels, MCP servers, cron jobs, teams) through YAML manifests — like Terraform for your AI gateway.
 
-```bash
-go install github.com/dataplanelabs/gcplane@latest
-```
+## Features
+
+- **Declarative manifests** — k8s-style YAML with camelCase keys
+- **Plan → Apply** — preview changes before applying (like `terraform plan`)
+- **Serve mode** — continuous reconciliation with health/metrics endpoints
+- **Git source** — watch a git repo for manifest changes (GitOps)
+- **Prune** — safely delete resources removed from manifest (`--prune`)
+- **Reference validation** — catch broken cross-resource references before apply
+- **Multi-provider** — pluggable provider architecture (GoClaw, OpenClaw, ZeroClaw)
+- **Multi-platform** — Linux, macOS, Windows (amd64/arm64)
 
 ## Quick Start
 
-```yaml
-# gcplane.yaml
+```bash
+# Install
+go install github.com/dataplanelabs/gcplane@latest
+
+# Create manifest
+cat > manifest.yaml << 'EOF'
 apiVersion: gcplane.io/v1
 kind: Manifest
-
 metadata:
-  name: my-deployment
-
+  name: my-setup
 connection:
   endpoint: http://localhost:18790
   token: ${GOCLAW_TOKEN}
-
 resources:
   - kind: Provider
-    key: anthropic
+    name: anthropic
     spec:
       displayName: "Anthropic"
-      baseUrl: https://api.anthropic.com
+      providerType: anthropic_native
+      apiBase: https://api.anthropic.com
       apiKey: ${ANTHROPIC_API_KEY}
-      models:
-        - claude-sonnet-4-20250514
-
+      enabled: true
   - kind: Agent
-    key: assistant
+    name: assistant
     spec:
       displayName: "Assistant"
       provider: anthropic
       model: claude-sonnet-4-20250514
       agentType: open
       status: active
-```
+      isDefault: true
+EOF
 
-```bash
-# Validate manifest
-gcplane validate -f gcplane.yaml
-
-# Preview changes (dry-run)
-gcplane plan -f gcplane.yaml
-
-# Apply changes
-gcplane apply -f gcplane.yaml
+# Preview → Apply
+gcplane plan -f manifest.yaml
+gcplane apply -f manifest.yaml
 ```
 
 ## Commands
 
-| Command    | Description                                   |
-|------------|-----------------------------------------------|
-| `validate` | Validate manifest schema (no connection needed) |
-| `plan`     | Show changes required to reach desired state    |
-| `apply`    | Apply manifest with confirmation prompt         |
-| `version`  | Print version                                   |
+| Command | Description |
+|---------|-------------|
+| `validate` | Check manifest syntax + references (offline) |
+| `plan` | Preview changes (dry-run) |
+| `apply` | Apply manifest to GoClaw |
+| `serve` | Continuous reconciliation (GitOps mode) |
 
-## Connection Config
+### Flags
 
-Priority: CLI flags > environment variables > manifest `connection` block.
+| Flag | Description |
+|------|-------------|
+| `-f, --file` | Manifest file path |
+| `--prune` | Delete resources removed from manifest |
+| `--auto-approve` | Skip confirmation prompt |
+| `--repo` | Git repository URL (serve mode) |
+| `--interval` | Reconciliation interval (default: 30s) |
 
-| Flag         | Env Var            | Description        |
-|--------------|--------------------|--------------------|
-| `--endpoint` | `GCPLANE_ENDPOINT` | GoClaw endpoint URL |
-| `--token`    | `GCPLANE_TOKEN`    | GoClaw auth token   |
-| `-f, --file` | —                  | Manifest file/dir   |
-| `-v`         | —                  | Verbose output      |
+## Documentation
 
-## Supported Resources
+| Document | Description |
+|----------|-------------|
+| [Manifest Reference](docs/manifest-reference.md) | Resource kinds, secret resolution, serve endpoints |
+| [System Architecture](docs/system-architecture.md) | Package structure, data flow, design decisions |
+| [Tenant Structure](docs/tenant-structure.md) | Multi-tenant deployment patterns |
+| [Usage Guide](docs/usage-guide.md) | Detailed command usage and examples |
+| [Code Standards](docs/code-standards.md) | Development conventions |
 
-| Kind              | Transport | Operations     |
-|-------------------|-----------|----------------|
-| `Provider`        | HTTP      | create, update |
-| `Agent`           | HTTP      | create, update |
-| `ChannelInstance`  | HTTP      | create, update |
-| `MCPServer`       | HTTP      | create, update |
-| `Skill`           | HTTP      | update only    |
-| `CustomTool`      | HTTP      | create, update |
-| `CronJob`         | WebSocket | create, update |
-| `Team`            | WebSocket | create, update |
-| `TTSConfig`       | WebSocket | create, update |
+## Development
 
-## Secret Resolution
+```bash
+# Setup (requires Docker for GoClaw)
+cp .env.example .env   # fill in credentials
+make setup              # start GoClaw + apply config
 
-```yaml
-token: ${ENV_VAR}           # environment variable
-apiKey: file:///path/to/key  # file reference
+# Install git hooks
+git config core.hooksPath .githooks
+
+# Test
+make test               # unit tests
+make test-e2e           # full e2e (reset + plan + apply + serve)
+
+# Serve (continuous reconciliation)
+make serve
 ```
-
-## Plan Output
-
-```
-GCPlane Plan: 1 to create, 1 to update, 0 unchanged
-
-+ Provider/anthropic
-~ Agent/assistant
-    model: "claude-haiku-4-5-20251001" → "claude-sonnet-4-20250514"
-```
-
-## Docs
-
-- [System Architecture](docs/system-architecture.md)
-- [Code Standards](docs/code-standards.md)
-- [Usage Guide](docs/usage-guide.md)
-- [Examples](examples/)
 
 ## License
 

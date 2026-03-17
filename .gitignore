@@ -26,3 +26,6 @@ plans/
 *.key
 
 coverage.out
+
+# GoReleaser build output
+dist/

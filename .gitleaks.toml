@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "gcplane allowlist"
+paths = [
+  '''\.env\.example''',
+  '''plans/''',
+  '''docs/''',
+]
