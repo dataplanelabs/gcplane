@@ -23,7 +23,9 @@ func (p *Provider) observeMCPServer(key string) (map[string]any, error) {
 
 	for _, s := range resp.Servers {
 		if strVal(s, "name") == key {
-			return translateResult(s), nil
+			// grants managed via separate API, not returned in list — mask
+			s["grants"] = "***"
+			return translateResult(stripInternal(s)), nil
 		}
 	}
 	return nil, nil

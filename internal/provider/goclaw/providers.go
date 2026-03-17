@@ -24,7 +24,7 @@ func (p *Provider) observeProvider(key string) (map[string]any, error) {
 
 	for _, prov := range resp.Providers {
 		if strVal(prov, "name") == key {
-			return translateResult(prov), nil
+			return translateResult(stripInternal(prov)), nil
 		}
 	}
 	return nil, nil

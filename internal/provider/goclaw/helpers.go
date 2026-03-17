@@ -42,6 +42,26 @@ func (p *Provider) resolveAgentID(agentKey string) (string, error) {
 	return "", fmt.Errorf("agent %q not found", agentKey)
 }
 
+// internalFields are API response fields not present in manifests.
+// Stripping them prevents phantom diffs during comparison.
+var internalFields = []string{
+	"id", "created_at", "updated_at", "created_by", "owner_id",
+	"restrict_to_workspace", "workspace",
+	"context_window", "max_tool_iterations",
+	"compaction_config", "memory_config", "context_pruning",
+	"sandbox_config", "subagents_config", "other_config",
+	"frontmatter", "budget_monthly_cents",
+	"agent_count", "has_credentials", "credentials",
+}
+
+// stripInternal removes API-internal fields from an observed resource.
+func stripInternal(m map[string]any) map[string]any {
+	for _, f := range internalFields {
+		delete(m, f)
+	}
+	return m
+}
+
 // strVal safely extracts a string value from a map.
 func strVal(m map[string]any, key string) string {
 	v, ok := m[key]

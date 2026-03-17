@@ -26,7 +26,11 @@ func (p *Provider) observeTeam(key string) (map[string]any, error) {
 
 	for _, team := range resp.Teams {
 		if strVal(team, "name") == key {
-			return translateResult(team), nil
+			// WS response uses different format than manifest — mask write-only fields
+			team["members"] = "***"
+			team["lead"] = "***"
+			team["displayName"] = "***"
+			return translateResult(stripInternal(team)), nil
 		}
 	}
 	return nil, nil

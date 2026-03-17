@@ -25,7 +25,7 @@ func (p *Provider) observeTTSConfig(_ string) (map[string]any, error) {
 	if len(config) == 0 {
 		return nil, nil
 	}
-	return translateResult(config), nil
+	return translateResult(stripInternal(config)), nil
 }
 
 // createTTSConfig sets the global TTS config via WS RPC (same as update).

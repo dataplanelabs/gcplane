@@ -26,7 +26,11 @@ func (p *Provider) observeCronJob(key string) (map[string]any, error) {
 
 	for _, job := range resp.Jobs {
 		if strVal(job, "name") == key {
-			return translateResult(job), nil
+			// Mask write-only fields: manifest uses agentKey/message at top level
+			// but API stores them as agentId/payload.message
+			job["agentKey"] = "***"
+			job["message"] = "***"
+			return translateResult(stripInternal(job)), nil
 		}
 	}
 	return nil, nil

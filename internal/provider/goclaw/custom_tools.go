@@ -23,7 +23,7 @@ func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
 
 	for _, t := range resp.Tools {
 		if strVal(t, "name") == key {
-			return translateResult(t), nil
+			return translateResult(stripInternal(t)), nil
 		}
 	}
 	return nil, nil

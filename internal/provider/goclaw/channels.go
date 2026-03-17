@@ -23,7 +23,16 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 
 	for _, inst := range resp.Instances {
 		if strVal(inst, "name") == key {
-			return translateResult(inst), nil
+			// Remove fields that can't be compared against manifest
+			// agent_id is UUID, manifest uses agentKey (string name)
+			// bot_token/credentials are masked or absent in response
+			// Mask write-only fields — manifest sends these but API doesn't return them
+			delete(inst, "agent_id") // UUID; manifest uses agentKey (string name)
+			delete(inst, "bot_token")
+			// Mark manifest-side write-only fields as masked so CompareSpec skips them
+			inst["agent_key"] = "***"
+			inst["bot_token"] = "***"
+			return translateResult(stripInternal(inst)), nil
 		}
 	}
 	return nil, nil

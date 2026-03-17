@@ -22,7 +22,7 @@ func (p *Provider) observeSkill(key string) (map[string]any, error) {
 
 	for _, s := range resp.Skills {
 		if strVal(s, "key") == key {
-			return translateResult(s), nil
+			return translateResult(stripInternal(s)), nil
 		}
 	}
 	return nil, nil
