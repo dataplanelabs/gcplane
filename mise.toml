@@ -1,0 +1,135 @@
+[env]
+_.file = ".env"
+
+[vars]
+BINARY = "gcplane"
+F = "examples/local-dev.yaml"
+GOCLAW_DIR = "../../nextlevelbuilder/goclaw"
+
+[tools]
+go = "1.25"
+
+# ============================================================
+# Build
+# ============================================================
+[tasks.build]
+description = "Build gcplane binary"
+run = """
+VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+go build -ldflags "-X github.com/dataplanelabs/gcplane/cmd.Version=$VERSION" -o {{vars.BINARY}} .
+"""
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -f {{vars.BINARY}} coverage.out coverage_provider.out"
+
+# ============================================================
+# Tests
+# ============================================================
+[tasks.test]
+description = "Run unit tests"
+run = "go test ./... -count=1"
+
+[tasks."test:verbose"]
+description = "Run unit tests (verbose)"
+run = "go test ./... -v -count=1"
+
+[tasks."test:cover"]
+description = "Run tests with coverage report"
+run = """
+go test ./... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+"""
+
+[tasks."test:race"]
+description = "Run tests with race detector"
+run = "go test -race ./... -count=1"
+
+[tasks."test:e2e"]
+description = "Full e2e: reset GoClaw + test all features"
+depends = ["reset"]
+run = "scripts/test-e2e.sh"
+
+# ============================================================
+# CLI Commands
+# ============================================================
+[tasks.validate]
+description = "Validate manifest"
+depends = ["build"]
+run = "./{{vars.BINARY}} validate -f ${F:-{{vars.F}}}"
+
+[tasks.plan]
+description = "Show plan"
+depends = ["build"]
+run = "./{{vars.BINARY}} plan -f ${F:-{{vars.F}}}"
+
+[tasks.apply]
+description = "Apply manifest"
+depends = ["build"]
+run = "./{{vars.BINARY}} apply -f ${F:-{{vars.F}}}"
+
+[tasks.serve]
+description = "Run continuous reconciliation"
+depends = ["build"]
+run = "./{{vars.BINARY}} serve -f ${F:-{{vars.F}}} --interval 10s"
+
+[tasks.top]
+description = "Launch TUI dashboard"
+depends = ["build"]
+run = "./{{vars.BINARY}} top -f ${F:-{{vars.F}}}"
+
+[tasks."top:attach"]
+description = "Launch TUI in attach mode"
+depends = ["build"]
+run = "./{{vars.BINARY}} top --attach ${ATTACH:-http://localhost:8480}"
+
+# ============================================================
+# GoClaw Instance
+# ============================================================
+[tasks."goclaw:up"]
+description = "Start GoClaw (docker compose)"
+run = "scripts/goclaw.sh up"
+
+[tasks."goclaw:down"]
+description = "Stop GoClaw"
+run = "scripts/goclaw.sh down"
+
+[tasks."goclaw:reset"]
+description = "Reset GoClaw (wipe volumes + restart)"
+run = "scripts/goclaw.sh reset"
+
+[tasks."goclaw:logs"]
+description = "Follow GoClaw logs"
+run = "scripts/goclaw.sh logs"
+
+# ============================================================
+# Workflows
+# ============================================================
+[tasks.setup]
+description = "One-click: build + start GoClaw + apply config"
+depends = ["build", "goclaw:up"]
+run = "scripts/wait-and-apply.sh"
+
+[tasks.reset]
+description = "Full reset: wipe GoClaw + re-apply from scratch"
+depends = ["build"]
+run = """
+scripts/goclaw.sh reset
+scripts/wait-and-apply.sh
+"""
+
+[tasks.dev]
+description = "Build + run TUI against local-dev"
+depends = ["build"]
+run = "./{{vars.BINARY}} top -f {{vars.F}}"
+
+# ============================================================
+# Quality
+# ============================================================
+[tasks.lint]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.check]
+description = "Build + vet + test"
+depends = ["build", "lint", "test"]
