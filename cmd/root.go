@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/dataplanelabs/gcplane/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +21,9 @@ var (
 	verbose    bool
 )
 
+// updateResult receives the background update check result.
+var updateResult chan *update.ReleaseInfo
+
 var rootCmd = &cobra.Command{
 	Use:   "gcplane",
 	Short: "Declarative config management for GoClaw",
@@ -30,6 +36,34 @@ reconciles them against the actual state via GoClaw's API.
 Modes:
   CLI:     gcplane plan/apply/diff for manual operations
   Service: gcplane serve for continuous reconciliation`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Skip update check for serve (long-running) and version commands
+		if cmd.Name() == "serve" || cmd.Name() == "version" {
+			return
+		}
+		if !update.ShouldCheck() {
+			return
+		}
+		updateResult = make(chan *update.ReleaseInfo, 1)
+		go func() {
+			updateResult <- update.Check(context.Background(), Version)
+		}()
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		if updateResult == nil {
+			return
+		}
+		// Wait up to 2 seconds for the background check
+		select {
+		case rel := <-updateResult:
+			if rel != nil {
+				fmt.Fprintf(os.Stderr, "\nA new version of gcplane is available: %s → %s\n", Version, rel.Version)
+				fmt.Fprintf(os.Stderr, "Upgrade: curl -fsSL https://raw.githubusercontent.com/dataplanelabs/gcplane/main/install.sh | sh\n")
+			}
+		case <-time.After(2 * time.Second):
+			// don't block forever
+		}
+	},
 }
 
 // Execute runs the root command.
