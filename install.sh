@@ -1,7 +1,7 @@
 #!/bin/sh
 # GCPlane installer — auto-detects OS/arch, downloads binary
-# Usage: curl -fsSL https://gcplane.vanducng.dev | sh
-#        curl -fsSL https://gcplane.vanducng.dev | sh -s -- --version v0.6.1
+# Usage: curl -fsSL https://raw.githubusercontent.com/dataplanelabs/gcplane/main/install.sh | sh
+#        curl -fsSL https://raw.githubusercontent.com/dataplanelabs/gcplane/main/install.sh | sh -s -- --version v0.6.1
 set -e
 
 REPO="dataplanelabs/gcplane"
@@ -13,7 +13,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --version|-v) VERSION="$2"; shift 2 ;;
     --dir|-d)     INSTALL_DIR="$2"; shift 2 ;;
-    --help|-h)    echo "Usage: curl -fsSL https://gcplane.vanducng.dev | sh -s -- [--version VERSION] [--dir DIR]"; exit 0 ;;
+    --help|-h)    echo "Usage: curl -fsSL https://raw.githubusercontent.com/dataplanelabs/gcplane/main/install.sh | sh -s -- [--version VERSION] [--dir DIR]"; exit 0 ;;
     *)            echo "Unknown flag: $1"; exit 1 ;;
   esac
 done
