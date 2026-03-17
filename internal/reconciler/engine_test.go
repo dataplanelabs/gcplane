@@ -59,7 +59,7 @@ func TestReconcile_CreateNew(t *testing.T) {
 		},
 	}
 
-	plan, _ := engine.Reconcile(m, true)
+	plan, _ := engine.Reconcile(m, ReconcileOpts{DryRun: true})
 	if plan.Creates != 1 {
 		t.Errorf("expected 1 create, got %d", plan.Creates)
 	}
@@ -79,7 +79,7 @@ func TestReconcile_UpdateExisting(t *testing.T) {
 		},
 	}
 
-	plan, _ := engine.Reconcile(m, true)
+	plan, _ := engine.Reconcile(m, ReconcileOpts{DryRun: true})
 	if plan.Updates != 1 {
 		t.Errorf("expected 1 update, got %d", plan.Updates)
 	}
@@ -96,7 +96,7 @@ func TestReconcile_NoopIdentical(t *testing.T) {
 		},
 	}
 
-	plan, _ := engine.Reconcile(m, true)
+	plan, _ := engine.Reconcile(m, ReconcileOpts{DryRun: true})
 	if plan.Noops != 1 {
 		t.Errorf("expected 1 noop, got %d", plan.Noops)
 	}
@@ -112,7 +112,7 @@ func TestReconcile_ApplyExecutes(t *testing.T) {
 		},
 	}
 
-	_, result := engine.Reconcile(m, false)
+	_, result := engine.Reconcile(m, ReconcileOpts{DryRun: false})
 	if result.Applied != 1 {
 		t.Errorf("expected 1 applied, got %d", result.Applied)
 	}
@@ -133,7 +133,7 @@ func TestReconcile_DependencyOrder(t *testing.T) {
 		},
 	}
 
-	plan, _ := engine.Reconcile(m, true)
+	plan, _ := engine.Reconcile(m, ReconcileOpts{DryRun: true})
 	if len(plan.Changes) != 2 {
 		t.Fatalf("expected 2 changes, got %d", len(plan.Changes))
 	}

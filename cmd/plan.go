@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var planPrune bool
+
 var planCmd = &cobra.Command{
 	Use:   "plan",
 	Short: "Show changes required to reach desired state (dry-run)",
@@ -29,9 +31,13 @@ Similar to 'terraform plan'.`,
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider)
-		plan, _ := engine.Reconcile(m, true)
+		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: planPrune})
 
 		display.PrintPlan(plan, verbose)
 		return nil
 	},
+}
+
+func init() {
+	planCmd.Flags().BoolVar(&planPrune, "prune", false, "include deletion of gcplane-owned resources not in manifest")
 }

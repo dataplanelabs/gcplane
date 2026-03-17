@@ -10,6 +10,7 @@ const (
 	ActionCreate Action = "create"
 	ActionUpdate Action = "update"
 	ActionNoop   Action = "noop"
+	ActionDelete Action = "delete"
 )
 
 // Change describes a single planned resource change.
@@ -29,11 +30,18 @@ type FieldDiff struct {
 
 // Plan is the result of a dry-run reconciliation.
 type Plan struct {
-	Changes  []Change `json:"changes"`
-	Creates  int      `json:"creates"`
-	Updates  int      `json:"updates"`
-	Noops    int      `json:"noops"`
-	Errors   []string `json:"errors,omitempty"`
+	Changes []Change `json:"changes"`
+	Creates int      `json:"creates"`
+	Updates int      `json:"updates"`
+	Deletes int      `json:"deletes"`
+	Noops   int      `json:"noops"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
+// ReconcileOpts controls reconciliation behaviour.
+type ReconcileOpts struct {
+	DryRun bool
+	Prune  bool
 }
 
 // ApplyResult is the result of applying a plan.

@@ -21,8 +21,8 @@ const (
 
 // PrintPlan renders a plan as terraform-style colored output.
 func PrintPlan(plan *reconciler.Plan, verbose bool) {
-	fmt.Printf("\n%sGCPlane Plan:%s %d to create, %d to update, %d unchanged\n\n",
-		colorBold, colorReset, plan.Creates, plan.Updates, plan.Noops)
+	fmt.Printf("\n%sGCPlane Plan:%s %d to create, %d to update, %d to delete, %d unchanged\n\n",
+		colorBold, colorReset, plan.Creates, plan.Updates, plan.Deletes, plan.Noops)
 
 	for _, c := range plan.Changes {
 		switch c.Action {
@@ -30,6 +30,8 @@ func PrintPlan(plan *reconciler.Plan, verbose bool) {
 			printCreate(c)
 		case reconciler.ActionUpdate:
 			printUpdate(c)
+		case reconciler.ActionDelete:
+			printDelete(c)
 		case reconciler.ActionNoop:
 			if verbose {
 				printNoop(c)
@@ -44,8 +46,12 @@ func PrintPlan(plan *reconciler.Plan, verbose bool) {
 		}
 	}
 
-	fmt.Printf("\n%sPlan:%s %d to create, %d to update, %d unchanged.\n",
-		colorBold, colorReset, plan.Creates, plan.Updates, plan.Noops)
+	fmt.Printf("\n%sPlan:%s %d to create, %d to update, %d to delete, %d unchanged.\n",
+		colorBold, colorReset, plan.Creates, plan.Updates, plan.Deletes, plan.Noops)
+}
+
+func printDelete(c reconciler.Change) {
+	fmt.Printf("%s- %s/%s%s\n", colorRed, c.Kind, c.Name, colorReset)
 }
 
 func printCreate(c reconciler.Change) {
@@ -71,6 +77,12 @@ func printNoop(c reconciler.Change) {
 		return
 	}
 	fmt.Printf("%s= %s/%s (no changes)%s\n", colorDim, c.Kind, c.Name, colorReset)
+}
+
+// PrintPruneWarning renders a destructive-action warning before confirmation.
+func PrintPruneWarning(count int) {
+	fmt.Printf("\n%s%sWarning:%s Will delete %d resource(s). This cannot be undone.\n",
+		colorBold, colorRed, colorReset, count)
 }
 
 // PrintApplyResult renders the result of applying a plan.

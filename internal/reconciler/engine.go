@@ -27,8 +27,9 @@ func NewEngine(provider ProviderInterface) *Engine {
 }
 
 // Reconcile processes a manifest and returns a plan.
-// If dryRun=false, it also executes the changes via the provider.
-func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResult) {
+// If opts.DryRun=false, it also executes the changes via the provider.
+// If opts.Prune=true, orphaned gcplane-owned resources are deleted.
+func (e *Engine) Reconcile(m *manifest.Manifest, opts ReconcileOpts) (*Plan, *ApplyResult) {
 	plan := &Plan{}
 	result := &ApplyResult{}
 
@@ -65,7 +66,7 @@ func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResu
 			}
 
 			// Execute if not dry-run
-			if !dryRun && change.Action != ActionNoop {
+			if !opts.DryRun && change.Action != ActionNoop {
 				err := e.execute(change, res)
 				if err != nil {
 					result.Failed++
@@ -77,7 +78,73 @@ func (e *Engine) Reconcile(m *manifest.Manifest, dryRun bool) (*Plan, *ApplyResu
 		}
 	}
 
+	// Prune phase: detect orphaned gcplane-owned resources
+	if opts.Prune {
+		pruneChanges, pruneResult := e.detectAndExecutePrunes(m, opts.DryRun)
+		plan.Changes = append(plan.Changes, pruneChanges...)
+		for _, c := range pruneChanges {
+			if c.Action == ActionDelete {
+				plan.Deletes++
+			}
+		}
+		result.Applied += pruneResult.Applied
+		result.Failed += pruneResult.Failed
+		result.Errors = append(result.Errors, pruneResult.Errors...)
+	}
+
 	return plan, result
+}
+
+func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Change, *ApplyResult) {
+	result := &ApplyResult{}
+	var changes []Change
+
+	// Build manifest resource set per kind
+	manifestSet := make(map[manifest.ResourceKind]map[string]bool)
+	for _, r := range m.Resources {
+		if manifestSet[r.Kind] == nil {
+			manifestSet[r.Kind] = make(map[string]bool)
+		}
+		manifestSet[r.Kind][r.Name] = true
+	}
+
+	// Check each kind in reverse dependency order
+	for _, kind := range manifest.DeleteOrder() {
+		// Skip non-deletable kinds
+		if kind == manifest.KindSkill || kind == manifest.KindTTSConfig {
+			continue
+		}
+
+		remotes, err := e.provider.ListAll(kind)
+		if err != nil {
+			// Can't list this kind — skip silently
+			continue
+		}
+
+		for _, remote := range remotes {
+			// Only prune gcplane-owned resources
+			if remote.CreatedBy != "gcplane" {
+				continue
+			}
+			// Skip if resource is in manifest
+			if manifestSet[kind][remote.Name] {
+				continue
+			}
+
+			change := Change{Kind: kind, Name: remote.Name, Action: ActionDelete}
+			changes = append(changes, change)
+
+			if !dryRun {
+				if err := e.provider.Delete(kind, remote.Name); err != nil {
+					result.Failed++
+					result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", kind, remote.Name, err))
+				} else {
+					result.Applied++
+				}
+			}
+		}
+	}
+	return changes, result
 }
 
 func (e *Engine) reconcileOne(res manifest.Resource) Change {

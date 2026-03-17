@@ -13,6 +13,7 @@ import (
 )
 
 var autoApprove bool
+var applyPrune bool
 
 var applyCmd = &cobra.Command{
 	Use:   "apply",
@@ -36,14 +37,20 @@ Only manages declared resources — UI-created objects are untouched.`,
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider)
+		opts := reconciler.ReconcileOpts{Prune: applyPrune}
 
-		// Show plan first
-		plan, _ := engine.Reconcile(m, true)
+		// Show plan first (dry-run)
+		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: applyPrune})
 		display.PrintPlan(plan, verbose)
 
-		if plan.Creates == 0 && plan.Updates == 0 {
+		if plan.Creates == 0 && plan.Updates == 0 && plan.Deletes == 0 {
 			fmt.Println("\nNo changes to apply.")
 			return nil
+		}
+
+		// Warn before confirmation when deletions are planned
+		if plan.Deletes > 0 {
+			display.PrintPruneWarning(plan.Deletes)
 		}
 
 		// Confirm unless auto-approve
@@ -59,7 +66,8 @@ Only manages declared resources — UI-created objects are untouched.`,
 		}
 
 		// Apply
-		_, result := engine.Reconcile(m, false)
+		opts.DryRun = false
+		_, result := engine.Reconcile(m, opts)
 		display.PrintApplyResult(result)
 
 		if result.Failed > 0 {
@@ -71,4 +79,5 @@ Only manages declared resources — UI-created objects are untouched.`,
 
 func init() {
 	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, "skip confirmation prompt")
+	applyCmd.Flags().BoolVar(&applyPrune, "prune", false, "delete gcplane-owned resources not present in manifest")
 }

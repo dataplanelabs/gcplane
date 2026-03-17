@@ -114,7 +114,7 @@ func (c *Controller) reconcileOnce() {
 	}
 
 	engine := reconciler.NewEngine(c.provider)
-	plan, result := engine.Reconcile(m, false)
+	plan, result := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: false})
 
 	// Build resource statuses from plan + result
 	resources := buildResourceStatuses(plan, result)
