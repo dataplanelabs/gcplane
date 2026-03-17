@@ -17,7 +17,7 @@ GCPlane manages GoClaw resources (agents, providers, channels, MCP servers, cron
 - **Git source** — watch a git repo for manifest changes (GitOps)
 - **Prune** — safely delete resources removed from manifest (`--prune`)
 - **Reference validation** — catch broken cross-resource references before apply
-- **Pluggable providers** — built for the Claw family (GoClaw, OpenClaw, ZeroClaw, and future agents)
+- **Pluggable providers** — built for GoClaw (and extensible to any xClaw exposed API)
 - **Multi-platform** — Linux, macOS, Windows (amd64/arm64)
 
 ## Quick Start
