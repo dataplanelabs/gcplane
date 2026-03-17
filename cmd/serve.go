@@ -22,6 +22,7 @@ var (
 	serveRepo     string
 	serveBranch   string
 	servePath     string
+	servePrune    bool
 )
 
 var serveCmd = &cobra.Command{
@@ -56,6 +57,7 @@ func init() {
 	serveCmd.Flags().StringVar(&serveRepo, "repo", "", "git repository URL")
 	serveCmd.Flags().StringVar(&serveBranch, "branch", "main", "git branch")
 	serveCmd.Flags().StringVar(&servePath, "path", "manifest.yaml", "manifest path in repo")
+	serveCmd.Flags().BoolVar(&servePrune, "prune", false, "delete resources not in manifest")
 }
 
 func runServe(_ *cobra.Command, _ []string) error {
@@ -110,6 +112,7 @@ func runServe(_ *cobra.Command, _ []string) error {
 		Provider: provider,
 		Tracker:  tracker,
 		Interval: interval,
+		Prune:    servePrune,
 		Logger:   logger,
 	})
 

@@ -16,6 +16,7 @@ type Controller struct {
 	tracker   *StatusTracker
 	metrics   *Metrics
 	interval  time.Duration
+	prune     bool
 	triggerCh chan struct{}
 	logger    *slog.Logger
 	lastHash  string
@@ -43,6 +44,7 @@ type Config struct {
 	Provider reconciler.ProviderInterface
 	Tracker  *StatusTracker
 	Interval time.Duration
+	Prune    bool
 	Logger   *slog.Logger
 }
 
@@ -54,6 +56,7 @@ func New(cfg Config) *Controller {
 		tracker:   cfg.Tracker,
 		metrics:   &Metrics{},
 		interval:  cfg.Interval,
+		prune:     cfg.Prune,
 		triggerCh: make(chan struct{}, 1),
 		logger:    cfg.Logger,
 	}
@@ -114,7 +117,7 @@ func (c *Controller) reconcileOnce() {
 	}
 
 	engine := reconciler.NewEngine(c.provider)
-	plan, result := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: false})
+	plan, result := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: false, Prune: c.prune})
 
 	// Build resource statuses from plan + result
 	resources := buildResourceStatuses(plan, result)

@@ -55,6 +55,7 @@ func loadDir(dir string) (*Manifest, error) {
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
 	}
+	seen := make(map[string]bool)
 
 	for _, e := range entries {
 		if e.IsDir() {
@@ -78,7 +79,14 @@ func loadDir(dir string) (*Manifest, error) {
 			merged.Metadata = m.Metadata
 		}
 
-		merged.Resources = append(merged.Resources, m.Resources...)
+		for _, r := range m.Resources {
+			key := string(r.Kind) + "/" + r.Name
+			if seen[key] {
+				return nil, fmt.Errorf("duplicate resource %s in directory %s", key, dir)
+			}
+			seen[key] = true
+			merged.Resources = append(merged.Resources, r)
+		}
 	}
 
 	return merged, nil
