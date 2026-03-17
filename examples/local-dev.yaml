@@ -183,6 +183,14 @@ resources:
       status: active
       toolsConfig:
         profile: coding
+        exec:
+          enabled: true
+          timeout: 60
+        webFetch:
+          enabled: true
+        subagent:
+          enabled: true
+          maxDepth: 3
       contextFiles:
         - name: IDENTITY.md
           content: |
@@ -228,6 +236,11 @@ resources:
       status: active
       toolsConfig:
         profile: coding
+        exec:
+          enabled: true
+          timeout: 120
+        webFetch:
+          enabled: true
       contextFiles:
         - name: IDENTITY.md
           content: |

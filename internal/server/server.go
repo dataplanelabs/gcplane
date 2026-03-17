@@ -11,26 +11,29 @@ import (
 
 // Server exposes health, metrics, status, and sync trigger endpoints.
 type Server struct {
-	tracker    *controller.StatusTracker
-	controller *controller.Controller
-	httpServer *http.Server
-	logger     *slog.Logger
+	tracker       *controller.StatusTracker
+	controller    *controller.Controller
+	httpServer    *http.Server
+	logger        *slog.Logger
+	webhookSecret string
 }
 
 // Config holds server dependencies.
 type Config struct {
-	Addr       string
-	Tracker    *controller.StatusTracker
-	Controller *controller.Controller
-	Logger     *slog.Logger
+	Addr          string
+	Tracker       *controller.StatusTracker
+	Controller    *controller.Controller
+	Logger        *slog.Logger
+	WebhookSecret string
 }
 
 // New creates an HTTP server with all routes registered.
 func New(cfg Config) *Server {
 	s := &Server{
-		tracker:    cfg.Tracker,
-		controller: cfg.Controller,
-		logger:     cfg.Logger,
+		tracker:       cfg.Tracker,
+		controller:    cfg.Controller,
+		logger:        cfg.Logger,
+		webhookSecret: cfg.WebhookSecret,
 	}
 
 	mux := http.NewServeMux()

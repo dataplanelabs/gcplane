@@ -1,9 +1,14 @@
 package server
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,6 +88,65 @@ func TestHandleWebhook(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.handleWebhook(w, req)
 	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func newTestServerWithSecret(secret string) *Server {
+	s := newTestServer()
+	s.webhookSecret = secret
+	return s
+}
+
+func githubSig(secret, body string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(body))
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+func TestWebhook_NoSecret(t *testing.T) {
+	s := newTestServer()
+	req := httptest.NewRequest("POST", "/api/v1/webhook/git", strings.NewReader("{}"))
+	w := httptest.NewRecorder()
+	s.handleWebhook(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestWebhook_GitHubValid(t *testing.T) {
+	const secret = "mysecret"
+	body := `{"ref":"refs/heads/main"}`
+	s := newTestServerWithSecret(secret)
+	req := httptest.NewRequest("POST", "/api/v1/webhook/git", strings.NewReader(body))
+	req.Header.Set("X-Hub-Signature-256", githubSig(secret, body))
+	w := httptest.NewRecorder()
+	s.handleWebhook(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestWebhook_GitHubInvalid(t *testing.T) {
+	s := newTestServerWithSecret("mysecret")
+	body := `{"ref":"refs/heads/main"}`
+	req := httptest.NewRequest("POST", "/api/v1/webhook/git", strings.NewReader(body))
+	req.Header.Set("X-Hub-Signature-256", "sha256=invalidsignature")
+	w := httptest.NewRecorder()
+	s.handleWebhook(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestWebhook_GitLabValid(t *testing.T) {
+	const secret = "gitlab-token"
+	s := newTestServerWithSecret(secret)
+	req := httptest.NewRequest("POST", "/api/v1/webhook/git", strings.NewReader("{}"))
+	req.Header.Set("X-Gitlab-Token", secret)
+	w := httptest.NewRecorder()
+	s.handleWebhook(w, req)
+	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }

@@ -37,6 +37,38 @@ Resources are applied in dependency order: Provider → Agent → Skill → MCPS
 
 **Note:** Skill and TTSConfig are managed by GoClaw and cannot be deleted by gcplane. They are excluded from prune operations.
 
+## Tool Configuration
+
+Agents support per-agent tool policies via `toolsConfig` in the spec:
+
+```yaml
+- kind: Agent
+  name: dev-lead
+  spec:
+    toolsConfig:
+      profile: coding          # "coding", "minimal", "all"
+      exec:
+        enabled: true
+        timeout: 30            # seconds
+      webFetch:
+        enabled: true
+      fileRead:
+        enabled: true
+      subagent:
+        enabled: true
+        maxDepth: 3
+```
+
+### Profiles
+
+| Profile | Tools Enabled |
+|---------|--------------|
+| `coding` | exec, file read/write, web fetch, subagent |
+| `minimal` | web fetch only |
+| `all` | all built-in tools |
+
+Individual tool overrides take precedence over profile defaults.
+
 ## Secret Resolution
 
 Spec values support two secret formats:

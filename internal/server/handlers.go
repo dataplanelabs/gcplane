@@ -1,8 +1,13 @@
 package server
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -35,10 +40,44 @@ func (s *Server) handleSync(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprint(w, `{"message":"sync triggered"}`)
 }
 
-func (s *Server) handleWebhook(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	if s.webhookSecret != "" {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		if !s.verifyWebhookSignature(r, body) {
+			s.logger.Warn("webhook signature verification failed")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
 	s.controller.Trigger()
 	s.logger.Info("sync triggered via webhook")
 	w.WriteHeader(http.StatusOK)
+}
+
+// verifyWebhookSignature checks GitHub (X-Hub-Signature-256) or GitLab (X-Gitlab-Token).
+func (s *Server) verifyWebhookSignature(r *http.Request, body []byte) bool {
+	// GitHub: HMAC-SHA256
+	if sig := r.Header.Get("X-Hub-Signature-256"); sig != "" {
+		mac := hmac.New(sha256.New, []byte(s.webhookSecret))
+		mac.Write(body)
+		expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+		return hmac.Equal([]byte(expected), []byte(sig))
+	}
+
+	// GitLab: simple token comparison
+	if token := r.Header.Get("X-Gitlab-Token"); token != "" {
+		return token == s.webhookSecret
+	}
+
+	// No recognized header — reject if secret is configured
+	return false
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {

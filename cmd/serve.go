@@ -17,12 +17,13 @@ import (
 )
 
 var (
-	serveAddr     string
-	serveInterval string
-	serveRepo     string
-	serveBranch   string
-	servePath     string
-	servePrune    bool
+	serveAddr          string
+	serveInterval      string
+	serveRepo          string
+	serveBranch        string
+	servePath          string
+	servePrune         bool
+	serveWebhookSecret string
 )
 
 var serveCmd = &cobra.Command{
@@ -58,6 +59,7 @@ func init() {
 	serveCmd.Flags().StringVar(&serveBranch, "branch", "main", "git branch")
 	serveCmd.Flags().StringVar(&servePath, "path", "manifest.yaml", "manifest path in repo")
 	serveCmd.Flags().BoolVar(&servePrune, "prune", false, "delete resources not in manifest")
+	serveCmd.Flags().StringVar(&serveWebhookSecret, "webhook-secret", "", "webhook signature verification secret")
 }
 
 func runServe(_ *cobra.Command, _ []string) error {
@@ -117,10 +119,11 @@ func runServe(_ *cobra.Command, _ []string) error {
 	})
 
 	srv := server.New(server.Config{
-		Addr:       serveAddr,
-		Tracker:    tracker,
-		Controller: ctrl,
-		Logger:     logger,
+		Addr:          serveAddr,
+		Tracker:       tracker,
+		Controller:    ctrl,
+		Logger:        logger,
+		WebhookSecret: serveWebhookSecret,
 	})
 
 	// Signal handling
