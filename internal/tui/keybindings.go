@@ -47,6 +47,20 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
+	// Ctrl+R: apply (reconcile) — works in any mode
+	if event.Key() == tcell.KeyCtrlR {
+		h.app.applyAll()
+		return nil
+	}
+
+	// Ctrl+D: delete selected resource — only in normal mode on main page
+	if event.Key() == tcell.KeyCtrlD && h.mode == ModeNormal {
+		if name, _ := h.app.pages.GetFrontPage(); name == "main" {
+			h.app.deleteResource()
+			return nil
+		}
+	}
+
 	switch h.mode {
 	case ModeNormal:
 		return h.handleNormal(event)
@@ -80,6 +94,11 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 		h.mode = ModeSearch
 		h.app.activateSearch()
 		return nil
+	case 'e':
+		if name, _ := h.app.pages.GetFrontPage(); name == "main" {
+			h.app.editResource()
+			return nil
+		}
 	case 'r':
 		h.app.triggerRefresh()
 		return nil

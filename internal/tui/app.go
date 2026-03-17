@@ -17,6 +17,9 @@ import (
 // ProviderAPI is the subset of provider operations the TUI needs.
 type ProviderAPI interface {
 	Observe(kind manifest.ResourceKind, key string) (map[string]any, error)
+	Create(kind manifest.ResourceKind, key string, spec map[string]any) error
+	Update(kind manifest.ResourceKind, key string, spec map[string]any) error
+	Delete(kind manifest.ResourceKind, key string) error
 	Close() error
 }
 
@@ -32,6 +35,7 @@ type App struct {
 	table     *views.ResourceTable
 	detail    *views.ResourceDetail
 	drift     *views.DriftView
+	confirm   *views.ConfirmModal
 	viewStack []string // page name stack for Esc navigation
 
 	// Refresh infrastructure
@@ -101,11 +105,15 @@ func (a *App) buildLayout() {
 	// Drift view — shows field-level diff
 	a.drift = views.NewDriftView()
 
+	// Confirmation modal
+	a.confirm = views.NewConfirmModal()
+
 	// Switchable main content area
 	a.pages = tview.NewPages()
 	a.pages.AddPage("main", a.table.Table, true, true)
 	a.pages.AddPage("detail", a.detail.TextView, true, false)
 	a.pages.AddPage("drift", a.drift.TextView, true, false)
+	a.pages.AddPage("confirm", a.confirm.Modal, true, false)
 
 	// Help overlay
 	helpView := tview.NewTextView().
@@ -340,6 +348,12 @@ func (a *App) executeCommand(cmd string) {
 	case "help":
 		a.toggleHelp()
 		return
+	case "apply":
+		a.applyAll()
+		return
+	case "delete", "del":
+		a.deleteResource()
+		return
 	}
 
 	// Kind alias lookup
@@ -426,6 +440,13 @@ func helpText() string {
    /           Filter by name (case-insensitive)
    Enter       Apply filter
    Esc         Cancel / clear filter
+
+ [yellow]Actions[white]
+   Ctrl+R      Apply (reconcile all pending changes)
+   Ctrl+D      Delete selected resource
+   e           Edit selected resource ($EDITOR)
+   :apply      Apply all changes
+   :delete     Delete selected resource
 
  [yellow]Other[white]
    ?           Toggle this help
