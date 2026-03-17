@@ -8,44 +8,44 @@ GCPlane is a GitOps-style control plane for managing GoClaw deployments. It read
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                           CLI Layer                           │
+│                           CLI Layer                          │
 │  gcplane validate | plan | apply | serve [--prune] [--repo]  │
 └──────────┬───────────────────────────────────────────────────┘
            │
 ┌──────────▼───────────────────────────────────────────────────┐
 │                 Manifest Source (File or Git)                │
 │  File: SHA256 change detection                               │
-│  Git: Clone/fetch from branch, SHA change detection           │
+│  Git: Clone/fetch from branch, SHA change detection          │
 └──────────┬───────────────────────────────────────────────────┘
            │
 ┌──────────▼───────────────────────────────────────────────────┐
 │                      Manifest Loader                         │
-│  YAML parsing → validation → secret resolution                │
+│  YAML parsing → validation → secret resolution               │
 │  Supports: single file, directory merge, env vars, files     │
 └──────────┬───────────────────────────────────────────────────┘
            │
 ┌──────────▼───────────────────────────────────────────────────┐
 │                   Reconciler Engine                          │
-│  Observe → Compare → Act                                      │
-│  Dependency-ordered processing (Provider → Agent → ...)       │
+│  Observe → Compare → Act                                     │
+│  Dependency-ordered processing (Provider → Agent → ...)      │
 │  Modes: dry-run (plan) | apply | serve (continuous)          │
-│  Prune: detect and delete orphaned resources in reverse order │
+│  Prune: detect and delete orphaned resources in reverse order│
 └──────────┬───────────────────────────────────────────────────┘
            │
 ┌──────────▼───────────────────────────────────────────────────┐
 │                   GoClaw Provider                            │
-│  ┌──────────────────────┐  ┌──────────────────┐             │
-│  │     HTTP Client       │  │   WS RPC Client   │             │
-│  │   REST endpoints      │  │   v3 protocol     │             │
-│  │  Observe/Create/      │  │  CronJob, Team,   │             │
-│  │  Update/Delete/List   │  │  TTSConfig         │             │
-│  └──────────┬───────────┘  └────────┬──────────┘             │
+│  ┌──────────────────────┐  ┌───────────────────┐             │
+│  │     HTTP Client      │  │   WS RPC Client   │             │
+│  │   REST endpoints     │  │   v3 protocol     │             │
+│  │  Observe/Create/     │  │  CronJob, Team,   │             │
+│  │  Update/Delete/List  │  │  TTSConfig        │             │
+│  └─────────┬────────────┘  └──────┬────────────┘             │
 └────────────┼──────────────────────┼──────────────────────────┘
              │                      │
 ┌────────────▼──────────────────────▼──────────────────────────┐
 │                    GoClaw Instance                           │
-│              HTTP REST + WebSocket RPC                        │
-└────────────────────────────────────────────────────────────┘
+│              HTTP REST + WebSocket RPC                       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Package Structure
