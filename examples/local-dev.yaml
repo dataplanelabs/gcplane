@@ -336,6 +336,13 @@ resources:
       displayName: "Data Team"
       lead: data-engineer
       members: [data-analyst, report-builder]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskFailed: true
+        deliveryMode: direct
 
   - kind: AgentTeam
     name: product-team
@@ -343,6 +350,13 @@ resources:
       displayName: "Product Team"
       lead: product-planner
       members: [market-researcher, dev-lead]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskFailed: true
+        deliveryMode: through_leader
 
   - kind: AgentTeam
     name: ops-team
@@ -350,3 +364,10 @@ resources:
       displayName: "Ops Team"
       lead: devops-engineer
       members: [support-bot]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: false
+          taskFailed: true
+        deliveryMode: direct
