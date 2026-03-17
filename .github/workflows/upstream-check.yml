@@ -1,0 +1,70 @@
+name: Upstream Check
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # weekly Monday 8am UTC
+  workflow_dispatch:       # manual trigger
+
+env:
+  UPSTREAM_IMAGE: ghcr.io/nextlevelbuilder/goclaw
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get current pinned version
+        id: current
+        run: |
+          VERSION=$(grep 'GOCLAW_VERSION' .github/workflows/e2e.yml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current pinned: $VERSION"
+
+      - name: Check latest upstream tag
+        id: latest
+        run: |
+          # Pull latest and extract version label
+          docker pull ${{ env.UPSTREAM_IMAGE }}:latest --quiet
+          LATEST=$(docker inspect ${{ env.UPSTREAM_IMAGE }}:latest --format '{{index .Config.Labels "org.opencontainers.image.version"}}' 2>/dev/null || echo "unknown")
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest upstream: $LATEST"
+
+      - name: Compare versions
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "Up to date: $CURRENT"
+          else
+            echo "::warning::GoClaw upstream updated: $CURRENT → $LATEST"
+            echo "Update GOCLAW_VERSION in .github/workflows/e2e.yml"
+          fi
+
+      - name: Create issue if outdated
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const current = '${{ steps.current.outputs.version }}';
+            const latest = '${{ steps.latest.outputs.version }}';
+            const title = `chore: bump GoClaw test version ${current} → ${latest}`;
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream'
+            });
+            if (issues.data.some(i => i.title.includes('bump GoClaw'))) {
+              console.log('Issue already exists, skipping');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: `GoClaw upstream released a new version.\n\n- Current: \`${current}\`\n- Latest: \`${latest}\`\n\nUpdate \`GOCLAW_VERSION\` in \`.github/workflows/e2e.yml\` and run E2E tests.`,
+              labels: ['upstream', 'chore']
+            });
