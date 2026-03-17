@@ -1,0 +1,70 @@
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: acme-corp-prod
+  environment: prod
+
+connection:
+  endpoint: https://acme-goclaw.example.com
+  token: ${ACME_PROD_GOCLAW_TOKEN}
+
+resources:
+  # --- LLM Providers ---
+  - kind: Provider
+    name: anthropic
+    spec:
+      displayName: "Anthropic"
+      providerType: anthropic_native
+      apiBase: https://api.anthropic.com
+      apiKey: ${ANTHROPIC_API_KEY}
+      enabled: true
+
+  # --- Engineering agents ---
+  - kind: Agent
+    name: code-assistant
+    spec:
+      displayName: "Code Assistant"
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      agentType: open
+      status: active
+      isDefault: true
+      toolsConfig:
+        profile: coding
+
+  # --- Support agents ---
+  - kind: Agent
+    name: support-bot
+    spec:
+      displayName: "Support Bot"
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: minimal
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are the Acme Corp support assistant.
+            Be helpful, concise, and professional.
+
+  # --- Channels (prod only) ---
+  - kind: Channel
+    name: telegram-support
+    spec:
+      channelType: telegram
+      agentKey: support-bot
+      botToken: ${ACME_TELEGRAM_BOT_TOKEN}
+
+  # --- Cron Jobs (prod only) ---
+  - kind: CronJob
+    name: daily-report
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 9 * * *"
+        tz: Asia/Saigon
+      message: "Generate daily status report"
+      agentKey: support-bot
+      enabled: true

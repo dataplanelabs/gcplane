@@ -1,7 +1,7 @@
 apiVersion: gcplane.io/v1
 kind: Manifest
 metadata:
-  name: production
+  name: prod
   environment: prod
 
 connection:
