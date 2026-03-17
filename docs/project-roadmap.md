@@ -13,64 +13,68 @@
 - Directory loading
 - CI/CD + multi-platform release
 
-## Next: v0.2.0 — Production Hardening
+### v0.2.x (2026-03-17) — Production Hardening
+- Observe fidelity: field exclusion lists (no more *** masking)
+- MCP grants management: declarative agent grants
+- Export command: dump live GoClaw state as manifest YAML
+- Diff command: colorized drift detection
+- Server handler tests
+- AgentTeam v2 settings (notifications, delivery mode)
+- Channel display names + open policies
 
-### P1: Observe Fidelity
-- Replace `"***"` masking with proper field-level compare exclusions
-- Per-resource field mapping (manifest schema → API response schema)
-- Detect real drift for write-only fields (agentKey, botToken, grants)
+### v0.3.0 (2026-03-17) — Multi-Tenant
+- Multi-tenant serve: --tenants-dir with per-tenant controllers
+- Per-tenant HTTP endpoints: /api/v1/status/{tenant}
+- Webhook signature verification (GitHub HMAC + GitLab token)
+- Tool configuration docs + per-agent overrides
+- Directory hashing for FileSource
 
-### P1: MCP Grants Management
-- Separate API calls for agent grants (POST /v1/mcp/agents-grants)
-- Grant/revoke agents to MCP servers declaratively
-- Idempotent grant comparison
+### v0.4.0 (2026-03-17) — Composites & Operations
+- Composite resources: template-based abstractions (ChatBot = Agent + Channel)
+- Destroy command: tear down all gcplane-managed resources
+- Resource labels: --label filtering on plan/apply
+- 24 resources in local-dev example (9 agents, 3 teams, 3 MCP, 2 channels, 3 cron)
 
-### P1: Test Coverage
-- Provider package tests (mock HTTP/WS)
-- Server handler tests (httptest)
-- Controller integration tests
-- Target: 80%+ coverage
+## Next: v0.5.0 — Stability & DX
 
-### P2: Webhook Trigger
-- GitHub webhook signature verification (HMAC-SHA256)
-- GitLab webhook support
-- Configurable webhook secret
+### P1: End-to-End Testing
+- Automated e2e test in CI (spin up GoClaw via docker compose)
+- Test all commands: validate, plan, apply, diff, export, destroy
+- Composite expansion e2e test
+- Multi-tenant serve e2e test
 
-### P2: Export Command
-- `gcplane export` — dump current GoClaw state as manifest YAML
-- Bootstrap existing deployments into gcplane management
+### P1: Provider Test Coverage
+- Mock HTTP/WS for provider package tests
+- Test all 9 observe/create/update/delete methods
+- Target: 80%+ overall coverage
 
-### P2: Diff Command
-- `gcplane diff` — show drift between manifest and live state
-- Colorized output with field-level comparison
+### P2: Config File Support
+- `gcplane.yaml` or `.gcplane.yaml` as default config (no -f needed)
+- Auto-discover manifest in current directory
+- Support `GCPLANE_CONFIG` env var
 
-## Future: v0.3.0 — Multi-Tenant
+### P2: Init Command
+- `gcplane init` — generate starter manifest interactively
+- Prompt for provider type, model, agent name
+- Generate .env.example with required vars
 
-### Multi-Tenant Serve
-- One gcplane instance watches multiple tenant directories
-- Per-tenant connection config
-- Tenant-scoped metrics and status
+### P2: Dry-run Destroy
+- `gcplane destroy --dry-run` — preview what would be deleted
+- Consistent with plan (dry-run) → apply pattern
 
-### Composite Resources
-- Define abstractions (ChatBot = Provider + Agent + Channel)
-- Template expansion before reconciliation
-- Reduce manifest boilerplate for repeated patterns
-
-### Built-in Tool Config
-- Manage GoClaw built-in tool settings (exec, web_fetch, etc.)
-- Per-agent tool policy overrides
-
-## Future: v0.4.0 — Enterprise
-
-### RBAC / Approval Workflow
-- Require approval for destructive operations
-- Audit log of all apply/prune operations
-- Integration with external approval systems
+## Future: v0.6.0 — Enterprise
 
 ### Drift Alerting
 - Prometheus alerts on drift detection
 - Slack/webhook notifications on sync failures
+- Configurable alert thresholds
 
-### Backup / Restore
-- Export full GoClaw state before destructive operations
-- Rollback to previous state on failure
+### Audit Log
+- Log all apply/prune/destroy operations with timestamps
+- Export audit trail as JSON/CSV
+- Integration with external logging (stdout structured logs)
+
+### Backup Before Destroy
+- Auto-export state before destructive operations
+- `gcplane destroy --backup` creates a manifest snapshot
+- Rollback via `gcplane apply -f backup.yaml`

@@ -46,6 +46,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "GoClaw auth token (or GCPLANE_TOKEN env)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
+	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(applyCmd)
 	rootCmd.AddCommand(diffCmd)

@@ -49,12 +49,25 @@ func resolveConnection(m *manifest.Manifest) (ep, tok string, err error) {
 }
 
 // loadAndValidateManifest loads and validates the manifest from configFile.
+// Discovery order: --file flag > GCPLANE_CONFIG env > gcplane.yaml > gcplane.yml > .gcplane.yaml
 func loadAndValidateManifest() (*manifest.Manifest, error) {
-	if configFile == "" {
-		return nil, fmt.Errorf("manifest file required: use --file or -f")
+	path := configFile
+	if path == "" {
+		path = os.Getenv("GCPLANE_CONFIG")
+	}
+	if path == "" {
+		for _, name := range []string{"gcplane.yaml", "gcplane.yml", ".gcplane.yaml"} {
+			if _, err := os.Stat(name); err == nil {
+				path = name
+				break
+			}
+		}
+	}
+	if path == "" {
+		return nil, fmt.Errorf("manifest file required: use --file, GCPLANE_CONFIG env, or create gcplane.yaml")
 	}
 
-	m, err := manifest.Load(configFile)
+	m, err := manifest.Load(path)
 	if err != nil {
 		return nil, err
 	}

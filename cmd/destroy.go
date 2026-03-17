@@ -13,6 +13,7 @@ import (
 )
 
 var destroyAutoApprove bool
+var destroyDryRun bool
 
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
@@ -80,6 +81,12 @@ Deletes in reverse dependency order for safe cascading.`,
 			fmt.Printf("  \033[31m- %s/%s\033[0m\n", r.Kind, r.Name)
 		}
 
+		// Dry-run: show plan and exit without deleting
+		if destroyDryRun {
+			fmt.Println("\nDry-run: no resources deleted.")
+			return nil
+		}
+
 		// Confirm unless auto-approve
 		if !destroyAutoApprove {
 			fmt.Print("\nDestroy these resources? This cannot be undone. [y/N] ")
@@ -114,4 +121,5 @@ Deletes in reverse dependency order for safe cascading.`,
 
 func init() {
 	destroyCmd.Flags().BoolVar(&destroyAutoApprove, "auto-approve", false, "skip confirmation prompt")
+	destroyCmd.Flags().BoolVar(&destroyDryRun, "dry-run", false, "preview resources that would be deleted without deleting")
 }
