@@ -82,7 +82,7 @@ gcplane apply -f gcplane.yaml --auto-approve
 
 | Command | Description |
 |---------|-------------|
-| `init` | Generate a starter manifest interactively |
+| `init` | Generate a starter manifest interactively (supports provider type selection: anthropic, openai, openrouter, custom) |
 | `validate` | Validate manifest schema (no GoClaw connection) |
 | `plan` | Show changes required (dry-run) |
 | `apply` | Apply manifest to reach desired state |
@@ -118,8 +118,16 @@ gcplane apply -f gcplane.yaml --auto-approve
 |------|-------------|
 | `--prune` | Delete resources removed from manifest (default: false) |
 | `--auto-approve` | Skip confirmation prompt (apply only) |
+| `--log-file` | Write audit log to file (apply and destroy commands) |
 
 **Prune Safety**: Prune is opt-in to prevent accidental deletions. Only deletes gcplane-owned resources.
+
+## Destroy Flags
+
+| Flag | Description |
+|------|-------------|
+| `--backup` | Auto-export state to manifest snapshot before destruction |
+| `--log-file` | Write audit log to file |
 
 ## Manifest Reference
 

@@ -50,24 +50,21 @@
 - E2E: test-diff, test-composite, test-destroy Makefile targets + CI steps
 - Bugfix: hash[:12] panic guard in controller
 
-## Next: v0.6.0 — DX & Enterprise
+### v0.6.0 (2026-03-18) — DX & Enterprise
+- Enhanced init: `gcplane init` with interactive provider type selection (anthropic, openai, openrouter, custom)
+- Config auto-discovery: `gcplane.yaml` or `.gcplane.yaml` as default (no -f needed)
+- Audit logging: `--log-file` flag for apply and destroy commands
+- Backup before destroy: `gcplane destroy --backup` auto-exports state snapshot
+- Version update notifications: auto-check for new releases
+- Install script for easy setup
+
+## Next: v0.7.0 — Advanced Features
 
 ### P1: Config File Support
-- `gcplane.yaml` or `.gcplane.yaml` as default config (no -f needed)
-- Auto-discover manifest in current directory
-- Support `GCPLANE_CONFIG` env var
+- Support `GCPLANE_CONFIG` env var for custom config paths
+- Config file validation and schema documentation
 
-### P1: Init Command
-- `gcplane init` — generate starter manifest interactively
-- Prompt for provider type, model, agent name
-- Generate .env.example with required vars
-
-### P2: Audit Log
-- Log all apply/prune/destroy operations with timestamps
+### P2: Advanced Audit
 - Export audit trail as JSON/CSV
-- Integration with external logging (stdout structured logs)
-
-### P2: Backup Before Destroy
-- Auto-export state before destructive operations
-- `gcplane destroy --backup` creates a manifest snapshot
-- Rollback via `gcplane apply -f backup.yaml`
+- Integration with external logging systems
+- Audit event filtering and search
