@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/display"
 	"github.com/dataplanelabs/gcplane/internal/manifest"
@@ -16,6 +18,7 @@ import (
 var autoApprove bool
 var applyPrune bool
 var applyLabelSelector string
+var applyLogFile string
 
 var applyCmd = &cobra.Command{
 	Use:   "apply",
@@ -77,6 +80,8 @@ Only manages declared resources — UI-created objects are untouched.`,
 		_, result := engine.Reconcile(m, opts)
 		display.PrintApplyResult(result)
 
+		writeApplyAuditLog(applyLogFile, configFile, plan, result)
+
 		if result.Failed > 0 {
 			return fmt.Errorf("%d resource(s) failed to apply", result.Failed)
 		}
@@ -88,4 +93,30 @@ func init() {
 	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, "skip confirmation prompt")
 	applyCmd.Flags().BoolVar(&applyPrune, "prune", false, "delete gcplane-owned resources not present in manifest")
 	applyCmd.Flags().StringVarP(&applyLabelSelector, "label", "l", "", "filter resources by label (key=value,key2=value2)")
+	applyCmd.Flags().StringVar(&applyLogFile, "log-file", "", "write audit log to file (JSON format)")
+}
+
+// writeApplyAuditLog appends a JSON audit entry to logFile (no-op if empty).
+func writeApplyAuditLog(logFile, manifestFile string, plan *reconciler.Plan, result *reconciler.ApplyResult) {
+	if logFile == "" {
+		return
+	}
+	entry := map[string]any{
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"action":    "apply",
+		"manifest":  manifestFile,
+		"creates":   plan.Creates,
+		"updates":   plan.Updates,
+		"deletes":   plan.Deletes,
+		"applied":   result.Applied,
+		"failed":    result.Failed,
+		"errors":    result.Errors,
+	}
+	data, _ := json.Marshal(entry)
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	f.Write(append(data, '\n'))
 }

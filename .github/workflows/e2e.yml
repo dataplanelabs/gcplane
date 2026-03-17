@@ -1,0 +1,65 @@
+name: E2E
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: goclaw
+          POSTGRES_PASSWORD: goclaw
+          POSTGRES_DB: goclaw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build gcplane
+        run: go build -o gcplane .
+
+      - name: Start GoClaw
+        run: |
+          docker run -d --name goclaw \
+            --network host \
+            -e GOCLAW_HOST=0.0.0.0 \
+            -e GOCLAW_PORT=18790 \
+            -e GOCLAW_GATEWAY_TOKEN=test-token-ci \
+            -e GOCLAW_ENCRYPTION_KEY=$(openssl rand -hex 32) \
+            -e GOCLAW_POSTGRES_DSN=postgres://goclaw:goclaw@localhost:5432/goclaw?sslmode=disable \
+            ghcr.io/nextlevelbuilder/goclaw:latest
+
+          # Wait for health
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:18790/health > /dev/null 2>&1; then
+              echo "GoClaw ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Test validate
+        run: ./gcplane validate -f examples/minimal.yaml
+
+      - name: Test plan
+        env:
+          GOCLAW_TOKEN: test-token-ci
+        run: ./gcplane plan -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f goclaw 2>/dev/null || true
