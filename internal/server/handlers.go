@@ -42,7 +42,8 @@ func (s *Server) handleWebhook(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
-	m := s.controller.GetMetrics()
+	snap := s.controller.GetMetrics().Snapshot()
+	m := &snap
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 
 	fmt.Fprintf(w, "# HELP gcplane_sync_total Total number of sync operations\n")

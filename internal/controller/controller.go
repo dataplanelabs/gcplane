@@ -2,6 +2,7 @@ package controller
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
@@ -20,12 +21,20 @@ type Controller struct {
 	lastHash  string
 }
 
-// Metrics tracks sync counters for Prometheus exposition.
+// Metrics tracks sync counters for Prometheus exposition. Thread-safe via mutex.
 type Metrics struct {
+	mu           sync.RWMutex
 	SyncSuccess  int64
 	SyncErrors   int64
 	SyncDuration time.Duration
 	LastSyncTime time.Time
+}
+
+// Snapshot returns a copy of the current metrics (thread-safe).
+func (m *Metrics) Snapshot() Metrics {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return Metrics{SyncSuccess: m.SyncSuccess, SyncErrors: m.SyncErrors, SyncDuration: m.SyncDuration, LastSyncTime: m.LastSyncTime}
 }
 
 // Config holds controller dependencies.
@@ -92,7 +101,9 @@ func (c *Controller) reconcileOnce() {
 		c.logger.Error("fetch manifest failed", "error", err)
 		c.tracker.SetCondition(Condition{Type: ConditionError, Status: "True", Message: err.Error()})
 		c.tracker.SetCondition(Condition{Type: ConditionSynced, Status: "False"})
+		c.metrics.mu.Lock()
 		c.metrics.SyncErrors++
+		c.metrics.mu.Unlock()
 		return
 	}
 
@@ -123,11 +134,9 @@ func (c *Controller) reconcileOnce() {
 	if hasErrors {
 		c.tracker.SetCondition(Condition{Type: ConditionSynced, Status: "False"})
 		c.tracker.SetCondition(Condition{Type: ConditionError, Status: "True", Message: "sync completed with errors"})
-		c.metrics.SyncErrors++
 	} else {
 		c.tracker.SetCondition(Condition{Type: ConditionSynced, Status: "True"})
 		c.tracker.SetCondition(Condition{Type: ConditionError, Status: "False"})
-		c.metrics.SyncSuccess++
 	}
 
 	if hasDrift {
@@ -137,8 +146,15 @@ func (c *Controller) reconcileOnce() {
 	}
 
 	c.lastHash = hash
+	c.metrics.mu.Lock()
+	if hasErrors {
+		c.metrics.SyncErrors++
+	} else {
+		c.metrics.SyncSuccess++
+	}
 	c.metrics.SyncDuration = duration
 	c.metrics.LastSyncTime = time.Now()
+	c.metrics.mu.Unlock()
 
 	c.logger.Info("reconcile complete",
 		"creates", plan.Creates, "updates", plan.Updates, "noops", plan.Noops,
@@ -147,13 +163,8 @@ func (c *Controller) reconcileOnce() {
 }
 
 // buildResourceStatuses maps plan changes + apply results to per-resource statuses.
-func buildResourceStatuses(plan *reconciler.Plan, result *reconciler.ApplyResult) []ResourceStatus {
+func buildResourceStatuses(plan *reconciler.Plan, _ *reconciler.ApplyResult) []ResourceStatus {
 	statuses := make([]ResourceStatus, 0, len(plan.Changes))
-	errorSet := make(map[string]bool)
-	for _, e := range result.Errors {
-		errorSet[e] = true
-	}
-
 	for _, c := range plan.Changes {
 		rs := ResourceStatus{Kind: c.Kind, Key: c.Key}
 		switch {

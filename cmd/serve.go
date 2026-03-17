@@ -73,7 +73,11 @@ func runServe(_ *cobra.Command, _ []string) error {
 
 	switch {
 	case serveRepo != "":
-		gitSrc = source.NewGitSource(serveRepo, serveBranch, servePath, logger)
+		var err error
+		gitSrc, err = source.NewGitSource(serveRepo, serveBranch, servePath, logger)
+		if err != nil {
+			return err
+		}
 		src = gitSrc
 		logger.Info("using git source", "repo", serveRepo, "branch", serveBranch, "path", servePath)
 	case configFile != "":
@@ -125,17 +129,24 @@ func runServe(_ *cobra.Command, _ []string) error {
 	go ctrl.Run(done)
 
 	// Start HTTP server
+	srvErrCh := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			logger.Error("http server error", "error", err)
+		if err := srv.ListenAndServe(); err != nil && err.Error() != "http: Server closed" {
+			srvErrCh <- err
 		}
 	}()
 
 	logger.Info("gcplane serve started", "addr", serveAddr, "interval", interval)
 
-	// Wait for shutdown signal
-	sig := <-sigCh
-	logger.Info("received signal, shutting down", "signal", sig)
+	// Wait for shutdown signal or server error
+	select {
+	case sig := <-sigCh:
+		logger.Info("received signal, shutting down", "signal", sig)
+	case err := <-srvErrCh:
+		logger.Error("http server failed", "error", err)
+		close(done)
+		return fmt.Errorf("http server: %w", err)
+	}
 	close(done)
 
 	// Graceful HTTP shutdown

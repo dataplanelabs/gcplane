@@ -21,14 +21,21 @@ type GitSource struct {
 }
 
 // NewGitSource creates a source that watches a git repository.
-func NewGitSource(repo, branch, path string, logger *slog.Logger) *GitSource {
+// Returns error if inputs contain potentially dangerous values.
+func NewGitSource(repo, branch, path string, logger *slog.Logger) (*GitSource, error) {
 	if branch == "" {
 		branch = "main"
 	}
 	if path == "" {
 		path = "manifest.yaml"
 	}
-	return &GitSource{repo: repo, branch: branch, path: path, logger: logger}
+	// Prevent git argument injection
+	for _, v := range []string{repo, branch, path} {
+		if strings.HasPrefix(v, "-") {
+			return nil, fmt.Errorf("invalid git parameter %q: must not start with '-'", v)
+		}
+	}
+	return &GitSource{repo: repo, branch: branch, path: path, logger: logger}, nil
 }
 
 // Fetch clones (first call) or fetches (subsequent calls) the repo,
