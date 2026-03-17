@@ -82,11 +82,22 @@ GCPlane manages GoClaw resources — agents, providers, channels, MCP servers, c
                  └────────────┘
 ```
 
+## Install
+
+```bash
+# One-liner (auto-detects OS/arch)
+curl -fsSL https://gcplane.vanducng.dev | sh
+
+# Specific version
+curl -fsSL https://gcplane.vanducng.dev | sh -s -- --version v0.6.1
+
+# Or via Go
+go install github.com/dataplanelabs/gcplane@latest
+```
+
 ## Quick Start
 
 ```bash
-# Install
-go install github.com/dataplanelabs/gcplane@latest
 
 # Create manifest
 cat > manifest.yaml << 'EOF'
