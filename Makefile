@@ -12,7 +12,7 @@ LDFLAGS := -ldflags "-X github.com/dataplanelabs/gcplane/cmd.Version=$(VERSION)"
 .PHONY: validate plan apply serve
 .PHONY: goclaw-up goclaw-down goclaw-reset goclaw-logs
 .PHONY: setup reset
-.PHONY: test-e2e test-serve test-plan test-apply
+.PHONY: test-e2e test-serve test-plan test-apply test-diff test-destroy test-composite
 
 ## Run commands (usage: make validate F=examples/minimal.yaml)
 F ?= examples/local-dev.yaml
@@ -95,7 +95,7 @@ reset: build goclaw-reset
 # ============================================================
 
 ## Full e2e: reset GoClaw + test all features
-test-e2e: reset test-plan test-apply test-serve
+test-e2e: reset test-plan test-apply test-diff test-composite test-serve test-destroy
 	@echo ""
 	@echo "=== All E2E tests passed ==="
 
@@ -113,6 +113,29 @@ test-apply: build
 	./$(BINARY) apply -f $(F) --auto-approve
 	@echo "--- Second apply (should be 0 changes) ---"
 	./$(BINARY) plan -f $(F) | grep -q "0 to create, 0 to update" && echo "PASS: idempotent" || (echo "FAIL: not idempotent" && exit 1)
+
+## Test: diff shows no drift after apply (verifies id-stripping fix)
+test-diff: build
+	@echo ""
+	@echo "=== Test: diff (no drift after apply) ==="
+	./$(BINARY) diff -f $(F) 2>&1 | grep -q "No drift" && echo "PASS: no drift" || (echo "FAIL: unexpected drift detected" && exit 1)
+
+## Test: composite expansion validates and plans correctly
+test-composite: build
+	@echo ""
+	@echo "=== Test: composite ==="
+	./$(BINARY) validate -f examples/composite-example.yaml
+	./$(BINARY) plan -f examples/composite-example.yaml -v
+	@echo "PASS: composite"
+
+## Test: destroy actually removes resources (uses minimal.yaml to avoid side effects)
+test-destroy: build
+	@echo ""
+	@echo "=== Test: destroy ==="
+	./$(BINARY) apply -f examples/minimal.yaml --auto-approve
+	./$(BINARY) plan -f examples/minimal.yaml | grep -q "0 to create, 0 to update" || (echo "FAIL: minimal apply failed" && exit 1)
+	./$(BINARY) destroy -f examples/minimal.yaml --auto-approve
+	./$(BINARY) plan -f examples/minimal.yaml | grep -q "to create" && echo "PASS: resources destroyed and re-creatable" || (echo "FAIL: destroy did not remove resources" && exit 1)
 
 ## Test: serve starts, syncs, responds to health checks
 test-serve: build

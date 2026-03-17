@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gcplane
+spec:
+  template:
+    spec:
+      containers:
+        - name: gcplane
+          image: ghcr.io/dataplanelabs/gcplane:staging
+          args:
+            - serve
+            - -f
+            - /config/manifest.yaml
+            - --interval
+            - "15s"

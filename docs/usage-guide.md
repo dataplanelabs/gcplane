@@ -104,6 +104,14 @@ gcplane apply -f gcplane.yaml --auto-approve
 
 **Priority**: CLI flags > environment variables > manifest `connection` block.
 
+## Serve Environment Variables
+
+| Env Var | Description |
+|---------|-------------|
+| `GCPLANE_WEBHOOK_URL` | Webhook URL for drift notifications |
+| `GCPLANE_WEBHOOK_FORMAT` | Payload format: `slack` (default), `discord`, `googlechat`, `teams`, `telegram` |
+| `GCPLANE_LOG_FORMAT` | Log format: `text` (default) or `json` for structured output |
+
 ## Plan & Apply Flags
 
 | Flag | Description |
@@ -192,3 +200,68 @@ Exposes HTTP endpoints on `--addr` (default `:8480`):
 - `GET /api/v1/status` — Full sync status + per-resource state
 - `POST /api/v1/sync` — Trigger immediate reconcile
 - `POST /api/v1/webhook/git` — Git push webhook trigger (for CI/CD pipelines)
+
+## Deployment
+
+GCPlane is a single binary — deploy anywhere.
+
+### Local (docker compose)
+
+```bash
+# 1. Copy env file and fill in credentials
+cp .env.example .env
+
+# 2. Start gcplane (builds from source, watches examples/local-dev.yaml)
+docker compose up -d
+
+# 3. Check health
+curl http://localhost:8480/healthz
+
+# 4. View logs
+docker compose logs -f
+
+# 5. Stop
+docker compose down
+```
+
+To use a custom manifest, edit `docker-compose.yaml` volumes to mount your file:
+
+```yaml
+volumes:
+  - ./my-manifest.yaml:/config/manifest.yaml:ro
+```
+
+### VPS (binary / Docker)
+
+```bash
+# Direct binary
+gcplane serve -f /etc/gcplane/manifest.yaml --interval 30s
+
+# Docker (single container)
+docker run -v /path/to/manifest.yaml:/config/manifest.yaml \
+  -e GOCLAW_TOKEN=your-token \
+  -p 8480:8480 \
+  ghcr.io/dataplanelabs/gcplane:latest \
+  serve -f /config/manifest.yaml --interval 30s
+```
+
+### Kubernetes (kustomize)
+
+```bash
+# Dev environment
+kubectl apply -k deploy/overlays/dev
+
+# Staging
+kubectl apply -k deploy/overlays/staging
+
+# Production (2 replicas, higher resources)
+kubectl apply -k deploy/overlays/prod
+```
+
+Edit `deploy/base/configmap.yaml` with your manifest, create a Secret named `gcplane-secrets` with your env vars:
+
+```bash
+kubectl create secret generic gcplane-secrets \
+  --from-literal=GOCLAW_TOKEN=your-token \
+  --from-literal=ANTHROPIC_API_KEY=sk-ant-...
+```

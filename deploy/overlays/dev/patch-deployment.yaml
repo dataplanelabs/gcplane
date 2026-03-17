@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gcplane
+spec:
+  template:
+    spec:
+      containers:
+        - name: gcplane
+          image: ghcr.io/dataplanelabs/gcplane:dev
+          args:
+            - serve
+            - -f
+            - /config/manifest.yaml
+            - --interval
+            - "5s"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "25m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

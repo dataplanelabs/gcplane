@@ -179,6 +179,8 @@ func (tm *TenantManager) AggregatedMetrics() *Metrics {
 		snap := inst.Controller.GetMetrics().Snapshot()
 		agg.SyncSuccess += snap.SyncSuccess
 		agg.SyncErrors += snap.SyncErrors
+		agg.DriftDetected += snap.DriftDetected
+		agg.DriftResources += snap.DriftResources
 		if snap.LastSyncTime.After(agg.LastSyncTime) {
 			agg.LastSyncTime = snap.LastSyncTime
 			agg.SyncDuration = snap.SyncDuration

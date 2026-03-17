@@ -1,5 +1,10 @@
 # GCPlane Code Standards
 
+## Core Principles
+- **Deploy-Anywhere**: Single binary deploys to local dev, VPS (systemd/docker), and k8s equally. No platform-specific abstractions.
+- **Minimal Dependencies**: Keep total deps under 10. Prefer stdlib. No heavy frameworks, no SDKs for simple HTTP calls.
+- **Self-Contained**: Binary includes all logic. Config via env vars + YAML manifest. No external config services.
+
 ## Language & Tooling
 - **Go 1.25+** (pure Go, no CGO dependencies)
 - **Cobra** for CLI commands

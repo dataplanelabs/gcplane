@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/controller"
+	"github.com/dataplanelabs/gcplane/internal/notifier"
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/server"
 	"github.com/dataplanelabs/gcplane/internal/source"
@@ -64,8 +65,16 @@ func init() {
 	serveCmd.Flags().StringVar(&serveTenantsDir, "tenants-dir", "", "directory of tenant subdirs (mutually exclusive with -f/--repo)")
 }
 
+func newLogger() *slog.Logger {
+	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+	if os.Getenv("GCPLANE_LOG_FORMAT") == "json" {
+		return slog.New(slog.NewJSONHandler(os.Stdout, opts))
+	}
+	return slog.New(slog.NewTextHandler(os.Stdout, opts))
+}
+
 func runServe(_ *cobra.Command, _ []string) error {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := newLogger()
 
 	// Parse interval
 	interval, err := time.ParseDuration(serveInterval)
@@ -118,14 +127,16 @@ func runServe(_ *cobra.Command, _ []string) error {
 
 	// Create shared components
 	tracker := controller.NewStatusTracker()
+	n := notifier.New(os.Getenv("GCPLANE_WEBHOOK_URL"), os.Getenv("GCPLANE_WEBHOOK_FORMAT"))
 
 	ctrl := controller.New(controller.Config{
-		Source:   src,
-		Provider: provider,
-		Tracker:  tracker,
-		Interval: interval,
-		Prune:    servePrune,
-		Logger:   logger,
+		Source:    src,
+		Provider:  provider,
+		Tracker:   tracker,
+		Notifier:  n,
+		Interval:  interval,
+		Prune:     servePrune,
+		Logger:    logger,
 	})
 
 	srv := server.New(server.Config{

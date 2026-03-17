@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gcplane-manifest
+  labels:
+    app: gcplane
+data:
+  manifest.yaml: |
+    # Replace with your GCPlane manifest
+    # See examples/minimal.yaml for reference
+    apiVersion: gcplane/v1
+    kind: Manifest
+    metadata:
+      name: my-goclaw
+    spec:
+      provider:
+        url: http://goclaw:18790

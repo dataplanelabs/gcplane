@@ -163,4 +163,10 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintf(w, "# HELP gcplane_last_sync_timestamp Unix timestamp of last sync\n")
 	fmt.Fprintf(w, "# TYPE gcplane_last_sync_timestamp gauge\n")
 	fmt.Fprintf(w, "gcplane_last_sync_timestamp %d\n", m.LastSyncTime.Unix())
+	fmt.Fprintf(w, "# HELP gcplane_drift_detected_total Total number of sync cycles where drift was detected\n")
+	fmt.Fprintf(w, "# TYPE gcplane_drift_detected_total counter\n")
+	fmt.Fprintf(w, "gcplane_drift_detected_total %d\n", m.DriftDetected)
+	fmt.Fprintf(w, "# HELP gcplane_drift_resources Number of resources that drifted in the last sync cycle\n")
+	fmt.Fprintf(w, "# TYPE gcplane_drift_resources gauge\n")
+	fmt.Fprintf(w, "gcplane_drift_resources %d\n", m.DriftResources)
 }

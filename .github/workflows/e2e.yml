@@ -71,8 +71,19 @@ jobs:
       - name: Test export
         run: ./gcplane export --endpoint http://localhost:18790 --token test-token-ci
 
+      - name: Test composite validate
+        run: ./gcplane validate -f examples/composite-example.yaml
+
+      - name: Test composite plan
+        run: ./gcplane plan -f examples/composite-example.yaml --endpoint http://localhost:18790 --token test-token-ci
+
       - name: Test destroy --dry-run
         run: ./gcplane destroy --endpoint http://localhost:18790 --token test-token-ci --dry-run
+
+      - name: Test destroy (actual)
+        run: |
+          ./gcplane destroy -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci --auto-approve
+          ./gcplane plan -f examples/minimal.yaml --endpoint http://localhost:18790 --token test-token-ci | grep -q "to create"
 
       - name: Cleanup
         if: always()

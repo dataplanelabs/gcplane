@@ -2,6 +2,11 @@
 
 Declarative GitOps control plane for GoClaw. Manages AI agents, providers, channels, MCP servers, cron jobs, and teams through YAML manifests.
 
+## Core Principles
+- **Deploy-Anywhere**: Single binary for local, VPS, k8s. No platform lock-in.
+- **Minimal Dependencies**: Under 10 deps. Stdlib preferred. No SDKs for simple HTTP calls.
+- **Self-Contained**: Config via env vars + YAML manifest only.
+
 ## Tech Stack
 - Go 1.25, Cobra CLI, gorilla/websocket, gopkg.in/yaml.v3
 - No ORM, no heavy deps — 5 total dependencies
