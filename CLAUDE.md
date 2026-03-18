@@ -37,16 +37,16 @@ internal/
 
 ## Testing
 ```bash
-make test        # unit tests
-make test-e2e    # reset GoClaw + test all commands
-make reset       # wipe GoClaw + re-apply manifest
-make serve       # continuous reconciliation
+mise run test          # unit tests
+mise run test:e2e      # reset GoClaw + test all commands
+mise run reset         # wipe GoClaw + re-apply manifest
+mise run serve         # continuous reconciliation
 ```
 
 ## Local Dev
 ```bash
-cp .env.example .env  # fill in credentials
-make setup            # start GoClaw docker + apply config
+cp .env.example .env   # fill in credentials
+mise run setup         # start GoClaw docker + apply config
 ```
 
 ## GoClaw Compatibility

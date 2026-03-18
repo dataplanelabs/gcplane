@@ -1,0 +1,10 @@
+resources:
+  - kind: TTSConfig
+    name: tts
+    spec:
+      entries:
+        - provider: openrouter
+          model: openai/gpt-4o-audio-preview
+          timeout: 120
+          retries: 2
+          enabled: true

@@ -1,0 +1,9 @@
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: local-dev
+  environment: dev
+
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}

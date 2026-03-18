@@ -184,17 +184,17 @@ gcplane apply -f manifest.yaml
 ```bash
 # Setup (requires Docker for GoClaw)
 cp .env.example .env   # fill in credentials
-make setup              # start GoClaw + apply config
+mise run setup          # start GoClaw + apply config
 
 # Install git hooks
 git config core.hooksPath .githooks
 
 # Test
-make test               # unit tests
-make test-e2e           # full e2e (reset + plan + apply + serve)
+mise run test           # unit tests
+mise run test:e2e       # full e2e (reset + plan + apply + serve)
 
 # Serve (continuous reconciliation)
-make serve
+mise run serve
 ```
 
 ## Compatibility

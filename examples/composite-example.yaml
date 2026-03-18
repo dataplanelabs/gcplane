@@ -44,6 +44,6 @@ resources:
     spec:
       displayName: "Support Bot"
       provider: zai-coding
-      model: glm-5
+      model: glm-5-turbo
       channelType: telegram
       botToken: ${GOCLAW_TELEGRAM_TOKEN}

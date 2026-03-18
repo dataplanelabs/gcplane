@@ -1,0 +1,66 @@
+resources:
+  - kind: CronJob
+    name: daily-standup
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 9 * * 1-5"
+        tz: Asia/Saigon
+      message: "Check Huly for today's tasks, summarize blockers and priorities for the team"
+      agentKey: product-planner
+      enabled: true
+
+  - kind: CronJob
+    name: weekly-data-report
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 10 * * 1"
+        tz: Asia/Saigon
+      message: "Generate weekly data quality and pipeline health report. Include error rates, latency trends, and storage growth."
+      agentKey: report-builder
+      enabled: true
+
+  - kind: CronJob
+    name: daily-infra-check
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 8 * * *"
+        tz: Asia/Saigon
+      message: "Check k8s cluster health: pod restarts, resource usage, pending alerts. Report issues."
+      agentKey: devops-engineer
+      enabled: true
+
+  - kind: CronJob
+    name: weekly-security-scan
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 7 * * 1"
+        tz: Asia/Saigon
+      message: "Run weekly security review: check dependency CVEs, audit API key rotation status, review access logs for anomalies."
+      agentKey: security-engineer
+      enabled: true
+
+  - kind: CronJob
+    name: weekly-docs-sync
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 14 * * 5"
+        tz: Asia/Saigon
+      message: "Review recent merged PRs and changelog. Identify docs that need updating. Flag any undocumented features or API changes."
+      agentKey: tech-writer
+      enabled: true
+
+  - kind: CronJob
+    name: daily-model-health
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 9 * * 1-5"
+        tz: Asia/Saigon
+      message: "Check LLM provider health: response latencies, error rates, cost trends. Flag any degradation or pricing changes."
+      agentKey: ml-engineer
+      enabled: true

@@ -1,0 +1,84 @@
+resources:
+  - kind: AgentTeam
+    name: data-team
+    spec:
+      displayName: "Data Team"
+      lead: data-engineer
+      members: [data-analyst, report-builder]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskFailed: true
+        deliveryMode: through_leader
+
+  - kind: AgentTeam
+    name: product-team
+    spec:
+      displayName: "Product Team"
+      lead: product-planner
+      members: [market-researcher, ux-designer]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskFailed: true
+        deliveryMode: through_leader
+
+  - kind: AgentTeam
+    name: engineering-team
+    spec:
+      displayName: "Engineering Team"
+      lead: dev-lead
+      members: [backend-engineer, frontend-engineer, qa-engineer, security-engineer]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskFailed: true
+        deliveryMode: through_leader
+
+  - kind: AgentTeam
+    name: design-team
+    spec:
+      displayName: "Design & Content Team"
+      lead: tech-writer
+      members: [ux-designer]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: false
+          taskFailed: true
+        deliveryMode: direct
+
+  - kind: AgentTeam
+    name: ai-team
+    spec:
+      displayName: "AI/ML Team"
+      lead: ml-engineer
+      members: [prompt-engineer]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskFailed: true
+        deliveryMode: direct
+
+  - kind: AgentTeam
+    name: ops-team
+    spec:
+      displayName: "Ops Team"
+      lead: devops-engineer
+      members: [support-bot]
+      settings:
+        version: v2
+        notifications:
+          taskDispatched: true
+          taskProgress: false
+          taskFailed: true
+        deliveryMode: direct

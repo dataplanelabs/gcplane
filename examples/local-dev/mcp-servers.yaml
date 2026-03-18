@@ -1,0 +1,30 @@
+resources:
+  - kind: MCPServer
+    name: huly-mcp
+    spec:
+      displayName: "Huly Project Management"
+      transport: sse
+      url: https://mcp.dataplanelabs.com/huly/mcp
+      enabled: true
+      grants:
+        agents: [assistant, product-planner, dev-lead, qa-engineer]
+
+  - kind: MCPServer
+    name: k8s-mcp
+    spec:
+      displayName: "Kubernetes Monitoring"
+      transport: sse
+      url: https://mcp.dataplanelabs.com/k8s/mcp
+      enabled: true
+      grants:
+        agents: [assistant, devops-engineer, data-engineer, security-engineer]
+
+  - kind: MCPServer
+    name: gws-mcp
+    spec:
+      displayName: "Google Workspace"
+      transport: sse
+      url: https://mcp.dataplanelabs.com/gws/mcp
+      enabled: true
+      grants:
+        agents: [assistant, report-builder, product-planner, tech-writer]

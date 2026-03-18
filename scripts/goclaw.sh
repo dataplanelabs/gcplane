@@ -16,7 +16,8 @@ case "${1:-help}" in
     ;;
   reset)
     $COMPOSE down -v
-    $COMPOSE up -d --build
+    $COMPOSE build --no-cache
+    $COMPOSE up -d
     ;;
   logs)
     $COMPOSE logs -f goclaw

@@ -47,7 +47,7 @@
 - K8s deployment: kustomize base + dev/staging/prod overlays
 - Docker compose for local dev
 - Security hardening: runAsNonRoot, readOnlyRootFilesystem, drop ALL caps
-- E2E: test-diff, test-composite, test-destroy Makefile targets + CI steps
+- E2E: test-diff, test-composite, test-destroy via `mise run test:e2e` + CI steps
 - Bugfix: hash[:12] panic guard in controller
 
 ### v0.6.0 (2026-03-18) — DX & Enterprise

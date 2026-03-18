@@ -1,9 +1,7 @@
 [env]
 _.file = ".env"
-
-[vars]
 BINARY = "gcplane"
-F = "examples/local-dev.yaml"
+F = "examples/local-dev"
 GOCLAW_DIR = "../../nextlevelbuilder/goclaw"
 
 [tools]
@@ -16,12 +14,12 @@ go = "1.25"
 description = "Build gcplane binary"
 run = """
 VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
-go build -ldflags "-X github.com/dataplanelabs/gcplane/cmd.Version=$VERSION" -o {{vars.BINARY}} .
+go build -ldflags "-X github.com/dataplanelabs/gcplane/cmd.Version=$VERSION" -o $BINARY .
 """
 
 [tasks.clean]
 description = "Remove build artifacts"
-run = "rm -f {{vars.BINARY}} coverage.out coverage_provider.out"
+run = "rm -f $BINARY coverage.out coverage_provider.out"
 
 # ============================================================
 # Tests
@@ -56,32 +54,32 @@ run = "scripts/test-e2e.sh"
 [tasks.validate]
 description = "Validate manifest"
 depends = ["build"]
-run = "./{{vars.BINARY}} validate -f ${F:-{{vars.F}}}"
+run = "./$BINARY validate -f $F"
 
 [tasks.plan]
 description = "Show plan"
 depends = ["build"]
-run = "./{{vars.BINARY}} plan -f ${F:-{{vars.F}}}"
+run = "./$BINARY plan -f $F"
 
 [tasks.apply]
 description = "Apply manifest"
 depends = ["build"]
-run = "./{{vars.BINARY}} apply -f ${F:-{{vars.F}}}"
+run = "./$BINARY apply -f $F"
 
 [tasks.serve]
 description = "Run continuous reconciliation"
 depends = ["build"]
-run = "./{{vars.BINARY}} serve -f ${F:-{{vars.F}}} --interval 10s"
+run = "./$BINARY serve -f $F --interval 10s"
 
 [tasks.top]
 description = "Launch TUI dashboard"
 depends = ["build"]
-run = "./{{vars.BINARY}} top -f ${F:-{{vars.F}}}"
+run = "./$BINARY top -f $F"
 
 [tasks."top:attach"]
 description = "Launch TUI in attach mode"
 depends = ["build"]
-run = "./{{vars.BINARY}} top --attach ${ATTACH:-http://localhost:8480}"
+run = "./$BINARY top --attach ${ATTACH:-http://localhost:8480}"
 
 # ============================================================
 # GoClaw Instance
@@ -121,7 +119,7 @@ scripts/wait-and-apply.sh
 [tasks.dev]
 description = "Build + run TUI against local-dev"
 depends = ["build"]
-run = "./{{vars.BINARY}} top -f {{vars.F}}"
+run = "./$BINARY top -f $F"
 
 # ============================================================
 # Quality

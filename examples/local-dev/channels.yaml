@@ -1,0 +1,26 @@
+resources:
+  - kind: Channel
+    name: telegram-main
+    spec:
+      displayName: "Telegram Bot"
+      channelType: telegram
+      agentKey: data-engineer
+      botToken: ${GOCLAW_TELEGRAM_TOKEN}
+      enabled: true
+      config:
+        dmPolicy: open
+        groupPolicy: open
+
+  - kind: Channel
+    name: slack-main
+    spec:
+      displayName: "Slack Bot"
+      channelType: slack
+      agentKey: assistant
+      botToken: ${GOCLAW_SLACK_BOT_TOKEN}
+      enabled: true
+      config:
+        appToken: ${GOCLAW_SLACK_APP_TOKEN}
+        dmPolicy: open
+        groupPolicy: open
+        reactionLevel: full
