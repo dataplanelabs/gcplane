@@ -9,6 +9,7 @@ import (
 )
 
 var planPrune bool
+var planForce bool
 var planLabelSelector string
 
 var planCmd = &cobra.Command{
@@ -38,7 +39,7 @@ Similar to 'terraform plan'.`,
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider)
-		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: planPrune})
+		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: planPrune, Force: planForce})
 
 		display.PrintPlan(plan, verbose)
 		return nil
@@ -47,5 +48,6 @@ Similar to 'terraform plan'.`,
 
 func init() {
 	planCmd.Flags().BoolVar(&planPrune, "prune", false, "include deletion of gcplane-owned resources not in manifest")
+	planCmd.Flags().BoolVar(&planForce, "force", false, "show all resources as updates even when no diff detected")
 	planCmd.Flags().StringVarP(&planLabelSelector, "label", "l", "", "filter resources by label (key=value,key2=value2)")
 }

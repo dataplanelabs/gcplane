@@ -59,7 +59,11 @@ func printCreate(c reconciler.Change) {
 }
 
 func printUpdate(c reconciler.Change) {
-	fmt.Printf("%s~ %s/%s%s\n", colorYellow, c.Kind, c.Name, colorReset)
+	if c.Forced {
+		fmt.Printf("%s~ %s/%s (force)%s\n", colorYellow, c.Kind, c.Name, colorReset)
+	} else {
+		fmt.Printf("%s~ %s/%s%s\n", colorYellow, c.Kind, c.Name, colorReset)
+	}
 
 	keys := sortedKeys(c.Diff)
 	for _, k := range keys {

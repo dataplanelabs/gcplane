@@ -17,6 +17,7 @@ import (
 
 var autoApprove bool
 var applyPrune bool
+var applyForce bool
 var applyLabelSelector string
 var applyLogFile string
 
@@ -47,10 +48,10 @@ Only manages declared resources — UI-created objects are untouched.`,
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider)
-		opts := reconciler.ReconcileOpts{Prune: applyPrune}
+		opts := reconciler.ReconcileOpts{Prune: applyPrune, Force: applyForce}
 
 		// Show plan first (dry-run)
-		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: applyPrune})
+		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: applyPrune, Force: applyForce})
 		display.PrintPlan(plan, verbose)
 
 		if plan.Creates == 0 && plan.Updates == 0 && plan.Deletes == 0 {
@@ -92,6 +93,7 @@ Only manages declared resources — UI-created objects are untouched.`,
 func init() {
 	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, "skip confirmation prompt")
 	applyCmd.Flags().BoolVar(&applyPrune, "prune", false, "delete gcplane-owned resources not present in manifest")
+	applyCmd.Flags().BoolVar(&applyForce, "force", false, "re-apply all resources even when no diff detected")
 	applyCmd.Flags().StringVarP(&applyLabelSelector, "label", "l", "", "filter resources by label (key=value,key2=value2)")
 	applyCmd.Flags().StringVar(&applyLogFile, "log-file", "", "write audit log to file (JSON format)")
 }

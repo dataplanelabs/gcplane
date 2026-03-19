@@ -121,6 +121,54 @@ func TestReconcile_ApplyExecutes(t *testing.T) {
 	}
 }
 
+func TestReconcile_ForceUpdatesIdentical(t *testing.T) {
+	provider := newMockProvider()
+	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
+
+	engine := NewEngine(provider)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
+		},
+	}
+
+	// Without force: noop
+	plan, _ := engine.Reconcile(m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected 1 noop without force, got %d", plan.Noops)
+	}
+
+	// With force: update
+	plan, _ = engine.Reconcile(m, ReconcileOpts{DryRun: true, Force: true})
+	if plan.Updates != 1 {
+		t.Errorf("expected 1 update with force, got %d", plan.Updates)
+	}
+	if plan.Noops != 0 {
+		t.Errorf("expected 0 noops with force, got %d", plan.Noops)
+	}
+}
+
+func TestReconcile_ForceApplyExecutes(t *testing.T) {
+	provider := newMockProvider()
+	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
+
+	engine := NewEngine(provider)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
+		},
+	}
+
+	// Force apply should call Update even when specs are identical
+	_, result := engine.Reconcile(m, ReconcileOpts{DryRun: false, Force: true})
+	if result.Applied != 1 {
+		t.Errorf("expected 1 applied with force, got %d", result.Applied)
+	}
+	if len(provider.updated) != 1 {
+		t.Errorf("expected 1 update call with force, got %d", len(provider.updated))
+	}
+}
+
 func TestReconcile_DependencyOrder(t *testing.T) {
 	provider := newMockProvider()
 	engine := NewEngine(provider)

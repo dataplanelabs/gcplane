@@ -47,7 +47,7 @@ func (e *Engine) Reconcile(m *manifest.Manifest, opts ReconcileOpts) (*Plan, *Ap
 		}
 
 		for _, res := range resources {
-			change := e.reconcileOne(res)
+			change := e.reconcileOne(res, opts.Force)
 			plan.Changes = append(plan.Changes, change)
 
 			switch change.Action {
@@ -147,7 +147,7 @@ func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Ch
 	return changes, result
 }
 
-func (e *Engine) reconcileOne(res manifest.Resource) Change {
+func (e *Engine) reconcileOne(res manifest.Resource, force bool) Change {
 	change := Change{
 		Kind: res.Kind,
 		Name: res.Name,
@@ -174,6 +174,12 @@ func (e *Engine) reconcileOne(res manifest.Resource) Change {
 	exclude := manifest.WriteOnlyFields(res.Kind)
 	diffs := CompareSpecExcluding(spec, current, exclude)
 	if len(diffs) == 0 {
+		if force {
+			// Force re-apply even with no detected diff (covers write-only fields)
+			change.Action = ActionUpdate
+			change.Forced = true
+			return change
+		}
 		change.Action = ActionNoop
 		return change
 	}

@@ -20,6 +20,7 @@ type Change struct {
 	Action Action                `json:"action"`
 	Diff   map[string]FieldDiff  `json:"diff,omitempty"`
 	Error  string                `json:"error,omitempty"`
+	Forced bool                  `json:"forced,omitempty"` // true when update triggered by --force with no diff
 }
 
 // FieldDiff shows the before/after for a single field.
@@ -42,6 +43,7 @@ type Plan struct {
 type ReconcileOpts struct {
 	DryRun bool
 	Prune  bool
+	Force  bool // Force re-applies all resources, even when no diff detected
 }
 
 // ApplyResult is the result of applying a plan.
