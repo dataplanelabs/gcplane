@@ -129,6 +129,14 @@ gcplane/
 - **WebSocket RPC v3**: CronJob, Team, TTSConfig (no HTTP endpoints in GoClaw; support Create/Update/Delete/List)
 - WS connection is lazy-initialized on first WS resource access
 
+### Credential Structure
+Channel credentials are stored in a `credentials` object (not top-level). Structure varies by channel type:
+- **Telegram**: `credentials.token` — single bot token
+- **Slack**: `credentials.botToken` (bot token) + `credentials.appToken` (app token)
+- Other channel types follow similar nested credential patterns
+
+This prevents credential data from appearing in manifest comparisons via write-only field exclusion.
+
 ### No Local State
 GoClaw API is the single source of truth. GCPlane carries no local state (SQLite removed). Every reconciliation queries live state, ensuring accuracy and simplifying deployments.
 
@@ -147,6 +155,16 @@ Prune deletes in reverse order (safe cascading).
 - Skill and TTSConfig are excluded (GoClaw manages these)
 - Deletes happen in reverse dependency order to prevent cascade failures
 - Continue-on-error per-resource; one failure doesn't block others
+
+### Tenant Isolation
+In multi-tenant mode, GCPlane enforces tenant isolation via:
+- **Observation filtering**: `matchesTenant()` applied to all observe/listAll results
+  - Cached tenant UUID resolution prevents redundant API calls
+  - Filters by `tenant_id` field in response; trusts header-based scoping if field absent
+- **Creation injection**: Tenant slug resolved to UUID, injected as `tenant_id` into POST bodies
+  - GoClaw API requires `tenant_id` UUID for tenant-scoped resource creation
+- **Resource filtering**: Only resources matching the provider's tenant ID are considered
+  - Single-tenant mode (no tenant ID set) matches all resources
 
 ### API Key Masking
 GoClaw returns `"***"` for sensitive fields. Comparator skips masked fields to avoid false-positive diffs. On update, full key from manifest is always sent.

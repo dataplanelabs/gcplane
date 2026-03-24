@@ -42,6 +42,44 @@ Resources are applied in dependency order: Tenant → Provider → Agent → Ski
 
 **Note:** Skill and TTSConfig are managed by GoClaw and cannot be deleted by gcplane. BuiltinToolConfig, SkillConfig, and MCPCredentials are not enumerable for prune.
 
+## Channel Configuration
+
+Channel credentials are stored in a `credentials` object (nested structure, not top-level fields). The structure varies by channel type:
+
+### Telegram Channel
+```yaml
+- kind: Channel
+  name: telegram-main
+  spec:
+    displayName: "Telegram Bot"
+    channelType: telegram
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      token: ${TELEGRAM_BOT_TOKEN}
+    config:
+      dmPolicy: open       # or "closed"
+      groupPolicy: open    # or "closed"
+```
+
+### Slack Channel
+```yaml
+- kind: Channel
+  name: slack-main
+  spec:
+    displayName: "Slack Bot"
+    channelType: slack
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      botToken: ${SLACK_BOT_TOKEN}
+      appToken: ${SLACK_APP_TOKEN}
+    config:
+      dmPolicy: open
+```
+
+**Note:** The `credentials` field is write-only (excluded from comparison). Tokens are not returned by GoClaw during observe, preventing phantom diffs.
+
 ## Tool Configuration
 
 Agents support per-agent tool policies via `toolsConfig` in the spec:

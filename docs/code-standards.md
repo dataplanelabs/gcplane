@@ -62,3 +62,30 @@ Options are variadic functions that modify Provider state, enabling flexible, co
 - Never log or display resolved secrets
 - API keys masked as `"***"` in GoClaw responses — skip in comparison
 - Support `${ENV_VAR}` and `file://path` patterns
+
+## Tenant Isolation Pattern
+
+In multi-tenant mode, enforce isolation via:
+
+**1. Observation filtering** — Apply `matchesTenant()` to all observe/listAll results:
+```go
+if strVal(inst, "name") == key && p.matchesTenant(inst) {
+    return translateResult(stripInternal(inst)), nil
+}
+```
+
+**2. Creation injection** — Resolve tenant slug to UUID, inject into POST body:
+```go
+if p.tenantID != "" {
+    uuid, err := p.resolveTenantUUID()
+    if err != nil {
+        return err
+    }
+    spec["tenantId"] = uuid
+}
+```
+
+**3. Resource filtering** — `matchesTenant()` uses cached tenant UUID resolution:
+- Single-tenant mode (no tenant ID): always true
+- Multi-tenant: filters by `tenant_id` field in response
+- Header-based scoping fallback if field absent

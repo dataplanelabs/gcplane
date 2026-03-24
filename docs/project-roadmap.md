@@ -81,6 +81,20 @@
 - Multi-tenant example: `examples/multi-tenant/` with _system/ + acme-corp/ + globex-inc/
 - GoClaw v1.2.0 tenant isolation validated via 12 new tests
 
+### v0.7.2 (2026-03-25) — Channel Credentials & Tenant Isolation
+- **Channel credentials restructured**: Bot tokens moved from top-level to `credentials` object
+  - Telegram: `credentials.token` (single token)
+  - Slack: `credentials.botToken` + `credentials.appToken`
+- **Tenant isolation enforcement**: `matchesTenant` filter added to all observe/listAll functions
+  - Prevents cross-tenant resource matching in multi-tenant deployments
+  - Uses cached tenant UUID resolution for efficiency
+- **Multi-tenant resource creation**: Tenant slug resolved to UUID, injected into create bodies
+  - GoClaw API requires `tenant_id` UUID in POST requests for tenant-scoped operations
+- **Channel agent resolution**: `agentKey → agent_id` now resolved in both create and update paths
+  - Previously only handled in create path; update path now consistent
+- **Write-only fields**: `systemPrompt` added to agent write-only fields (GoClaw doesn't persist via agent API)
+- **Multi-tenant example**: New channel example for acme-corp tenant in local-dev-mt setup
+
 ## Next: v0.9.0 — Advanced Features
 
 ### P1: Config File Support
