@@ -78,6 +78,18 @@ After creating a tenant, use a tenant-bound API key to configure:
       apiKey: ${GITHUB_API_KEY}
 ```
 
+## Tenant Isolation Policy
+
+GCPlane enforces **strict tenant separation** — cross-tenant operations are not supported by design. Each tenant is a fully isolated unit:
+
+- Resources in tenant A **cannot** reference resources in tenant B
+- No shared resources, grants, or permissions across tenant boundaries
+- Each tenant has its own API key, connection, and reconciliation loop
+- System-level operations (Tenant CRUD via `_system/`) use a separate system API key
+- GoClaw enforces isolation at the database query level (`WHERE tenant_id = $N`)
+
+To serve multiple tenants, deploy each with its own subdirectory under `--tenants-dir`. There is no mechanism to link or share state between them.
+
 ## Org Unit vs Tenant
 
 **Tenant** = first-class resource, API-enforced isolation (GoClaw v1.2.0+).

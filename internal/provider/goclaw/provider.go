@@ -24,7 +24,7 @@ func WithTenantID(id string) Option {
 }
 
 // WithUserID sets the X-GoClaw-User-Id header. Default is "gcplane".
-// Must match GOCLAW_OWNER_IDS for cross-tenant operations (e.g., Tenant CRUD).
+// Must match GOCLAW_OWNER_IDS for system-level operations (e.g., Tenant CRUD).
 func WithUserID(id string) Option {
 	return func(p *Provider) {
 		p.userID = id

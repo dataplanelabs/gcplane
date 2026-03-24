@@ -1,7 +1,0 @@
-resources:
-  - kind: TTSConfig
-    name: tts
-    spec:
-      provider: openai
-      auto: "off"
-      mode: final
