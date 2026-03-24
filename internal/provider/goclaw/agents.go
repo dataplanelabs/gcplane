@@ -22,7 +22,7 @@ func (p *Provider) observeAgent(key string) (map[string]any, error) {
 	}
 
 	for _, a := range resp.Agents {
-		if strVal(a, "agent_key") == key {
+		if strVal(a, "agent_key") == key && p.matchesTenant(a) {
 			return translateResult(stripInternal(a)), nil
 		}
 	}

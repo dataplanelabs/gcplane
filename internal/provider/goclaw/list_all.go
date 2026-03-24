@@ -23,6 +23,9 @@ func (p *Provider) listAllProviders() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Providers))
 	for _, prov := range resp.Providers {
+		if !p.matchesTenant(prov) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindProvider,
 			Name:      strVal(prov, "name"),
@@ -46,6 +49,9 @@ func (p *Provider) listAllAgents() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Agents))
 	for _, a := range resp.Agents {
+		if !p.matchesTenant(a) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindAgent,
 			Name:      strVal(a, "agent_key"),
@@ -69,6 +75,9 @@ func (p *Provider) listAllChannels() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Instances))
 	for _, inst := range resp.Instances {
+		if !p.matchesTenant(inst) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindChannel,
 			Name:      strVal(inst, "name"),
@@ -92,6 +101,9 @@ func (p *Provider) listAllMCPServers() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Servers))
 	for _, s := range resp.Servers {
+		if !p.matchesTenant(s) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindMCPServer,
 			Name:      strVal(s, "name"),
@@ -115,6 +127,9 @@ func (p *Provider) listAllCustomTools() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Tools))
 	for _, t := range resp.Tools {
+		if !p.matchesTenant(t) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindTool,
 			Name:      strVal(t, "name"),
@@ -138,6 +153,9 @@ func (p *Provider) listAllSkills() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Skills))
 	for _, s := range resp.Skills {
+		if !p.matchesTenant(s) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindSkill,
 			Name:      strVal(s, "slug"),
@@ -164,6 +182,9 @@ func (p *Provider) listAllCronJobs() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Jobs))
 	for _, job := range resp.Jobs {
+		if !p.matchesTenant(job) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindCronJob,
 			Name:      strVal(job, "name"),
@@ -190,6 +211,9 @@ func (p *Provider) listAllTeams() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Teams))
 	for _, team := range resp.Teams {
+		if !p.matchesTenant(team) {
+			continue
+		}
 		infos = append(infos, reconciler.ResourceInfo{
 			Kind:      manifest.KindAgentTeam,
 			Name:      strVal(team, "name"),

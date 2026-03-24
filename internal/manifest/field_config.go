@@ -6,8 +6,8 @@ package manifest
 var writeOnlyFields = map[ResourceKind][]string{
 	KindTenant:            {},
 	KindProvider:          {},
-	KindAgent:             {"contextFiles"},
-	KindChannel:           {"agentKey", "botToken", "config"},
+	KindAgent:             {"contextFiles", "systemPrompt"},
+	KindChannel:           {"agentKey", "credentials", "config"},
 	KindMCPServer:         {"grants"},
 	KindCronJob:           {"agentKey", "message"},
 	KindAgentTeam:         {"lead", "members", "displayName"},

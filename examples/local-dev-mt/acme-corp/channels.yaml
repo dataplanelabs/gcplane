@@ -1,0 +1,13 @@
+resources:
+  - kind: Channel
+    name: acme-telegram
+    spec:
+      displayName: "Acme Telegram Bot"
+      channelType: telegram
+      agentKey: customer-support
+      enabled: true
+      credentials:
+        token: ${GOCLAW_TELEGRAM_DATA_TOKEN}
+      config:
+        dmPolicy: open
+        groupPolicy: open

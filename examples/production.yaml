@@ -68,7 +68,8 @@ resources:
     spec:
       channelType: telegram
       agentKey: support-bot
-      botToken: ${TELEGRAM_BOT_TOKEN}
+      credentials:
+        token: ${TELEGRAM_BOT_TOKEN}
       config:
         dmPolicy: allow
 
@@ -77,7 +78,8 @@ resources:
     spec:
       channelType: discord
       agentKey: support-bot
-      botToken: ${DISCORD_BOT_TOKEN}
+      credentials:
+        botToken: ${DISCORD_BOT_TOKEN}
 
   # ============================================================
   # Cron Jobs

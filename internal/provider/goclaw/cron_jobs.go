@@ -25,7 +25,7 @@ func (p *Provider) observeCronJob(key string) (map[string]any, error) {
 	}
 
 	for _, job := range resp.Jobs {
-		if strVal(job, "name") == key {
+		if strVal(job, "name") == key && p.matchesTenant(job) {
 			// agentKey/message are write-only; excluded via WriteOnlyFields(KindCronJob).
 			return translateResult(stripInternal(job)), nil
 		}

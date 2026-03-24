@@ -5,8 +5,9 @@ resources:
       displayName: "Telegram Bot"
       channelType: telegram
       agentKey: data-engineer
-      botToken: ${GOCLAW_TELEGRAM_TOKEN}
       enabled: true
+      credentials:
+        token: ${GOCLAW_TELEGRAM_TOKEN}
       config:
         dmPolicy: open
         groupPolicy: open
@@ -17,10 +18,11 @@ resources:
       displayName: "Slack Bot"
       channelType: slack
       agentKey: assistant
-      botToken: ${GOCLAW_SLACK_BOT_TOKEN}
       enabled: true
-      config:
+      credentials:
+        botToken: ${GOCLAW_SLACK_BOT_TOKEN}
         appToken: ${GOCLAW_SLACK_APP_TOKEN}
+      config:
         dmPolicy: open
         groupPolicy: open
         reactionLevel: full

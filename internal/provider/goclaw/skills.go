@@ -21,7 +21,7 @@ func (p *Provider) observeSkill(key string) (map[string]any, error) {
 	}
 
 	for _, s := range resp.Skills {
-		if strVal(s, "key") == key {
+		if strVal(s, "key") == key && p.matchesTenant(s) {
 			return translateResult(stripInternal(s)), nil
 		}
 	}

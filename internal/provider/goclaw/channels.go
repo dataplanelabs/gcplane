@@ -22,13 +22,9 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 	}
 
 	for _, inst := range resp.Instances {
-		if strVal(inst, "name") == key {
-			// Remove internal fields that can't be compared against manifest:
+		if strVal(inst, "name") == key && p.matchesTenant(inst) {
 			// agent_id is a UUID; manifest uses agentKey (string name).
-			// bot_token is not returned by the API.
-			// agentKey/botToken/config are write-only and excluded via WriteOnlyFields.
 			delete(inst, "agent_id")
-			delete(inst, "bot_token")
 			return translateResult(stripInternal(inst)), nil
 		}
 	}
@@ -74,6 +70,17 @@ func (p *Provider) updateChannelInstance(key string, spec map[string]any) error 
 	}
 
 	body := translateSpec(spec)
+
+	// Resolve agent_key → agent_id (GoClaw expects UUID)
+	if agentKey, ok := body["agent_key"].(string); ok {
+		agentID, err := p.resolveAgentID(agentKey)
+		if err != nil {
+			return fmt.Errorf("channel %s: %w", key, err)
+		}
+		body["agent_id"] = agentID
+		delete(body, "agent_key")
+	}
+
 	_, err = p.http.Put(context.Background(), "/v1/channels/instances/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("channel instance %s (id=%s) not found: %w", key, id, err)

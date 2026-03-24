@@ -33,14 +33,17 @@ func WithUserID(id string) Option {
 
 // Provider communicates with a GoClaw instance to observe and mutate resources.
 type Provider struct {
-	endpoint string
-	token    string
-	tenantID string
-	userID   string // X-GoClaw-User-Id header (default: "gcplane")
-	http     *HTTPClient
-	ws       *WSClient
-	wsOnce   sync.Once
-	wsErr    error
+	endpoint   string
+	token      string
+	tenantID   string // slug (e.g., "acme-corp")
+	tenantUUID string // resolved UUID — lazily populated on first create
+	userID     string // X-GoClaw-User-Id header (default: "gcplane")
+	http       *HTTPClient
+	ws         *WSClient
+	wsOnce     sync.Once
+	wsErr      error
+	tenantOnce sync.Once
+	tenantErr  error
 }
 
 // TenantID returns the provider's tenant ID (empty string if not scoped).
@@ -112,8 +115,43 @@ func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]a
 	}
 }
 
+// resolveTenantUUID resolves the tenant slug to a UUID (cached after first call).
+// No-op when tenantID is empty (single-tenant mode).
+func (p *Provider) resolveTenantUUID() (string, error) {
+	if p.tenantID == "" {
+		return "", nil
+	}
+	p.tenantOnce.Do(func() {
+		tenant, err := p.observeTenant(p.tenantID)
+		if err != nil {
+			p.tenantErr = fmt.Errorf("resolve tenant UUID for %q: %w", p.tenantID, err)
+			return
+		}
+		if tenant == nil {
+			p.tenantErr = fmt.Errorf("tenant %q not found", p.tenantID)
+			return
+		}
+		id, ok := tenant["id"].(string)
+		if !ok {
+			p.tenantErr = fmt.Errorf("tenant %q: missing id", p.tenantID)
+			return
+		}
+		p.tenantUUID = id
+	})
+	return p.tenantUUID, p.tenantErr
+}
+
 // Create creates a new resource in GoClaw.
 func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[string]any) error {
+	// Inject tenant_id UUID into spec for tenant-scoped creates
+	if p.tenantID != "" && kind != manifest.KindTenant {
+		uuid, err := p.resolveTenantUUID()
+		if err != nil {
+			return err
+		}
+		spec["tenantId"] = uuid
+	}
+
 	switch kind {
 	case manifest.KindTenant:
 		return p.createTenant(key, spec)

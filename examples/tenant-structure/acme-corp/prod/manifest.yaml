@@ -55,7 +55,8 @@ resources:
     spec:
       channelType: telegram
       agentKey: support-bot
-      botToken: ${ACME_TELEGRAM_BOT_TOKEN}
+      credentials:
+        token: ${ACME_TELEGRAM_BOT_TOKEN}
 
   # --- Cron Jobs (prod only) ---
   - kind: CronJob

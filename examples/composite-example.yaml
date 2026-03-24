@@ -35,8 +35,9 @@ resources:
             displayName: "{{ .displayName }} Channel"
             channelType: "{{ .channelType }}"
             agentKey: "{{ .name }}"
-            botToken: "{{ .botToken }}"
             enabled: true
+            credentials:
+              token: "{{ .botToken }}"
 
   # Instantiate the composite — expands into Agent + Channel at load time
   - kind: ChatBot

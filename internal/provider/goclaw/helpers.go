@@ -65,6 +65,24 @@ func stripInternal(m map[string]any) map[string]any {
 	return m
 }
 
+// matchesTenant returns true if the resource belongs to the provider's tenant.
+// Always true if provider is not tenant-scoped (single-tenant mode).
+// When the API response lacks tenant_id, trusts API header-based scoping.
+func (p *Provider) matchesTenant(resource map[string]any) bool {
+	if p.tenantID == "" {
+		return true
+	}
+	tid := strVal(resource, "tenant_id")
+	if tid == "" {
+		return true // API doesn't include tenant_id — trust header scoping
+	}
+	uuid, err := p.resolveTenantUUID()
+	if err != nil || uuid == "" {
+		return true
+	}
+	return tid == uuid
+}
+
 // strVal safely extracts a string value from a map.
 func strVal(m map[string]any, key string) string {
 	v, ok := m[key]

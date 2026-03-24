@@ -24,7 +24,7 @@ func (p *Provider) observeMCPServer(key string) (map[string]any, error) {
 	}
 
 	for _, s := range resp.Servers {
-		if strVal(s, "name") == key {
+		if strVal(s, "name") == key && p.matchesTenant(s) {
 			serverID := strVal(s, "id")
 			result := translateResult(stripInternal(s))
 			// Inject live grant list so reconciler can compare against desired.

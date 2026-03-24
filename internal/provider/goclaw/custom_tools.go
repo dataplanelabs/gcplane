@@ -22,7 +22,7 @@ func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
 	}
 
 	for _, t := range resp.Tools {
-		if strVal(t, "name") == key {
+		if strVal(t, "name") == key && p.matchesTenant(t) {
 			return translateResult(stripInternal(t)), nil
 		}
 	}
