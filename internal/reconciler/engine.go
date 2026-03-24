@@ -110,8 +110,9 @@ func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Ch
 
 	// Check each kind in reverse dependency order
 	for _, kind := range manifest.DeleteOrder() {
-		// Skip non-deletable kinds
-		if kind == manifest.KindSkill || kind == manifest.KindTTSConfig {
+		// Skip non-deletable and non-enumerable kinds
+		if kind == manifest.KindSkill || kind == manifest.KindTTSConfig ||
+			kind == manifest.KindBuiltinToolConfig || kind == manifest.KindSkillConfig || kind == manifest.KindMCPCredentials {
 			continue
 		}
 

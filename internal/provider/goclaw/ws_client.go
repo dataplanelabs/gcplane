@@ -15,6 +15,7 @@ import (
 type WSClient struct {
 	endpoint string
 	token    string
+	tenantID string // optional — passed in connect handshake for tenant scoping
 	conn     *websocket.Conn
 	mu       sync.Mutex
 	nextID   int64
@@ -43,10 +44,12 @@ type rpcError struct {
 }
 
 // NewWSClient creates a new WebSocket RPC client (not yet connected).
-func NewWSClient(endpoint, token string) *WSClient {
+// tenantID is optional — when set, included in connect handshake for tenant scoping.
+func NewWSClient(endpoint, token, tenantID string) *WSClient {
 	return &WSClient{
 		endpoint: endpoint,
 		token:    token,
+		tenantID: tenantID,
 	}
 }
 
@@ -75,11 +78,15 @@ func (c *WSClient) Connect(ctx context.Context) error {
 	c.conn = conn
 
 	// Send connect handshake
+	params := map[string]string{"token": c.token}
+	if c.tenantID != "" {
+		params["tenant_id"] = c.tenantID
+	}
 	frame := requestFrame{
 		Type:   "req",
 		ID:     "1",
 		Method: "connect",
-		Params: map[string]string{"token": c.token},
+		Params: params,
 	}
 	if err := conn.WriteJSON(frame); err != nil {
 		conn.Close()

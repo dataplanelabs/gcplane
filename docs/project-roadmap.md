@@ -69,7 +69,19 @@
 - Configurable auto-refresh with manual refresh option
 - Context-based clean shutdown
 
-## Next: v0.8.0 — Advanced Features
+### v0.8.0 (2026-03-24) — First-Class Multi-Tenant
+- Tenant CRUD: `Tenant` resource kind with kebab-case slug validation
+- Per-tenant config resources: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`
+- Connection scoping: `connection.tenantId` + `GCPLANE_TENANT_ID` env var
+- Provider option pattern: `goclaw.New(...Option)` with `WithTenantID()`
+- HTTP tenant header: `X-GoClaw-Tenant-Id` on all REST requests
+- WebSocket tenant support: `tenant_id` in connect handshake
+- Internal fields expansion: `tenant_id`, `tenant_name`, `tenant_slug` stripped from observe
+- 13 resource kinds (up from 9)
+- Multi-tenant example: `examples/multi-tenant/` with _system/ + acme-corp/ + globex-inc/
+- GoClaw v1.2.0 tenant isolation validated via 12 new tests
+
+## Next: v0.9.0 — Advanced Features
 
 ### P1: Config File Support
 - Support `GCPLANE_CONFIG` env var for custom config paths

@@ -59,8 +59,12 @@ func runTop(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	provOpts, err := resolveProviderOpts(m)
+	if err != nil {
+		return err
+	}
 
-	provider := goclaw.New(ep, tok)
+	provider := goclaw.New(ep, tok, provOpts...)
 	defer provider.Close()
 
 	engine := reconciler.NewEngine(provider)

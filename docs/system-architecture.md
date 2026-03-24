@@ -74,19 +74,24 @@ gcplane/
 │   │   ├── engine.go                # Reconciliation + prune detection + secret resolution
 │   │   └── compare.go              # Deep spec comparison (skips masked fields)
 │   ├── provider/goclaw/             # GoClaw API provider
-│   │   ├── provider.go              # Provider struct + routing
-│   │   ├── http_client.go           # Authenticated HTTP client
-│   │   ├── ws_client.go             # WebSocket RPC v3 client
-│   │   ├── helpers.go               # Shared utilities
+│   │   ├── provider.go              # Provider struct + routing + Option pattern
+│   │   ├── http_client.go           # Authenticated HTTP client + tenant header
+│   │   ├── ws_client.go             # WebSocket RPC v3 client + tenant handshake
+│   │   ├── helpers.go               # Shared utilities (stripInternal)
 │   │   ├── agents.go                # Agent CRUD
 │   │   ├── providers.go             # Provider CRUD (API key masking)
-│   │   ├── channels.go              # Channel CRUD (renamed from ChannelInstance)
+│   │   ├── channels.go              # Channel CRUD
 │   │   ├── mcp_servers.go           # MCP server CRUD
 │   │   ├── skills.go                # Skill observe/update (not deletable)
-│   │   ├── tools.go                 # Tool CRUD (renamed from CustomTool)
+│   │   ├── tools.go                 # Tool CRUD
 │   │   ├── cron_jobs.go             # Cron job CRUD (WS, deletable)
 │   │   ├── teams.go                 # Team CRUD (WS, deletable)
-│   │   └── tts_config.go            # TTS config (WS, not deletable)
+│   │   ├── tts_config.go            # TTS config (WS, not deletable)
+│   │   ├── tenants.go               # Tenant CRUD (system scope only)
+│   │   ├── builtin_tool_configs.go  # Per-tenant builtin tool config
+│   │   ├── skill_configs.go         # Per-tenant skill enable/disable
+│   │   ├── mcp_credentials.go       # Per-user MCP server credentials
+│   │   └── tenant_test.go           # Tenant resource tests (12 tests)
 │   ├── controller/                  # Reconciliation loop + status tracking
 │   │   ├── controller.go            # Main loop with interval + graceful shutdown
 │   │   └── status.go                # k8s-style status conditions
@@ -131,7 +136,10 @@ GoClaw API is the single source of truth. GCPlane carries no local state (SQLite
 GoClaw uses UUIDs internally. GCPlane uses human-readable natural keys (`name` field). Resolution: observe (list all) → filter by `name` → extract UUID for mutations.
 
 ### Dependency Ordering
-Resources processed in dependency order: Provider → Agent → Skill → MCPServer → Tool → Channel → CronJob → Team → TTSConfig. Prune deletes in reverse order (safe cascading).
+Resources processed in dependency order:
+Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → MCPServer → MCPCredentials → Tool → Channel → CronJob → AgentTeam → TTSConfig
+
+Prune deletes in reverse order (safe cascading).
 
 ### Prune Safety
 - Prune is opt-in (requires `--prune` flag or manifest `prune: true`)

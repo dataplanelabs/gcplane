@@ -120,9 +120,13 @@ func runServe(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	provOpts, err := resolveProviderOpts(m)
+	if err != nil {
+		return err
+	}
 
 	// Create long-lived provider
-	provider := goclaw.New(ep, tok)
+	provider := goclaw.New(ep, tok, provOpts...)
 	defer provider.Close()
 
 	// Create shared components

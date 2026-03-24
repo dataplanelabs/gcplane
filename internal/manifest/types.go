@@ -20,21 +20,26 @@ type Metadata struct {
 type Connection struct {
 	Endpoint string `yaml:"endpoint"`
 	Token    string `yaml:"token"`
+	TenantID string `yaml:"tenantId,omitempty"` // optional — scope all resources to this tenant
 }
 
 // ResourceKind enumerates the managed resource types.
 type ResourceKind string
 
 const (
-	KindProvider  ResourceKind = "Provider"
-	KindAgent     ResourceKind = "Agent"
-	KindChannel   ResourceKind = "Channel"
-	KindCronJob   ResourceKind = "CronJob"
-	KindMCPServer ResourceKind = "MCPServer"
-	KindSkill     ResourceKind = "Skill"
-	KindTool      ResourceKind = "Tool"
-	KindAgentTeam      ResourceKind = "AgentTeam"
-	KindTTSConfig ResourceKind = "TTSConfig"
+	KindTenant            ResourceKind = "Tenant"
+	KindProvider          ResourceKind = "Provider"
+	KindAgent             ResourceKind = "Agent"
+	KindChannel           ResourceKind = "Channel"
+	KindCronJob           ResourceKind = "CronJob"
+	KindMCPServer         ResourceKind = "MCPServer"
+	KindSkill             ResourceKind = "Skill"
+	KindTool              ResourceKind = "Tool"
+	KindAgentTeam         ResourceKind = "AgentTeam"
+	KindTTSConfig         ResourceKind = "TTSConfig"
+	KindBuiltinToolConfig ResourceKind = "BuiltinToolConfig"
+	KindSkillConfig       ResourceKind = "SkillConfig"
+	KindMCPCredentials    ResourceKind = "MCPCredentials"
 )
 
 // Resource is a generic managed resource with kind + name + arbitrary spec.
@@ -50,14 +55,18 @@ type Resource struct {
 // Resources must be applied in this order to satisfy dependencies.
 func ApplyOrder() []ResourceKind {
 	return []ResourceKind{
-		KindProvider,        // no deps
-		KindAgent,           // depends on Provider
-		KindSkill,           // depends on Agent for grants
-		KindMCPServer,       // depends on Agent for grants
-		KindTool,    // depends on Agent
-		KindChannel, // depends on Agent
-		KindCronJob,         // depends on Agent
-		KindAgentTeam,            // no strict deps
-		KindTTSConfig,       // global, no deps
+		KindTenant,            // first — creates tenant before anything
+		KindProvider,          // no deps within tenant
+		KindAgent,             // depends on Provider
+		KindSkill,             // depends on Agent for grants
+		KindBuiltinToolConfig, // configures builtin tools per tenant
+		KindSkillConfig,       // configures skills per tenant
+		KindMCPServer,         // depends on Agent for grants
+		KindMCPCredentials,    // per-user MCP creds, after MCPServer
+		KindTool,              // depends on Agent
+		KindChannel,           // depends on Agent
+		KindCronJob,           // depends on Agent
+		KindAgentTeam,         // no strict deps
+		KindTTSConfig,         // global, no deps
 	}
 }

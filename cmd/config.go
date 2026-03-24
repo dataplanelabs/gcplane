@@ -3,10 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
+	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/secrets"
 )
+
+// tenantIDRe validates tenantId values (slug or UUID format).
+var tenantIDRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // resolveConnection resolves the GoClaw connection config.
 // Priority: CLI flags > env vars > manifest connection block.
@@ -46,6 +51,27 @@ func resolveConnection(m *manifest.Manifest) (ep, tok string, err error) {
 	}
 
 	return ep, tok, nil
+}
+
+// resolveProviderOpts builds goclaw.Option slice from manifest connection.
+// Priority for tenantId: env var > manifest.
+func resolveProviderOpts(m *manifest.Manifest) ([]goclaw.Option, error) {
+	var opts []goclaw.Option
+	tid := os.Getenv("GCPLANE_TENANT_ID")
+	if tid == "" {
+		tid = m.Connection.TenantID
+	}
+	if tid != "" {
+		resolved, err := secrets.Resolve(tid)
+		if err != nil {
+			return nil, fmt.Errorf("resolve tenantId: %w", err)
+		}
+		if !tenantIDRe.MatchString(resolved) {
+			return nil, fmt.Errorf("invalid tenantId %q: must be kebab-case (a-z0-9, hyphens)", resolved)
+		}
+		opts = append(opts, goclaw.WithTenantID(resolved))
+	}
+	return opts, nil
 }
 
 // loadAndValidateManifest loads and validates the manifest from configFile.

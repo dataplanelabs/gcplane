@@ -27,14 +27,19 @@ type HTTPClient struct {
 }
 
 // NewHTTPClient creates a new authenticated HTTP client for GoClaw.
-func NewHTTPClient(baseURL, token string) *HTTPClient {
+// tenantID is optional — when set, all requests include X-GoClaw-Tenant-Id header.
+func NewHTTPClient(baseURL, token, tenantID string) *HTTPClient {
+	headers := map[string]string{
+		"X-GoClaw-User-Id": "gcplane", // required by agent/session endpoints
+	}
+	if tenantID != "" {
+		headers["X-GoClaw-Tenant-Id"] = tenantID
+	}
 	return &HTTPClient{
 		baseURL:    baseURL,
 		token:      token,
 		httpClient: &http.Client{},
-		headers: map[string]string{
-			"X-GoClaw-User-Id": "gcplane", // required by agent/session endpoints
-		},
+		headers:    headers,
 	}
 }
 

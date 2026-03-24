@@ -11,24 +11,46 @@ import (
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 )
 
+// Option configures a Provider.
+type Option func(*Provider)
+
+// WithTenantID sets the tenant ID for all requests made by this provider.
+// When set, X-GoClaw-Tenant-Id header is sent with HTTP requests and
+// tenant_id is included in WS connect handshake.
+func WithTenantID(id string) Option {
+	return func(p *Provider) {
+		p.tenantID = id
+	}
+}
+
 // Provider communicates with a GoClaw instance to observe and mutate resources.
 type Provider struct {
 	endpoint string
 	token    string
+	tenantID string
 	http     *HTTPClient
 	ws       *WSClient
 	wsOnce   sync.Once
 	wsErr    error
 }
 
+// TenantID returns the provider's tenant ID (empty string if not scoped).
+func (p *Provider) TenantID() string {
+	return p.tenantID
+}
+
 // New creates a GoClaw provider with the given connection config.
-func New(endpoint, token string) *Provider {
-	return &Provider{
+func New(endpoint, token string, opts ...Option) *Provider {
+	p := &Provider{
 		endpoint: endpoint,
 		token:    token,
-		http:     NewHTTPClient(endpoint, token),
-		ws:       NewWSClient(endpoint, token),
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	p.http = NewHTTPClient(endpoint, token, p.tenantID)
+	p.ws = NewWSClient(endpoint, token, p.tenantID)
+	return p
 }
 
 // ensureWS lazily connects the WebSocket client on first WS resource call.
@@ -50,6 +72,8 @@ func (p *Provider) Close() error {
 // Observe fetches the current state of a resource from GoClaw.
 func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]any, error) {
 	switch kind {
+	case manifest.KindTenant:
+		return p.observeTenant(key)
 	case manifest.KindProvider:
 		return p.observeProvider(key)
 	case manifest.KindAgent:
@@ -68,6 +92,12 @@ func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]a
 		return p.observeTeam(key)
 	case manifest.KindTTSConfig:
 		return p.observeTTSConfig(key)
+	case manifest.KindBuiltinToolConfig:
+		return p.observeBuiltinToolConfig(key)
+	case manifest.KindSkillConfig:
+		return p.observeSkillConfig(key)
+	case manifest.KindMCPCredentials:
+		return p.observeMCPCredentials(key)
 	default:
 		return nil, fmt.Errorf("observe not implemented for kind %s", kind)
 	}
@@ -76,6 +106,8 @@ func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]a
 // Create creates a new resource in GoClaw.
 func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[string]any) error {
 	switch kind {
+	case manifest.KindTenant:
+		return p.createTenant(key, spec)
 	case manifest.KindProvider:
 		return p.createProvider(key, spec)
 	case manifest.KindAgent:
@@ -92,6 +124,12 @@ func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[strin
 		return p.createTeam(key, spec)
 	case manifest.KindTTSConfig:
 		return p.createTTSConfig(key, spec)
+	case manifest.KindBuiltinToolConfig:
+		return p.createBuiltinToolConfig(key, spec)
+	case manifest.KindSkillConfig:
+		return p.createSkillConfig(key, spec)
+	case manifest.KindMCPCredentials:
+		return p.createMCPCredentials(key, spec)
 	default:
 		return fmt.Errorf("create not implemented for kind %s", kind)
 	}
@@ -100,6 +138,8 @@ func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[strin
 // Update patches an existing resource in GoClaw.
 func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[string]any) error {
 	switch kind {
+	case manifest.KindTenant:
+		return p.updateTenant(key, spec)
 	case manifest.KindProvider:
 		return p.updateProvider(key, spec)
 	case manifest.KindAgent:
@@ -118,6 +158,12 @@ func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[strin
 		return p.updateTeam(key, spec)
 	case manifest.KindTTSConfig:
 		return p.updateTTSConfig(key, spec)
+	case manifest.KindBuiltinToolConfig:
+		return p.updateBuiltinToolConfig(key, spec)
+	case manifest.KindSkillConfig:
+		return p.updateSkillConfig(key, spec)
+	case manifest.KindMCPCredentials:
+		return p.updateMCPCredentials(key, spec)
 	default:
 		return fmt.Errorf("update not implemented for kind %s", kind)
 	}
@@ -126,6 +172,8 @@ func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[strin
 // Delete removes a resource from GoClaw. Idempotent: no-op if already absent.
 func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
 	switch kind {
+	case manifest.KindTenant:
+		return p.deleteTenant(key)
 	case manifest.KindProvider:
 		return p.deleteProvider(key)
 	case manifest.KindAgent:
@@ -140,6 +188,12 @@ func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
 		return p.deleteCronJob(key)
 	case manifest.KindAgentTeam:
 		return p.deleteTeam(key)
+	case manifest.KindBuiltinToolConfig:
+		return p.deleteBuiltinToolConfig(key)
+	case manifest.KindSkillConfig:
+		return p.deleteSkillConfig(key)
+	case manifest.KindMCPCredentials:
+		return p.deleteMCPCredentials(key)
 	case manifest.KindSkill, manifest.KindTTSConfig:
 		return nil // not deletable
 	default:
@@ -150,6 +204,8 @@ func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
 // ListAll returns lightweight resource references for every remote resource of a given kind.
 func (p *Provider) ListAll(kind manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
 	switch kind {
+	case manifest.KindTenant:
+		return p.listAllTenants()
 	case manifest.KindProvider:
 		return p.listAllProviders()
 	case manifest.KindAgent:
@@ -166,8 +222,8 @@ func (p *Provider) ListAll(kind manifest.ResourceKind) ([]reconciler.ResourceInf
 		return p.listAllCronJobs()
 	case manifest.KindAgentTeam:
 		return p.listAllTeams()
-	case manifest.KindTTSConfig:
-		return nil, nil // global singleton, not enumerable
+	case manifest.KindTTSConfig, manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindMCPCredentials:
+		return nil, nil // per-tenant configs not enumerable for prune
 	default:
 		return nil, fmt.Errorf("list not implemented for kind %s", kind)
 	}

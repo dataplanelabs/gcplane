@@ -4,15 +4,19 @@ package manifest
 // by the GoClaw API (secrets, UUIDs, grants managed separately).
 // These fields are excluded from comparison during reconciliation.
 var writeOnlyFields = map[ResourceKind][]string{
-	KindProvider:  {},
-	KindAgent:     {"contextFiles"},
-	KindChannel:   {"agentKey", "botToken", "config"},
-	KindMCPServer: {"grants"},
-	KindCronJob:   {"agentKey", "message"},
-	KindAgentTeam:      {"lead", "members", "displayName"},
-	KindTool:      {},
-	KindSkill:     {},
-	KindTTSConfig: {},
+	KindTenant:            {},
+	KindProvider:          {},
+	KindAgent:             {"contextFiles"},
+	KindChannel:           {"agentKey", "botToken", "config"},
+	KindMCPServer:         {"grants"},
+	KindCronJob:           {"agentKey", "message"},
+	KindAgentTeam:         {"lead", "members", "displayName"},
+	KindTool:              {},
+	KindSkill:             {},
+	KindTTSConfig:         {},
+	KindBuiltinToolConfig: {},
+	KindSkillConfig:       {},
+	KindMCPCredentials:    {"credentials"}, // credentials are write-only (encrypted)
 }
 
 // WriteOnlyFields returns the write-only fields for a resource kind.

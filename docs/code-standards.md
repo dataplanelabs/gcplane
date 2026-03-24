@@ -39,6 +39,18 @@ func (p *Provider) updateX(key string, spec map[string]any) error
 
 Routing in `provider.go` dispatches by `ResourceKind`.
 
+## Provider Options
+Use the Option pattern for Provider configuration:
+```go
+// Create provider with options
+provider := goclaw.New(
+  goclaw.WithTenantID("acme-corp"),
+  goclaw.WithHTTPClient(client),
+)
+```
+
+Options are variadic functions that modify Provider state, enabling flexible, composable configuration without constructor parameters.
+
 ## Testing
 - Unit tests in `*_test.go` alongside source files
 - Use `testing.T` and table-driven tests

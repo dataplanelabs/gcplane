@@ -13,6 +13,7 @@ metadata:
 connection:
   endpoint: http://localhost:18790
   token: ${GOCLAW_TOKEN}
+  tenantId: ${GOCLAW_TENANT_ID}  # optional — scope all resources to this tenant
 resources:
   - kind: Provider
     name: my-provider
@@ -23,19 +24,23 @@ resources:
 
 | Kind | Transport | Deletable | Description |
 |------|-----------|-----------|-------------|
+| `Tenant` | HTTP | Yes | Tenant definition (system scope only, requires GoClaw v1.2.0+) |
 | `Provider` | HTTP | Yes | LLM provider (Anthropic, OpenAI, etc.) |
 | `Agent` | HTTP | Yes | AI agent with model + config |
 | `Channel` | HTTP | Yes | Messaging channel (Telegram, Discord, etc.) |
 | `MCPServer` | HTTP | Yes | MCP tool server |
 | `Skill` | HTTP | No | Agent skill (update only, auto-discovered, GoClaw-managed) |
+| `BuiltinToolConfig` | HTTP | Yes | Per-tenant builtin tool enable/disable |
+| `SkillConfig` | HTTP | Yes | Per-tenant skill enable/disable |
 | `Tool` | HTTP | Yes | Custom tool definition |
 | `CronJob` | WebSocket | Yes | Scheduled task |
 | `AgentTeam` | WebSocket | Yes | Agent team |
 | `TTSConfig` | WebSocket | No | Text-to-speech settings (GoClaw-managed) |
+| `MCPCredentials` | HTTP | Yes | Per-user MCP server credentials |
 
-Resources are applied in dependency order: Provider → Agent → Skill → MCPServer → Tool → Channel → CronJob → Team → TTSConfig. Prune deletes in reverse order.
+Resources are applied in dependency order: Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → MCPServer → MCPCredentials → Tool → Channel → CronJob → AgentTeam → TTSConfig. Prune deletes in reverse order.
 
-**Note:** Skill and TTSConfig are managed by GoClaw and cannot be deleted by gcplane. They are excluded from prune operations.
+**Note:** Skill and TTSConfig are managed by GoClaw and cannot be deleted by gcplane. BuiltinToolConfig, SkillConfig, and MCPCredentials are not enumerable for prune.
 
 ## Tool Configuration
 
@@ -85,6 +90,63 @@ Priority: CLI flags > env vars > manifest.
 | CLI flag | `--endpoint` | `--token` |
 | Env var | `GCPLANE_ENDPOINT` | `GCPLANE_TOKEN` |
 | Manifest | `connection.endpoint` | `connection.token` |
+
+The optional `connection.tenantId` field scopes all API requests to a specific tenant via the `X-GoClaw-Tenant-Id` header. Not needed when using tenant-bound API keys (auto-scoped).
+
+## Multi-Tenant Support
+
+GCPlane supports two multi-tenant deployment models:
+
+**1. Single GoClaw, multiple tenants** (recommended for SaaS):
+```
+tenants/
+├── _system/           # system-level key — manages Tenant resources
+│   └── manifest.yaml
+├── acme-corp/         # tenant-bound key — manages resources within tenant
+│   └── manifest.yaml
+└── globex-inc/
+    └── manifest.yaml
+```
+
+**2. Multiple GoClaw instances** (one per tenant):
+Each subdirectory connects to a different GoClaw endpoint.
+
+Run with: `gcplane serve --tenants-dir tenants/`
+
+### Tenant Resource
+
+Create tenants declaratively (requires system-level API key):
+
+```yaml
+- kind: Tenant
+  name: acme-corp      # slug — kebab-case identifier
+  spec:
+    displayName: "Acme Corporation"
+```
+
+### Per-Tenant Config Resources
+
+```yaml
+# Enable/disable builtin tools for this tenant
+- kind: BuiltinToolConfig
+  name: exec
+  spec:
+    enabled: true
+
+# Enable/disable skills for this tenant
+- kind: SkillConfig
+  name: my-skill-slug
+  spec:
+    enabled: false
+
+# Per-user MCP server credentials
+- kind: MCPCredentials
+  name: github-mcp      # MCP server name
+  spec:
+    userId: "service-account"
+    credentials:
+      apiKey: ${GITHUB_API_KEY}
+```
 
 ## Config Auto-Discovery
 

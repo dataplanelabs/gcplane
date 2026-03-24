@@ -9,15 +9,19 @@ var keyRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // validKinds is the set of supported resource kinds.
 var validKinds = map[ResourceKind]bool{
-	KindProvider:  true,
-	KindAgent:     true,
-	KindChannel:   true,
-	KindCronJob:   true,
-	KindMCPServer: true,
-	KindSkill:     true,
-	KindTool:      true,
-	KindAgentTeam:      true,
-	KindTTSConfig: true,
+	KindTenant:            true,
+	KindProvider:          true,
+	KindAgent:             true,
+	KindChannel:           true,
+	KindCronJob:           true,
+	KindMCPServer:         true,
+	KindSkill:             true,
+	KindTool:              true,
+	KindAgentTeam:         true,
+	KindTTSConfig:         true,
+	KindBuiltinToolConfig: true,
+	KindSkillConfig:       true,
+	KindMCPCredentials:    true,
 }
 
 // Validate checks the manifest for structural errors.

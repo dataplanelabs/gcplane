@@ -2,111 +2,124 @@
 
 ## Overview
 
-Each tenant is an organization/customer with dedicated GoClaw infrastructure (instance + database). Environments (dev/dev/prod) are separate deployments within a tenant.
+GCPlane v0.8.0+ supports two multi-tenant deployment models:
 
-## Directory Layout
+1. **Single GoClaw, multiple tenants** (SaaS model, recommended)
+   - One GoClaw instance with tenant isolation via `connection.tenantId` header
+   - Tenant CRUD via `Tenant` resource kind
+   - Per-tenant configs: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`
+   - GoClaw v1.2.0+ required
+
+2. **Multiple GoClaw instances** (federated model)
+   - Each tenant = dedicated GoClaw endpoint
+   - Traditional isolated deployment model
+
+## Directory Layout (SaaS Model)
 
 ```
 goclaw-config/
-├── tenants/
-│   ├── acme-corp/                      # tenant = org/customer
-│   │   ├── base/                       # shared resources across envs
-│   │   │   └── providers.yaml
-│   │   ├── dev/
-│   │   │   ├── connection.yaml         # dev GoClaw endpoint + token
-│   │   │   └── manifest.yaml
-│   │   └── prod/
-│   │       ├── connection.yaml         # prod GoClaw endpoint + token
-│   │       └── manifest.yaml
-│   │
-│   └── globex-inc/
-│       ├── base/
-│       │   └── providers.yaml
-│       ├── dev/
-│       │   └── manifest.yaml
-│       └── prod/
-│           └── manifest.yaml
-│
-└── platform/                           # platform team infra
+├── _system/                           # system-level (creates tenants)
+│   ├── connection.yaml                # system API key
+│   └── manifest.yaml
+├── acme-corp/                         # tenant-scoped
+│   ├── connection.yaml                # tenant API key + tenantId
+│   └── manifest.yaml
+└── globex-inc/
+    ├── connection.yaml
     └── manifest.yaml
 ```
 
-## Isolation Model
+Run with: `gcplane serve --tenants-dir ./goclaw-config/`
 
-| Boundary | Isolation Level |
-|----------|----------------|
-| **Tenant** | Full — separate GoClaw instance + PostgreSQL database |
-| **Environment** | Full — separate deployment (dev/dev/prod) |
-| **Org unit** | Logical — resource grouping within a manifest |
+## Isolation Model (GoClaw v1.2.0+)
 
-## Tenant vs Org Unit
+| Boundary | Isolation Level | Notes |
+|----------|----------------|-------|
+| **Tenant** | Full (API-enforced) | Single GoClaw instance, tenant scope in header |
+| **Environment** | Logical | Via subdirectories or separate manifests |
+| **Org unit** | Logical | Resource labels + naming conventions |
 
-**Tenant** = infrastructure boundary. Each tenant gets:
-- Dedicated GoClaw deployment
-- Dedicated PostgreSQL database
-- Own connection config (endpoint + token)
-- Independent scaling and upgrades
+## Tenant Resource
 
-**Org unit** (engineering, support, data) = logical grouping within a tenant. NOT separate infrastructure. Represented as:
+Create tenants declaratively via `Tenant` resource (requires system API key):
+
+```yaml
+- kind: Tenant
+  name: acme-corp          # kebab-case slug
+  spec:
+    displayName: "Acme Corporation"
+```
+
+System scope only. Not filterable by `connection.tenantId` (no self-reference).
+
+## Per-Tenant Config Resources
+
+After creating a tenant, use a tenant-bound API key to configure:
+
+```yaml
+# Enable/disable builtin tools (exec, webFetch, etc.)
+- kind: BuiltinToolConfig
+  name: exec
+  spec:
+    enabled: true
+
+# Enable/disable skills
+- kind: SkillConfig
+  name: my-skill-slug
+  spec:
+    enabled: false
+
+# Per-user MCP server credentials
+- kind: MCPCredentials
+  name: github-mcp
+  spec:
+    userId: "user@example.com"
+    credentials:
+      apiKey: ${GITHUB_API_KEY}
+```
+
+## Org Unit vs Tenant
+
+**Tenant** = first-class resource, API-enforced isolation (GoClaw v1.2.0+).
+
+**Org unit** (engineering, support, data) = logical grouping within a tenant. Represented as:
 - Labeled resources within a single manifest
 - Separate files in a directory (when using multi-file loading)
 - Agent naming conventions (e.g., `engineering-assistant`, `support-bot`)
 
-## Connection Per Tenant
+## Connection Config
 
-Each tenant/environment has its own connection:
+Priority: CLI flags > env vars > manifest.
 
 ```yaml
-# tenants/acme-corp/prod/connection.yaml
 apiVersion: gcplane.io/v1
 kind: Manifest
 metadata:
-  name: acme-corp-prod
+  name: my-deployment
 connection:
-  endpoint: https://acme-goclaw.example.com
-  token: ${ACME_PROD_GOCLAW_TOKEN}
+  endpoint: https://goclaw.example.com
+  token: ${GOCLAW_TOKEN}
+  tenantId: ${GOCLAW_TENANT_ID}  # optional — scopes all requests to tenant
 resources: []
 ```
 
-## Serve Mode Per Tenant
-
-Run one `gcplane serve` instance per tenant/environment:
-
-```bash
-# Acme Corp prod
-gcplane serve --repo git@github.com:org/goclaw-config.git \
-  --path tenants/acme-corp/prod/manifest.yaml
-
-# Globex Inc dev
-gcplane serve --repo git@github.com:org/goclaw-config.git \
-  --path tenants/globex-inc/dev/manifest.yaml
-```
-
-Or deploy as k8s Deployments — one per tenant/environment.
+**tenantId** usage:
+- Passed as `X-GoClaw-Tenant-Id` header in all HTTP requests
+- Passed as `tenant_id` in WebSocket connect handshake
+- Not needed when API key is already tenant-bound (auto-scoped by GoClaw)
+- Supported via manifest, CLI `--tenant-id`, or `GCPLANE_TENANT_ID` env var
 
 ## Multi-Tenant Serve
 
-`gcplane serve --tenants-dir` discovers all subdirectories under the given path and starts an independent reconcile loop per tenant. All loops share one HTTP server.
+Run `gcplane serve --tenants-dir` for single HTTP server, multiple tenant reconcile loops:
 
 ```bash
-gcplane serve --tenants-dir tenants/ --interval 30s --addr :8480
+gcplane serve --tenants-dir ./tenants/ --interval 30s --addr :8480
 ```
 
-Each subdirectory must contain at least one YAML file with a `connection` block:
+Each tenant subdirectory must contain at least one YAML with a `connection` block. Subdirectory name becomes tenant identifier in status endpoints.
 
-```yaml
-# tenants/acme-corp/connection.yaml
-apiVersion: gcplane.io/v1
-kind: Manifest
-metadata:
-  name: acme-corp
-connection:
-  endpoint: https://acme-goclaw.example.com
-  token: ${ACME_GOCLAW_TOKEN}
-resources: []
-```
-
-### API endpoints (multi-tenant mode)
+API endpoints:
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -116,8 +129,4 @@ resources: []
 | POST | `/api/v1/sync/{tenant}` | Trigger sync for one tenant |
 | GET | `/metrics` | Aggregated Prometheus metrics |
 
-### Isolation
-
-- Each tenant runs in its own goroutine — one tenant failure does not affect others.
-- Each tenant has its own connection token — no cross-tenant leakage.
-- `--tenants-dir` is mutually exclusive with `-f`/`--file` and `--repo`.
+Each tenant runs independently — one tenant failure doesn't affect others. `--tenants-dir` mutually exclusive with `-f`/`--file` and `--repo`.

@@ -39,6 +39,7 @@ Deletes in reverse dependency order for safe cascading.`,
 		}
 
 		// If -f provided, load manifest for connection
+		var provOpts []goclaw.Option
 		if configFile != "" {
 			m, err := loadAndValidateManifest()
 			if err != nil {
@@ -49,13 +50,17 @@ Deletes in reverse dependency order for safe cascading.`,
 			if resolveErr != nil {
 				return resolveErr
 			}
+			provOpts, resolveErr = resolveProviderOpts(m)
+			if resolveErr != nil {
+				return resolveErr
+			}
 		}
 
 		if ep == "" || tok == "" {
 			return fmt.Errorf("--endpoint and --token (or -f manifest) required")
 		}
 
-		provider := goclaw.New(ep, tok)
+		provider := goclaw.New(ep, tok, provOpts...)
 		defer provider.Close()
 
 		// Backup current state before destroying
@@ -77,7 +82,8 @@ Deletes in reverse dependency order for safe cascading.`,
 		// Discover all gcplane-managed resources in reverse dependency order
 		var toDelete []reconciler.ResourceInfo
 		for _, kind := range manifest.DeleteOrder() {
-			if kind == manifest.KindSkill || kind == manifest.KindTTSConfig {
+			if kind == manifest.KindSkill || kind == manifest.KindTTSConfig ||
+				kind == manifest.KindBuiltinToolConfig || kind == manifest.KindSkillConfig || kind == manifest.KindMCPCredentials {
 				continue
 			}
 			infos, err := provider.ListAll(kind)

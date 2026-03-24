@@ -198,3 +198,26 @@ func (p *Provider) listAllTeams() ([]reconciler.ResourceInfo, error) {
 	}
 	return infos, nil
 }
+
+// listAllTenants returns ResourceInfo for every tenant in GoClaw.
+func (p *Provider) listAllTenants() ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(context.Background(), "/v1/tenants")
+	if err != nil {
+		return nil, fmt.Errorf("list tenants: %w", err)
+	}
+	var resp struct {
+		Tenants []map[string]any `json:"tenants"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parse tenants response: %w", err)
+	}
+	infos := make([]reconciler.ResourceInfo, 0, len(resp.Tenants))
+	for _, t := range resp.Tenants {
+		infos = append(infos, reconciler.ResourceInfo{
+			Kind:      manifest.KindTenant,
+			Name:      strVal(t, "slug"),
+			CreatedBy: strVal(t, "created_by"),
+		})
+	}
+	return infos, nil
+}

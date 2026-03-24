@@ -48,6 +48,7 @@ func (p *Provider) resolveAgentID(agentKey string) (string, error) {
 // the resource UUID before issuing PUT/DELETE requests.
 var internalFields = []string{
 	"created_at", "updated_at", "created_by", "owner_id",
+	"tenant_id", "tenant_name", "tenant_slug",
 	"restrict_to_workspace", "workspace",
 	"context_window", "max_tool_iterations",
 	"compaction_config", "memory_config", "context_pruning",

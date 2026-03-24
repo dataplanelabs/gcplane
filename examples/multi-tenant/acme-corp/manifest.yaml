@@ -1,0 +1,25 @@
+# Tenant-scoped manifest for Acme Corp.
+# Uses a tenant-bound API key — auto-scoped, no tenantId needed.
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: acme-production
+connection:
+  endpoint: ${GOCLAW_ENDPOINT}
+  token: ${ACME_TOKEN}
+resources:
+  - kind: Provider
+    name: anthropic
+    spec:
+      providerType: anthropic
+      displayName: "Anthropic"
+      apiKey: ${ANTHROPIC_API_KEY}
+
+  - kind: Agent
+    name: support-bot
+    spec:
+      agentKey: support-bot
+      displayName: "Support Bot"
+      provider: anthropic
+      model: claude-sonnet-4-5-20250514
+      systemPrompt: "You are Acme Corp's support assistant."

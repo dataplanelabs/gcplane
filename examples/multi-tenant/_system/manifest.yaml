@@ -1,0 +1,20 @@
+# System-level manifest for managing tenants.
+# Uses a system API key — no tenantId needed.
+# Run with: gcplane serve --tenants-dir examples/multi-tenant/
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: system-tenants
+connection:
+  endpoint: ${GOCLAW_ENDPOINT}
+  token: ${GOCLAW_SYSTEM_TOKEN}
+resources:
+  - kind: Tenant
+    name: acme-corp
+    spec:
+      displayName: "Acme Corporation"
+
+  - kind: Tenant
+    name: globex-inc
+    spec:
+      displayName: "Globex Inc"

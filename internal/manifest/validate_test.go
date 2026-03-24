@@ -241,3 +241,33 @@ func TestApplyOrder_ContainsAllKinds(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate_NewKinds(t *testing.T) {
+	newKinds := []struct {
+		kind     ResourceKind
+		name     string
+		testName string
+	}{
+		{KindTenant, "my-tenant", "KindTenant"},
+		{KindBuiltinToolConfig, "tool-config", "KindBuiltinToolConfig"},
+		{KindSkillConfig, "skill-config", "KindSkillConfig"},
+		{KindMCPCredentials, "mcp-creds", "KindMCPCredentials"},
+	}
+
+	for _, tc := range newKinds {
+		t.Run(tc.testName, func(t *testing.T) {
+			m := &Manifest{
+				APIVersion: "gcplane.io/v1",
+				Kind:       "Manifest",
+				Resources: []Resource{
+					{Kind: tc.kind, Name: tc.name, Spec: map[string]any{"x": 1}},
+				},
+			}
+
+			errs := Validate(m)
+			if len(errs) != 0 {
+				t.Errorf("expected no errors for %s, got %d: %v", tc.testName, len(errs), errs)
+			}
+		})
+	}
+}

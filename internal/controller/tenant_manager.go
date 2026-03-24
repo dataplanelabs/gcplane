@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/dataplanelabs/gcplane/internal/secrets"
 	"github.com/dataplanelabs/gcplane/internal/source"
 )
+
+var tenantIDRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // TenantInstance groups per-tenant components.
 type TenantInstance struct {
@@ -81,7 +84,22 @@ func NewTenantManager(cfg TenantManagerConfig) (*TenantManager, error) {
 			continue
 		}
 
-		provider := goclaw.New(ep, tok)
+		// Resolve optional tenantId for tenant-scoped API requests
+		var providerOpts []goclaw.Option
+		if m.Connection.TenantID != "" {
+			tenantID, resolveErr := secrets.Resolve(m.Connection.TenantID)
+			if resolveErr != nil {
+				cfg.Logger.Error("skip tenant: resolve tenantId failed", "tenant", name, "error", resolveErr)
+				continue
+			}
+			if !tenantIDRe.MatchString(tenantID) {
+				cfg.Logger.Error("skip tenant: invalid tenantId", "tenant", name, "tenantId", tenantID)
+				continue
+			}
+			providerOpts = append(providerOpts, goclaw.WithTenantID(tenantID))
+		}
+
+		provider := goclaw.New(ep, tok, providerOpts...)
 		tracker := NewStatusTracker()
 		ctrl := New(Config{
 			Source:   src,

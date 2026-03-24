@@ -33,6 +33,39 @@ func TestStripInternal(t *testing.T) {
 	}
 }
 
+func TestStripInternal_TenantFields(t *testing.T) {
+	input := map[string]any{
+		"id":           "uuid-1",
+		"slug":         "acme",
+		"name":         "Acme Corp",
+		"tenant_id":    "tenant-123",
+		"tenant_name":  "Parent Tenant",
+		"tenant_slug":  "parent",
+		"created_at":   "2024-01-01",
+		"created_by":   "gcplane",
+	}
+
+	result := stripInternal(input)
+
+	// core fields must survive
+	if result["id"] != "uuid-1" {
+		t.Errorf("expected id to survive, got %v", result["id"])
+	}
+	if result["slug"] != "acme" {
+		t.Errorf("expected slug to survive, got %v", result["slug"])
+	}
+	if result["name"] != "Acme Corp" {
+		t.Errorf("expected name to survive, got %v", result["name"])
+	}
+
+	// tenant fields must be removed
+	for _, removed := range []string{"tenant_id", "tenant_name", "tenant_slug"} {
+		if _, ok := result[removed]; ok {
+			t.Errorf("expected tenant field %q to be stripped, but it remains", removed)
+		}
+	}
+}
+
 func TestStrVal(t *testing.T) {
 	m := map[string]any{
 		"str":   "hello",
