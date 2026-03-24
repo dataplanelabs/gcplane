@@ -71,6 +71,20 @@ func resolveProviderOpts(m *manifest.Manifest) ([]goclaw.Option, error) {
 		}
 		opts = append(opts, goclaw.WithTenantID(resolved))
 	}
+
+	// UserId: env > manifest > default ("gcplane")
+	uid := os.Getenv("GCPLANE_USER_ID")
+	if uid == "" {
+		uid = m.Connection.UserID
+	}
+	if uid != "" {
+		resolved, err := secrets.Resolve(uid)
+		if err != nil {
+			return nil, fmt.Errorf("resolve userId: %w", err)
+		}
+		opts = append(opts, goclaw.WithUserID(resolved))
+	}
+
 	return opts, nil
 }
 

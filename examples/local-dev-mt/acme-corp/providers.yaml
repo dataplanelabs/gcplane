@@ -1,0 +1,17 @@
+resources:
+  - kind: Provider
+    name: anthropic
+    spec:
+      displayName: "Anthropic"
+      providerType: anthropic_native
+      apiKey: ${GOCLAW_ANTHROPIC_API_KEY}
+      enabled: true
+
+  - kind: Provider
+    name: openai
+    spec:
+      displayName: "OpenAI"
+      providerType: openai_compat
+      apiBase: https://api.openai.com/v1
+      apiKey: ${GOCLAW_OPENAI_API_KEY}
+      enabled: true

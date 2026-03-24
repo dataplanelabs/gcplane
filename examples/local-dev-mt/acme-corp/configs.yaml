@@ -1,0 +1,10 @@
+# Per-tenant config overrides for Acme Corp.
+# NOTE: BuiltinToolConfig/SkillConfig require GoClaw HTTP endpoints
+# that are not yet available. Uncomment when supported.
+#
+# resources:
+#   - kind: BuiltinToolConfig
+#     name: exec
+#     spec:
+#       enabled: true
+resources: []

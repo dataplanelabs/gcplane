@@ -1,0 +1,30 @@
+resources:
+  # --- Product ---
+  - kind: Agent
+    name: product-copilot
+    labels:
+      team: product
+    spec:
+      agentKey: product-copilot
+      displayName: "Product Copilot"
+      provider: openai
+      model: gpt-4o
+      systemPrompt: |
+        You are Startup.io's product assistant. Help with feature specs,
+        user story writing, competitive analysis, and roadmap prioritization.
+        Think lean — focus on MVP and customer validation.
+
+  # --- Sales ---
+  - kind: Agent
+    name: sales-assistant
+    labels:
+      team: sales
+    spec:
+      agentKey: sales-assistant
+      displayName: "Sales Assistant"
+      provider: openai
+      model: gpt-4o
+      systemPrompt: |
+        You are Startup.io's sales assistant. Help draft outreach emails,
+        prepare meeting notes, analyze leads, and create proposals.
+        Tone: professional but approachable. Focus on value, not features.

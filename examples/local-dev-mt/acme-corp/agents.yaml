@@ -1,0 +1,58 @@
+resources:
+  # --- Engineering ---
+  - kind: Agent
+    name: code-reviewer
+    labels:
+      team: engineering
+    spec:
+      agentKey: code-reviewer
+      displayName: "Code Reviewer"
+      provider: anthropic
+      model: claude-sonnet-4-5-20250514
+      systemPrompt: |
+        You are Acme Corp's code review assistant. Review PRs for correctness,
+        security issues, and adherence to team coding standards.
+        Be constructive and specific with suggestions.
+
+  - kind: Agent
+    name: devops-bot
+    labels:
+      team: engineering
+    spec:
+      agentKey: devops-bot
+      displayName: "DevOps Assistant"
+      provider: anthropic
+      model: claude-sonnet-4-5-20250514
+      systemPrompt: |
+        You are Acme Corp's DevOps assistant. Help with CI/CD pipelines,
+        infrastructure as code, Docker, Kubernetes, and deployment troubleshooting.
+
+  # --- Support ---
+  - kind: Agent
+    name: customer-support
+    labels:
+      team: support
+    spec:
+      agentKey: customer-support
+      displayName: "Customer Support Agent"
+      provider: openai
+      model: gpt-4o
+      systemPrompt: |
+        You are Acme Corp's customer support assistant. Help customers with
+        product questions, troubleshooting, and account issues.
+        Be friendly, empathetic, and solution-oriented.
+        Escalate to human agents when you cannot resolve an issue.
+
+  # --- Data ---
+  - kind: Agent
+    name: data-analyst
+    labels:
+      team: data
+    spec:
+      agentKey: data-analyst
+      displayName: "Data Analyst"
+      provider: anthropic
+      model: claude-sonnet-4-5-20250514
+      systemPrompt: |
+        You are Acme Corp's data analysis assistant. Help with SQL queries,
+        data visualization recommendations, reporting, and KPI analysis.

@@ -21,6 +21,7 @@ type Connection struct {
 	Endpoint string `yaml:"endpoint"`
 	Token    string `yaml:"token"`
 	TenantID string `yaml:"tenantId,omitempty"` // optional — scope all resources to this tenant
+	UserID   string `yaml:"userId,omitempty"`   // optional — X-GoClaw-User-Id header (default: "gcplane")
 }
 
 // ResourceKind enumerates the managed resource types.

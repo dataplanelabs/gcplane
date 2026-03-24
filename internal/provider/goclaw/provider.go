@@ -23,11 +23,20 @@ func WithTenantID(id string) Option {
 	}
 }
 
+// WithUserID sets the X-GoClaw-User-Id header. Default is "gcplane".
+// Must match GOCLAW_OWNER_IDS for cross-tenant operations (e.g., Tenant CRUD).
+func WithUserID(id string) Option {
+	return func(p *Provider) {
+		p.userID = id
+	}
+}
+
 // Provider communicates with a GoClaw instance to observe and mutate resources.
 type Provider struct {
 	endpoint string
 	token    string
 	tenantID string
+	userID   string // X-GoClaw-User-Id header (default: "gcplane")
 	http     *HTTPClient
 	ws       *WSClient
 	wsOnce   sync.Once
@@ -48,8 +57,8 @@ func New(endpoint, token string, opts ...Option) *Provider {
 	for _, opt := range opts {
 		opt(p)
 	}
-	p.http = NewHTTPClient(endpoint, token, p.tenantID)
-	p.ws = NewWSClient(endpoint, token, p.tenantID)
+	p.http = NewHTTPClient(endpoint, token, p.tenantID, p.userID)
+	p.ws = NewWSClient(endpoint, token, p.tenantID, p.userID)
 	return p
 }
 

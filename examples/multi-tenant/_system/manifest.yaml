@@ -12,9 +12,9 @@ resources:
   - kind: Tenant
     name: acme-corp
     spec:
-      displayName: "Acme Corporation"
+      name: "Acme Corporation"
 
   - kind: Tenant
     name: globex-inc
     spec:
-      displayName: "Globex Inc"
+      name: "Globex Inc"

@@ -116,10 +116,73 @@ scripts/goclaw.sh reset
 scripts/wait-and-apply.sh
 """
 
+[tasks."reset:mt"]
+description = "Full reset: wipe GoClaw + apply multi-tenant config"
+depends = ["build"]
+run = """
+scripts/goclaw.sh reset
+scripts/wait-and-apply.sh
+echo ""
+echo "=== Deploying multi-tenant resources ==="
+./$BINARY apply -f examples/local-dev-mt/_system --auto-approve
+./$BINARY apply -f examples/local-dev-mt/acme-corp --auto-approve
+./$BINARY apply -f examples/local-dev-mt/startup-io --auto-approve
+"""
+
 [tasks.dev]
 description = "Build + run TUI against local-dev"
 depends = ["build"]
 run = "./$BINARY top -f $F"
+
+# ============================================================
+# Multi-Tenant
+# ============================================================
+[tasks."mt:plan"]
+description = "Plan multi-tenant local-dev (all tenants)"
+depends = ["build"]
+run = """
+echo "=== System (tenant provisioning) ==="
+./$BINARY plan -f examples/local-dev-mt/_system -v
+echo ""
+echo "=== Acme Corp ==="
+./$BINARY plan -f examples/local-dev-mt/acme-corp -v
+echo ""
+echo "=== Startup.io ==="
+./$BINARY plan -f examples/local-dev-mt/startup-io -v
+"""
+
+[tasks."mt:apply"]
+description = "Apply multi-tenant local-dev (system → tenants)"
+depends = ["build"]
+run = """
+echo "=== Creating tenants ==="
+./$BINARY apply -f examples/local-dev-mt/_system --auto-approve
+echo ""
+echo "=== Deploying Acme Corp ==="
+./$BINARY apply -f examples/local-dev-mt/acme-corp --auto-approve
+echo ""
+echo "=== Deploying Startup.io ==="
+./$BINARY apply -f examples/local-dev-mt/startup-io --auto-approve
+"""
+
+[tasks."mt:destroy"]
+description = "Destroy multi-tenant test resources (tenants → system)"
+depends = ["build"]
+run = """
+echo "=== Destroying Startup.io ==="
+./$BINARY destroy -f examples/local-dev-mt/startup-io --auto-approve 2>/dev/null || true
+echo ""
+echo "=== Destroying Acme Corp ==="
+./$BINARY destroy -f examples/local-dev-mt/acme-corp --auto-approve 2>/dev/null || true
+echo ""
+echo "=== Destroying tenants ==="
+./$BINARY destroy -f examples/local-dev-mt/_system --auto-approve 2>/dev/null || true
+"""
+
+[tasks."mt:serve"]
+description = "Multi-tenant serve mode"
+depends = ["build"]
+run = "./$BINARY serve --tenants-dir examples/local-dev-mt --interval 30s"
 
 # ============================================================
 # Quality

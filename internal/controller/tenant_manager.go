@@ -98,6 +98,14 @@ func NewTenantManager(cfg TenantManagerConfig) (*TenantManager, error) {
 			}
 			providerOpts = append(providerOpts, goclaw.WithTenantID(tenantID))
 		}
+		if m.Connection.UserID != "" {
+			userID, resolveErr := secrets.Resolve(m.Connection.UserID)
+			if resolveErr != nil {
+				cfg.Logger.Error("skip tenant: resolve userId failed", "tenant", name, "error", resolveErr)
+				continue
+			}
+			providerOpts = append(providerOpts, goclaw.WithUserID(userID))
+		}
 
 		provider := goclaw.New(ep, tok, providerOpts...)
 		tracker := NewStatusTracker()

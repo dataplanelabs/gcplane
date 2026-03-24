@@ -1,0 +1,9 @@
+resources:
+  - kind: Provider
+    name: openai
+    spec:
+      displayName: "OpenAI"
+      providerType: openai_compat
+      apiBase: https://api.openai.com/v1
+      apiKey: ${GOCLAW_OPENAI_API_KEY}
+      enabled: true

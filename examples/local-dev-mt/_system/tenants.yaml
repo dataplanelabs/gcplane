@@ -1,0 +1,21 @@
+# System-level manifest: tenant provisioning.
+# Uses gateway token (system scope) — no tenantId needed.
+# Run: gcplane apply -f examples/local-dev-mt/_system
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: platform-tenants
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}
+  userId: ${GOCLAW_USER_ID}
+resources:
+  - kind: Tenant
+    name: acme-corp
+    spec:
+      name: "Acme Corporation"
+
+  - kind: Tenant
+    name: startup-io
+    spec:
+      name: "Startup.io"

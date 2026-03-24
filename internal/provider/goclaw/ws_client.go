@@ -16,6 +16,7 @@ type WSClient struct {
 	endpoint string
 	token    string
 	tenantID string // optional — passed in connect handshake for tenant scoping
+	userID   string // optional — X-GoClaw-User-Id equivalent for WS (default: "gcplane")
 	conn     *websocket.Conn
 	mu       sync.Mutex
 	nextID   int64
@@ -45,11 +46,15 @@ type rpcError struct {
 
 // NewWSClient creates a new WebSocket RPC client (not yet connected).
 // tenantID is optional — when set, included in connect handshake for tenant scoping.
-func NewWSClient(endpoint, token, tenantID string) *WSClient {
+func NewWSClient(endpoint, token, tenantID, userID string) *WSClient {
+	if userID == "" {
+		userID = "gcplane"
+	}
 	return &WSClient{
 		endpoint: endpoint,
 		token:    token,
 		tenantID: tenantID,
+		userID:   userID,
 	}
 }
 
@@ -78,7 +83,7 @@ func (c *WSClient) Connect(ctx context.Context) error {
 	c.conn = conn
 
 	// Send connect handshake
-	params := map[string]string{"token": c.token}
+	params := map[string]string{"token": c.token, "user_id": c.userID}
 	if c.tenantID != "" {
 		params["tenant_id"] = c.tenantID
 	}

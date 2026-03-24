@@ -55,7 +55,7 @@ func TestHTTPClient_Get_AuthHeader(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewHTTPClient(srv.URL, "my-token", "")
+	c := NewHTTPClient(srv.URL, "my-token", "", "")
 	_, err := c.Get(context.Background(), "/v1/test")
 	if err != nil {
 		t.Fatalf("get: %v", err)
@@ -74,7 +74,7 @@ func TestHTTPClient_Patch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewHTTPClient(srv.URL, "tok", "")
+	c := NewHTTPClient(srv.URL, "tok", "", "")
 	_, err := c.Patch(context.Background(), "/v1/test", map[string]any{"key": "val"})
 	if err != nil {
 		t.Fatalf("patch: %v", err)
@@ -91,7 +91,7 @@ func TestHTTPClient_Delete_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewHTTPClient(srv.URL, "tok", "")
+	c := NewHTTPClient(srv.URL, "tok", "", "")
 	err := c.Delete(context.Background(), "/v1/missing")
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
@@ -107,7 +107,7 @@ func TestHTTPClient_ExtraHeaders(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewHTTPClient(srv.URL, "tok", "")
+	c := NewHTTPClient(srv.URL, "tok", "", "")
 	_, err := c.Get(context.Background(), "/v1/test")
 	if err != nil {
 		t.Fatalf("get: %v", err)
@@ -127,7 +127,7 @@ func TestHTTPClient_TenantHeader(t *testing.T) {
 	defer srv.Close()
 
 	// With tenant ID
-	c := NewHTTPClient(srv.URL, "tok", "acme")
+	c := NewHTTPClient(srv.URL, "tok", "acme", "")
 	_, err := c.Get(context.Background(), "/v1/test")
 	if err != nil {
 		t.Fatalf("get: %v", err)
@@ -138,7 +138,7 @@ func TestHTTPClient_TenantHeader(t *testing.T) {
 
 	// Without tenant ID — header should not be present
 	gotTenantID = "should-be-empty"
-	c2 := NewHTTPClient(srv.URL, "tok", "")
+	c2 := NewHTTPClient(srv.URL, "tok", "", "")
 	_, err = c2.Get(context.Background(), "/v1/test")
 	if err != nil {
 		t.Fatalf("get: %v", err)

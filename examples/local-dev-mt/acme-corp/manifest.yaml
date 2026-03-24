@@ -1,0 +1,13 @@
+# Acme Corporation — mid-size company with engineering, support, and data teams.
+# Uses gateway token + tenantId scoping (local dev).
+# In production, use a tenant-bound API key instead.
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: acme-corp
+  environment: dev
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}
+  tenantId: acme-corp
+  userId: ${GOCLAW_USER_ID}

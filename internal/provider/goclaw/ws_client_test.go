@@ -44,7 +44,7 @@ func TestWSClient_Connect_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := NewWSClient(srv.URL, "test-token", "")
+	c := NewWSClient(srv.URL, "test-token", "", "")
 	if err := c.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestWSClient_Connect_Rejected(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := NewWSClient(srv.URL, "bad-token", "")
+	c := NewWSClient(srv.URL, "bad-token", "", "")
 	err := c.Connect(context.Background())
 	if err == nil {
 		t.Fatal("expected error on rejected connect")
@@ -75,7 +75,7 @@ func TestWSClient_Connect_Rejected(t *testing.T) {
 }
 
 func TestWSClient_Connect_DialFail(t *testing.T) {
-	c := NewWSClient("ws://127.0.0.1:1", "tok", "")
+	c := NewWSClient("ws://127.0.0.1:1", "tok", "", "")
 	err := c.Connect(context.Background())
 	if err == nil {
 		t.Fatal("expected dial error for unreachable address")
@@ -104,7 +104,7 @@ func TestWSClient_Call_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := NewWSClient(srv.URL, "tok", "")
+	c := NewWSClient(srv.URL, "tok", "", "")
 	if err := c.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestWSClient_Call_RPCError(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := NewWSClient(srv.URL, "tok", "")
+	c := NewWSClient(srv.URL, "tok", "", "")
 	if err := c.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestWSClient_Call_RPCError(t *testing.T) {
 }
 
 func TestWSClient_Call_NotConnected(t *testing.T) {
-	c := NewWSClient("ws://irrelevant", "tok", "")
+	c := NewWSClient("ws://irrelevant", "tok", "", "")
 	_, err := c.Call(context.Background(), "any.method", nil)
 	if err == nil {
 		t.Fatal("expected error when not connected")
@@ -194,7 +194,7 @@ func TestWSClient_Call_SkipsNonMatchingFrames(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := NewWSClient(srv.URL, "tok", "")
+	c := NewWSClient(srv.URL, "tok", "", "")
 	if err := c.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestWSClient_Call_SkipsNonMatchingFrames(t *testing.T) {
 }
 
 func TestWSClient_Close_Idempotent(t *testing.T) {
-	c := NewWSClient("ws://irrelevant", "tok", "")
+	c := NewWSClient("ws://irrelevant", "tok", "", "")
 	// Close on unconnected client should be a no-op
 	if err := c.Close(); err != nil {
 		t.Fatalf("Close on unconnected: %v", err)
@@ -233,7 +233,7 @@ func TestWSClient_Close_Connected(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := NewWSClient(srv.URL, "tok", "")
+	c := NewWSClient(srv.URL, "tok", "", "")
 	if err := c.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}

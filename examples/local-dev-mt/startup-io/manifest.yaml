@@ -1,0 +1,12 @@
+# Startup.io — lean startup with product and sales agents.
+# Demonstrates tenant isolation: cannot see Acme Corp's resources.
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: startup-io
+  environment: dev
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}
+  tenantId: startup-io
+  userId: ${GOCLAW_USER_ID}

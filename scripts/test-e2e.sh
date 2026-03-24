@@ -72,6 +72,75 @@ test_destroy() {
 }
 run_test "destroy" test_destroy
 
+# ============================================================
+# Multi-Tenant Tests (requires GoClaw v1.2.0+ with tenant API)
+# ============================================================
+MT="examples/local-dev-mt"
+GOCLAW_EP="${GCPLANE_ENDPOINT:-http://localhost:18790}"
+GOCLAW_TOK="${GOCLAW_TOKEN:-}"
+
+tenant_api_available() {
+  [ -n "$GOCLAW_TOK" ] && \
+  curl -sf "$GOCLAW_EP/v1/tenants" \
+    -H "Authorization: Bearer $GOCLAW_TOK" \
+    -H "X-GoClaw-User-Id: gcplane" > /dev/null 2>&1
+}
+
+if tenant_api_available; then
+
+  # --- Tenant CRUD ---
+  test_tenant_crud() {
+    $BINARY plan -f "$MT/_system" -v | grep -q "Tenant"
+    $BINARY apply -f "$MT/_system" --auto-approve
+    $BINARY plan -f "$MT/_system" | grep -q "0 to create, 0 to update"
+  }
+  run_test "tenant-crud" test_tenant_crud
+
+  # --- Tenant-scoped apply (Acme Corp) ---
+  test_tenant_scoped_apply() {
+    $BINARY apply -f "$MT/acme-corp" --auto-approve
+    $BINARY plan -f "$MT/acme-corp" | grep -q "0 to create, 0 to update"
+  }
+  run_test "tenant-scoped-apply" test_tenant_scoped_apply
+
+  # --- Tenant isolation (Startup.io can't see Acme's resources) ---
+  test_tenant_isolation() {
+    $BINARY apply -f "$MT/startup-io" --auto-approve
+    # Startup.io plan should show 0 changes (its own resources)
+    $BINARY plan -f "$MT/startup-io" | grep -q "0 to create, 0 to update"
+  }
+  run_test "tenant-isolation" test_tenant_isolation
+
+  # --- Multi-tenant serve ---
+  test_tenant_serve() {
+    $BINARY serve --tenants-dir "$MT" --interval 30s &
+    local pid=$!
+    sleep 4
+
+    local ok=true
+    curl -sf http://localhost:8480/healthz > /dev/null || ok=false
+    curl -sf http://localhost:8480/api/v1/status > /dev/null || ok=false
+
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true
+    $ok
+  }
+  run_test "tenant-serve" test_tenant_serve
+
+  # --- Tenant destroy (cleanup) ---
+  test_tenant_destroy() {
+    $BINARY destroy -f "$MT/startup-io" --auto-approve
+    $BINARY destroy -f "$MT/acme-corp" --auto-approve
+    $BINARY destroy -f "$MT/_system" --auto-approve
+    # Tenants should need re-creation
+    $BINARY plan -f "$MT/_system" | grep -q "to create"
+  }
+  run_test "tenant-destroy" test_tenant_destroy
+
+else
+  echo ""
+  echo "SKIP: Multi-tenant tests (tenant API not available — need GoClaw v1.2.0+)"
+fi
+
 # --- Summary ---
 echo ""
 echo "==============================="

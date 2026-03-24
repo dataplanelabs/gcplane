@@ -1,0 +1,30 @@
+resources:
+  - kind: AgentTeam
+    name: engineering-team
+    spec:
+      displayName: "Engineering Team"
+      lead: code-reviewer
+      members: [devops-bot]
+      settings:
+        version: 2
+        notifications:
+          taskDispatched: true
+          taskProgress: true
+          taskCompleted: true
+        delivery:
+          mode: sync
+
+  - kind: AgentTeam
+    name: support-team
+    spec:
+      displayName: "Customer Support Team"
+      lead: customer-support
+      members: [data-analyst]
+      settings:
+        version: 2
+        notifications:
+          taskDispatched: true
+          taskProgress: false
+          taskCompleted: true
+        delivery:
+          mode: sync
