@@ -87,7 +87,47 @@ func valuesEqual(a, b any) bool {
 		return aNum == bNum
 	}
 
+	// Handle slices element-by-element to support nested numeric coercion
+	aSlice, aIsSlice := toSlice(a)
+	bSlice, bIsSlice := toSlice(b)
+	if aIsSlice && bIsSlice {
+		if len(aSlice) != len(bSlice) {
+			return false
+		}
+		for i := range aSlice {
+			if !valuesEqual(aSlice[i], bSlice[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Handle nested maps with numeric coercion
+	aMap, aIsMap := toMap(a)
+	bMap, bIsMap := toMap(b)
+	if aIsMap && bIsMap {
+		if len(aMap) != len(bMap) {
+			return false
+		}
+		for k, av := range aMap {
+			bv, ok := bMap[k]
+			if !ok || !valuesEqual(av, bv) {
+				return false
+			}
+		}
+		return true
+	}
+
 	return reflect.DeepEqual(a, b)
+}
+
+func toSlice(v any) ([]any, bool) {
+	switch s := v.(type) {
+	case []any:
+		return s, true
+	default:
+		return nil, false
+	}
 }
 
 func toFloat64(v any) (float64, bool) {
