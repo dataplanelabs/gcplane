@@ -1,10 +1,18 @@
 # Per-tenant config overrides for Acme Corp.
-# NOTE: BuiltinToolConfig/SkillConfig require GoClaw HTTP endpoints
-# that are not yet available. Uncomment when supported.
-#
-# resources:
-#   - kind: BuiltinToolConfig
-#     name: exec
-#     spec:
-#       enabled: true
-resources: []
+# BuiltinToolConfig: enable/disable builtin tools for this tenant.
+# Tool names use snake_case (matching GoClaw internal names).
+resources:
+  - kind: BuiltinToolConfig
+    name: exec
+    spec:
+      enabled: true
+
+  - kind: BuiltinToolConfig
+    name: web-fetch
+    spec:
+      enabled: true
+
+  - kind: BuiltinToolConfig
+    name: read-file
+    spec:
+      enabled: true

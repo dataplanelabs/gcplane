@@ -4,12 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
+// toolName converts kebab-case manifest name to snake_case GoClaw tool name.
+func toolName(key string) string {
+	return strings.ReplaceAll(key, "-", "_")
+}
+
 // observeBuiltinToolConfig checks if a builtin tool has a tenant-level config override.
-// Key is the tool name (e.g., "exec", "web_fetch").
+// Key is kebab-case manifest name (e.g., "exec", "web-fetch") — converted to snake_case for API.
 func (p *Provider) observeBuiltinToolConfig(key string) (map[string]any, error) {
-	data, err := p.http.Get(context.Background(), "/v1/builtin-tools")
+	data, err := p.http.Get(context.Background(), "/v1/tools/builtin")
 	if err != nil {
 		return nil, fmt.Errorf("list builtin tools: %w", err)
 	}
@@ -21,17 +27,15 @@ func (p *Provider) observeBuiltinToolConfig(key string) (map[string]any, error) 
 		return nil, fmt.Errorf("parse builtin tools response: %w", err)
 	}
 
+	apiName := toolName(key)
 	for _, t := range resp.Tools {
-		if strVal(t, "name") == key {
-			// Check if there's a tenant config override
-			if tc, ok := t["tenant_config"].(map[string]any); ok {
-				return translateResult(tc), nil
+		if strVal(t, "name") == apiName {
+			// GoClaw list response includes "tenant_enabled" when tenant-scoped.
+			// If present, it's the per-tenant override; otherwise use global "enabled".
+			if te, ok := t["tenant_enabled"]; ok {
+				return map[string]any{"enabled": te}, nil
 			}
-			// Tool exists but no tenant config — return enabled state from tool itself
-			result := map[string]any{
-				"enabled": t["enabled"],
-			}
-			return translateResult(result), nil
+			return map[string]any{"enabled": t["enabled"]}, nil
 		}
 	}
 	return nil, nil
@@ -40,7 +44,7 @@ func (p *Provider) observeBuiltinToolConfig(key string) (map[string]any, error) 
 // createBuiltinToolConfig sets a per-tenant config for a builtin tool.
 func (p *Provider) createBuiltinToolConfig(key string, spec map[string]any) error {
 	body := translateSpec(spec)
-	path := fmt.Sprintf("/v1/builtin-tools/%s/tenant-config", key)
+	path := fmt.Sprintf("/v1/tools/builtin/%s/tenant-config", toolName(key))
 	_, err := p.http.Put(context.Background(), path, body)
 	if err != nil {
 		return fmt.Errorf("set builtin tool config %s: %w", key, err)
@@ -55,6 +59,6 @@ func (p *Provider) updateBuiltinToolConfig(key string, spec map[string]any) erro
 
 // deleteBuiltinToolConfig removes a per-tenant config override for a builtin tool.
 func (p *Provider) deleteBuiltinToolConfig(key string) error {
-	path := fmt.Sprintf("/v1/builtin-tools/%s/tenant-config", key)
+	path := fmt.Sprintf("/v1/tools/builtin/%s/tenant-config", toolName(key))
 	return p.http.Delete(context.Background(), path)
 }
