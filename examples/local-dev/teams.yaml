@@ -6,7 +6,7 @@ resources:
       lead: data-engineer
       members: [data-analyst, report-builder]
       settings:
-        version: v2
+        version: 2
         notifications:
           taskDispatched: true
           taskProgress: true
@@ -20,7 +20,7 @@ resources:
       lead: product-planner
       members: [market-researcher, ux-designer]
       settings:
-        version: v2
+        version: 2
         notifications:
           taskDispatched: true
           taskProgress: true
@@ -34,7 +34,7 @@ resources:
       lead: dev-lead
       members: [backend-engineer, frontend-engineer, qa-engineer, security-engineer]
       settings:
-        version: v2
+        version: 2
         notifications:
           taskDispatched: true
           taskProgress: true
@@ -48,7 +48,7 @@ resources:
       lead: tech-writer
       members: [ux-designer]
       settings:
-        version: v2
+        version: 2
         notifications:
           taskDispatched: true
           taskProgress: false
@@ -62,7 +62,7 @@ resources:
       lead: ml-engineer
       members: [prompt-engineer]
       settings:
-        version: v2
+        version: 2
         notifications:
           taskDispatched: true
           taskProgress: true
@@ -76,7 +76,7 @@ resources:
       lead: devops-engineer
       members: [support-bot]
       settings:
-        version: v2
+        version: 2
         notifications:
           taskDispatched: true
           taskProgress: false
