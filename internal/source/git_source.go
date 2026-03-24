@@ -72,7 +72,7 @@ func (s *GitSource) Fetch() (*manifest.Manifest, string, error) {
 // Cleanup removes the temporary clone directory.
 func (s *GitSource) Cleanup() {
 	if s.dir != "" {
-		os.RemoveAll(s.dir)
+		_ = os.RemoveAll(s.dir)
 	}
 }
 
@@ -86,7 +86,7 @@ func (s *GitSource) clone() error {
 	_, err = s.runGitIn("", "clone", "--depth", "1", "--single-branch",
 		"--branch", s.branch, s.repo, dir)
 	if err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		return fmt.Errorf("git clone: %w", err)
 	}
 

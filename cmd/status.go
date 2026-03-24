@@ -31,7 +31,7 @@ var statusCmd = &cobra.Command{
 		provider := goclaw.New(ep, tok, provOpts...)
 		defer provider.Close()
 
-		engine := reconciler.NewEngine(provider)
+		engine := reconciler.NewEngine(provider, nil)
 		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true})
 
 		total := plan.Creates + plan.Updates + plan.Noops + plan.Deletes

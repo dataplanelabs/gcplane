@@ -28,8 +28,26 @@ checksum:
 
 changelog:
   sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat'
+    - title: Bug Fixes
+      regexp: '^fix'
+    - title: Refactoring
+      regexp: '^refactor'
+    - title: Others
+      order: 999
   filters:
     exclude:
       - '^docs:'
       - '^chore:'
       - '^test:'
+
+dockers:
+  - image_templates:
+      - "ghcr.io/dataplanelabs/gcplane:{{ .Version }}"
+      - "ghcr.io/dataplanelabs/gcplane:latest"
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.source=https://github.com/dataplanelabs/gcplane"

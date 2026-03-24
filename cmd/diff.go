@@ -28,7 +28,7 @@ var diffCmd = &cobra.Command{
 		provider := goclaw.New(ep, tok, provOpts...)
 		defer provider.Close()
 
-		engine := reconciler.NewEngine(provider)
+		engine := reconciler.NewEngine(provider, nil)
 		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true})
 
 		display.PrintDiff(plan)

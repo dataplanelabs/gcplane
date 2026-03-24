@@ -1,0 +1,3 @@
+FROM scratch
+COPY gcplane /gcplane
+ENTRYPOINT ["/gcplane"]

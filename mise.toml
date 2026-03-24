@@ -6,6 +6,7 @@ GOCLAW_DIR = "../../nextlevelbuilder/goclaw"
 
 [tools]
 go = "1.25"
+golangci-lint = "2.11"
 
 # ============================================================
 # Build
@@ -188,8 +189,8 @@ run = "./$BINARY serve --tenants-dir examples/local-dev-mt --interval 30s"
 # Quality
 # ============================================================
 [tasks.lint]
-description = "Run go vet"
-run = "go vet ./..."
+description = "Run golangci-lint"
+run = "golangci-lint run ./..."
 
 [tasks.check]
 description = "Build + vet + test"

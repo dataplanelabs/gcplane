@@ -51,7 +51,7 @@ Only manages declared resources — UI-created objects are untouched.`,
 		provider := goclaw.New(ep, tok, provOpts...)
 		defer provider.Close()
 
-		engine := reconciler.NewEngine(provider)
+		engine := reconciler.NewEngine(provider, nil)
 		opts := reconciler.ReconcileOpts{Prune: applyPrune, Force: applyForce}
 
 		// Show plan first (dry-run)
@@ -123,6 +123,6 @@ func writeApplyAuditLog(logFile, manifestFile string, plan *reconciler.Plan, res
 	if err != nil {
 		return
 	}
-	defer f.Close()
-	f.Write(append(data, '\n'))
+	defer f.Close() //nolint:errcheck
+	_, _ = f.Write(append(data, '\n'))
 }

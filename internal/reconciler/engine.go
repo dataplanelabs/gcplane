@@ -2,6 +2,8 @@ package reconciler
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/secrets"
@@ -19,11 +21,16 @@ type ProviderInterface interface {
 // Engine is the Observe→Compare→Act reconciliation engine.
 type Engine struct {
 	provider ProviderInterface
+	logger   *slog.Logger
 }
 
-// NewEngine creates a reconciler engine with the given provider.
-func NewEngine(provider ProviderInterface) *Engine {
-	return &Engine{provider: provider}
+// NewEngine creates a reconciler engine with the given provider and optional logger.
+// If logger is nil, log output is discarded.
+func NewEngine(provider ProviderInterface, logger *slog.Logger) *Engine {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	return &Engine{provider: provider, logger: logger}
 }
 
 // Reconcile processes a manifest and returns a plan.
@@ -135,8 +142,16 @@ func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Ch
 			change := Change{Kind: kind, Name: remote.Name, Action: ActionDelete}
 			changes = append(changes, change)
 
+			e.logger.Info("pruning resource",
+				slog.String("kind", string(kind)),
+				slog.String("name", remote.Name))
+
 			if !dryRun {
 				if err := e.provider.Delete(kind, remote.Name); err != nil {
+					e.logger.Error("prune failed",
+						slog.String("kind", string(kind)),
+						slog.String("name", remote.Name),
+						slog.Any("error", err))
 					result.Failed++
 					result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", kind, remote.Name, err))
 				} else {
@@ -155,15 +170,28 @@ func (e *Engine) reconcileOne(res manifest.Resource, force bool) Change {
 	}
 
 	// Resolve secrets in spec
-	spec := resolveSpecSecrets(res.Spec)
+	spec := e.resolveSpecSecrets(res.Spec)
 
 	// Observe current state
+	e.logger.Debug("observing resource",
+		slog.String("kind", string(res.Kind)),
+		slog.String("name", res.Name))
+
 	current, err := e.provider.Observe(res.Kind, res.Name)
 	if err != nil {
+		e.logger.Warn("observe failed",
+			slog.String("kind", string(res.Kind)),
+			slog.String("name", res.Name),
+			slog.Any("error", err))
 		change.Action = ActionNoop
 		change.Error = fmt.Sprintf("observe failed: %v", err)
 		return change
 	}
+
+	e.logger.Debug("observe result",
+		slog.String("kind", string(res.Kind)),
+		slog.String("name", res.Name),
+		slog.Bool("exists", current != nil))
 
 	// Resource doesn't exist — create
 	if current == nil {
@@ -191,41 +219,64 @@ func (e *Engine) reconcileOne(res manifest.Resource, force bool) Change {
 }
 
 func (e *Engine) execute(change Change, res manifest.Resource) error {
-	spec := resolveSpecSecrets(res.Spec)
+	spec := e.resolveSpecSecrets(res.Spec)
 
 	switch change.Action {
 	case ActionCreate:
-		return e.provider.Create(res.Kind, res.Name, spec)
+		e.logger.Info("creating resource",
+			slog.String("kind", string(res.Kind)),
+			slog.String("name", res.Name))
+		if err := e.provider.Create(res.Kind, res.Name, spec); err != nil {
+			e.logger.Error("create failed",
+				slog.String("kind", string(res.Kind)),
+				slog.String("name", res.Name),
+				slog.Any("error", err))
+			return err
+		}
+		return nil
 	case ActionUpdate:
-		return e.provider.Update(res.Kind, res.Name, spec)
+		e.logger.Info("updating resource",
+			slog.String("kind", string(res.Kind)),
+			slog.String("name", res.Name))
+		if err := e.provider.Update(res.Kind, res.Name, spec); err != nil {
+			e.logger.Error("update failed",
+				slog.String("kind", string(res.Kind)),
+				slog.String("name", res.Name),
+				slog.Any("error", err))
+			return err
+		}
+		return nil
 	default:
 		return nil
 	}
 }
 
 // resolveSpecSecrets walks a spec map and resolves secret references in string values.
-func resolveSpecSecrets(spec map[string]any) map[string]any {
+func (e *Engine) resolveSpecSecrets(spec map[string]any) map[string]any {
 	out := make(map[string]any, len(spec))
 	for k, v := range spec {
-		out[k] = resolveValue(v)
+		out[k] = e.resolveValue(v)
 	}
 	return out
 }
 
-func resolveValue(v any) any {
+func (e *Engine) resolveValue(v any) any {
 	switch val := v.(type) {
 	case string:
 		resolved, err := secrets.Resolve(val)
 		if err != nil {
+			e.logger.Warn("secret resolve failed",
+				slog.String("value", val),
+				slog.Any("error", err))
 			return val // Return original on error
 		}
 		return resolved
 	case map[string]any:
-		return resolveSpecSecrets(val)
+		return e.resolveSpecSecrets(val)
 	case []any:
 		resolved := make([]any, len(val))
 		for i, item := range val {
-			resolved[i] = resolveValue(item)
+			resolved[i] = e.resolveValue(item)
 		}
 		return resolved
 	default:

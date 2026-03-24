@@ -171,6 +171,6 @@ func writeDestroyAuditLog(logFile string, deleted, failed int) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
-	f.Write(append(data, '\n'))
+	defer f.Close() //nolint:errcheck
+	_, _ = f.Write(append(data, '\n'))
 }

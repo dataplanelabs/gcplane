@@ -51,7 +51,7 @@ func (m *mockProvider) ListAll(kind manifest.ResourceKind) ([]ResourceInfo, erro
 
 func TestReconcile_CreateNew(t *testing.T) {
 	provider := newMockProvider()
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
@@ -72,7 +72,7 @@ func TestReconcile_UpdateExisting(t *testing.T) {
 	provider := newMockProvider()
 	provider.observed["Agent/bot"] = map[string]any{"model": "old-model"}
 
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{Kind: manifest.KindAgent, Name: "bot", Spec: map[string]any{"model": "new-model"}},
@@ -89,7 +89,7 @@ func TestReconcile_NoopIdentical(t *testing.T) {
 	provider := newMockProvider()
 	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
 
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
@@ -104,7 +104,7 @@ func TestReconcile_NoopIdentical(t *testing.T) {
 
 func TestReconcile_ApplyExecutes(t *testing.T) {
 	provider := newMockProvider()
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
@@ -125,7 +125,7 @@ func TestReconcile_ForceUpdatesIdentical(t *testing.T) {
 	provider := newMockProvider()
 	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
 
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
@@ -152,7 +152,7 @@ func TestReconcile_ForceApplyExecutes(t *testing.T) {
 	provider := newMockProvider()
 	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
 
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{Kind: manifest.KindProvider, Name: "anthropic", Spec: map[string]any{"displayName": "Anthropic"}},
@@ -171,7 +171,7 @@ func TestReconcile_ForceApplyExecutes(t *testing.T) {
 
 func TestReconcile_DependencyOrder(t *testing.T) {
 	provider := newMockProvider()
-	engine := NewEngine(provider)
+	engine := NewEngine(provider, nil)
 
 	// Agent depends on Provider — Provider should be processed first
 	m := &manifest.Manifest{

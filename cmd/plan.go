@@ -42,7 +42,7 @@ Similar to 'terraform plan'.`,
 		provider := goclaw.New(ep, tok, provOpts...)
 		defer provider.Close()
 
-		engine := reconciler.NewEngine(provider)
+		engine := reconciler.NewEngine(provider, nil)
 		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: planPrune, Force: planForce})
 
 		display.PrintPlan(plan, verbose)

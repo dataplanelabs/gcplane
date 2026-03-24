@@ -1,0 +1,36 @@
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  enable:
+    - revive
+    - staticcheck
+    - govet
+    - errcheck
+    - ineffassign
+    - unused
+  disable:
+    - depguard
+    - funlen
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [errcheck]
+      - path: cmd/init\.go
+        linters: [errcheck]
+      # Deferred Close calls — errors unactionable at this point
+      - linters: [errcheck]
+        text: "Error return value of `.*(Close|Shutdown)`"
+      # HTTP ResponseWriter writes — errors are connection-level and unrecoverable
+      - path: internal/server/handlers\.go
+        linters: [errcheck]
+      # Hash writer (crypto/sha256) never returns errors
+      - path: internal/source/file_source\.go
+        linters: [errcheck]

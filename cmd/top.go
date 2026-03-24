@@ -67,7 +67,7 @@ func runTop(_ *cobra.Command, _ []string) error {
 	provider := goclaw.New(ep, tok, provOpts...)
 	defer provider.Close()
 
-	engine := reconciler.NewEngine(provider)
+	engine := reconciler.NewEngine(provider, nil)
 
 	app, err := tui.NewApp(tui.Config{
 		Manifest: m,
