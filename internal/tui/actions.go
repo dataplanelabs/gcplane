@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,7 +41,7 @@ func (a *App) applyAll() {
 
 // doApply runs the actual reconciliation in a goroutine.
 func (a *App) doApply() {
-	_, result := a.Engine.Reconcile(a.Manifest, reconciler.ReconcileOpts{DryRun: false})
+	_, result := a.Engine.Reconcile(context.Background(), a.Manifest, reconciler.ReconcileOpts{DryRun: false})
 
 	// Refresh to show updated state
 	a.refresh()
@@ -126,14 +127,14 @@ func (a *App) editResource() {
 		return
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if _, err := tmpFile.Write(yamlBytes); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		a.showStatus(fmt.Sprintf("[red]Write error: %s[-]", err))
 		return
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Determine editor
 	editor := os.Getenv("EDITOR")
@@ -147,7 +148,7 @@ func (a *App) editResource() {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		cmd.Run()
+		_ = cmd.Run()
 	})
 
 	// Read edited file

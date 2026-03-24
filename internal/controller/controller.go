@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
@@ -14,43 +15,65 @@ type Notifier interface {
 	NotifyDrift(ctx context.Context, changes []reconciler.Change) error
 }
 
+// SyncResult contains the outcome of a single reconcile cycle.
+type SyncResult struct {
+	Applied int      `json:"applied"`
+	Failed  int      `json:"failed"`
+	Creates int      `json:"creates"`
+	Updates int      `json:"updates"`
+	Noops   int      `json:"noops"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
 // Controller orchestrates the periodic reconcile loop.
 type Controller struct {
-	source    source.ManifestSource
-	provider  reconciler.ProviderInterface
-	tracker   *StatusTracker
-	metrics   *Metrics
-	notifier  Notifier
-	interval  time.Duration
-	prune     bool
-	triggerCh chan struct{}
-	logger    *slog.Logger
-	lastHash  string
+	source         source.ManifestSource
+	provider       reconciler.ProviderInterface
+	tracker        *StatusTracker
+	metrics        *Metrics
+	notifier       Notifier
+	interval       time.Duration
+	prune          bool
+	triggerCh      chan struct{}
+	logger         *slog.Logger
+	lastHash       string
+	debounceWindow time.Duration
+	debounceTimer  *time.Timer
+	mu             sync.Mutex
+	waiters        []chan *SyncResult
 }
 
 // Config holds controller dependencies.
 type Config struct {
-	Source   source.ManifestSource
-	Provider reconciler.ProviderInterface
-	Tracker  *StatusTracker
-	Notifier Notifier
-	Interval time.Duration
-	Prune    bool
-	Logger   *slog.Logger
+	Source         source.ManifestSource
+	Provider       reconciler.ProviderInterface
+	Tracker        *StatusTracker
+	Notifier       Notifier
+	Interval       time.Duration
+	Prune          bool
+	Logger         *slog.Logger
+	DebounceWindow time.Duration
 }
+
+const defaultDebounceWindow = 2 * time.Second
 
 // New creates a controller with the given config.
 func New(cfg Config) *Controller {
+	dw := cfg.DebounceWindow
+	if dw <= 0 {
+		dw = defaultDebounceWindow
+	}
 	return &Controller{
-		source:    cfg.Source,
-		provider:  cfg.Provider,
-		tracker:   cfg.Tracker,
-		metrics:   &Metrics{},
-		notifier:  cfg.Notifier,
-		interval:  cfg.Interval,
-		prune:     cfg.Prune,
-		triggerCh: make(chan struct{}, 1),
-		logger:    cfg.Logger,
+		source:         cfg.Source,
+		provider:       cfg.Provider,
+		tracker:        cfg.Tracker,
+		metrics:        &Metrics{},
+		notifier:       cfg.Notifier,
+		interval:       cfg.Interval,
+		prune:          cfg.Prune,
+		triggerCh:      make(chan struct{}, 1),
+		logger:         cfg.Logger,
+		debounceWindow: dw,
 	}
 }
 
@@ -77,11 +100,55 @@ func (c *Controller) Run(done <-chan struct{}) {
 	}
 }
 
-// Trigger requests an immediate reconcile. Non-blocking; drops if already pending.
+// Trigger requests an immediate reconcile with debouncing. Non-blocking.
+// Rapid calls within the debounce window are coalesced into a single reconcile.
 func (c *Controller) Trigger() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.debounceTimer != nil {
+		c.debounceTimer.Stop()
+	}
+	c.debounceTimer = time.AfterFunc(c.debounceWindow, func() {
+		select {
+		case c.triggerCh <- struct{}{}:
+		default:
+		}
+	})
+}
+
+// TriggerAndWait triggers an immediate reconcile and waits for its result.
+// Returns the SyncResult or ctx.Err() on timeout/cancellation.
+// Bypass debounce — reconcile is scheduled immediately.
+func (c *Controller) TriggerAndWait(ctx context.Context) (*SyncResult, error) {
+	ch := make(chan *SyncResult, 1)
+
+	c.mu.Lock()
+	c.waiters = append(c.waiters, ch)
+	c.mu.Unlock()
+
+	// Send directly to triggerCh, bypassing debounce.
 	select {
 	case c.triggerCh <- struct{}{}:
 	default:
+		// A reconcile is already queued; our waiter will catch that result.
+	}
+
+	select {
+	case res := <-ch:
+		return res, nil
+	case <-ctx.Done():
+		// Remove the orphaned waiter to avoid a goroutine leak.
+		c.mu.Lock()
+		filtered := c.waiters[:0]
+		for _, w := range c.waiters {
+			if w != ch {
+				filtered = append(filtered, w)
+			}
+		}
+		c.waiters = filtered
+		c.mu.Unlock()
+		return nil, ctx.Err()
 	}
 }
 
@@ -98,6 +165,9 @@ func (c *Controller) reconcileOnce() {
 		c.metrics.mu.Lock()
 		c.metrics.SyncErrors++
 		c.metrics.mu.Unlock()
+
+		errResult := &SyncResult{Errors: []string{err.Error()}}
+		c.notifyWaiters(errResult)
 		return
 	}
 
@@ -108,11 +178,13 @@ func (c *Controller) reconcileOnce() {
 			display = display[:12]
 		}
 		c.logger.Info("manifest unchanged, skipping", "hash", display)
+		// Notify waiters with a no-op result so TriggerAndWait doesn't block forever.
+		c.notifyWaiters(&SyncResult{})
 		return
 	}
 
 	engine := reconciler.NewEngine(c.provider, c.logger)
-	plan, result := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: false, Prune: c.prune})
+	plan, result := engine.Reconcile(context.Background(), m, reconciler.ReconcileOpts{DryRun: false, Prune: c.prune, Concurrency: 5})
 
 	resources := buildResourceStatuses(plan, result)
 	duration := time.Since(start)
@@ -164,6 +236,31 @@ func (c *Controller) reconcileOnce() {
 		"creates", plan.Creates, "updates", plan.Updates, "noops", plan.Noops,
 		"applied", result.Applied, "failed", result.Failed,
 		"duration", duration.Round(time.Millisecond))
+
+	syncResult := &SyncResult{
+		Applied: result.Applied,
+		Failed:  result.Failed,
+		Creates: plan.Creates,
+		Updates: plan.Updates,
+		Noops:   plan.Noops,
+		Errors:  result.Errors,
+	}
+	if len(plan.Errors) > 0 {
+		syncResult.Errors = append(syncResult.Errors, plan.Errors...)
+	}
+	c.notifyWaiters(syncResult)
+}
+
+// notifyWaiters sends the result to all registered waiters and clears the list.
+func (c *Controller) notifyWaiters(result *SyncResult) {
+	c.mu.Lock()
+	waiters := c.waiters
+	c.waiters = nil
+	c.mu.Unlock()
+
+	for _, ch := range waiters {
+		ch <- result
+	}
 }
 
 // logDriftChanges logs each drifted resource at Info level.
@@ -216,4 +313,3 @@ func buildResourceStatuses(plan *reconciler.Plan, _ *reconciler.ApplyResult) []R
 	}
 	return statuses
 }
-

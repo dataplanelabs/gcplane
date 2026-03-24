@@ -1,0 +1,18 @@
+# Validate a valid manifest
+exec gcplane validate -f manifest.yaml
+stdout 'Valid: test-setup \(1 resources\)'
+
+-- manifest.yaml --
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: test-setup
+connection:
+  endpoint: http://localhost:18790
+  token: test-token
+resources:
+  - kind: Provider
+    name: test-provider
+    spec:
+      type: anthropic
+      apiKey: test-key

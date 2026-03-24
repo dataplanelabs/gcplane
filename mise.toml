@@ -44,6 +44,10 @@ go tool cover -func=coverage.out
 description = "Run tests with race detector"
 run = "go test -race ./... -count=1"
 
+[tasks."test:script"]
+description = "Run testscript golden-file tests"
+run = "go test ./cmd/ -run TestScript -v -count=1"
+
 [tasks."test:e2e"]
 description = "Full e2e: reset GoClaw + test all features"
 depends = ["reset"]
@@ -192,6 +196,13 @@ run = "./$BINARY serve --tenants-dir examples/local-dev-mt --interval 30s"
 description = "Run golangci-lint"
 run = "golangci-lint run ./..."
 
+[tasks.vuln]
+description = "Run vulnerability scanner"
+run = """
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+"""
+
 [tasks.check]
-description = "Build + vet + test"
-depends = ["build", "lint", "test"]
+description = "Build + lint + test + vuln"
+depends = ["build", "lint", "test", "vuln"]

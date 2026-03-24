@@ -1,0 +1,3 @@
+# Validate with missing file
+! exec gcplane validate -f nonexistent.yaml
+stderr 'nonexistent\.yaml'

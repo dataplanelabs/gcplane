@@ -1,9 +1,13 @@
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/secrets"
@@ -36,7 +40,8 @@ func NewEngine(provider ProviderInterface, logger *slog.Logger) *Engine {
 // Reconcile processes a manifest and returns a plan.
 // If opts.DryRun=false, it also executes the changes via the provider.
 // If opts.Prune=true, orphaned gcplane-owned resources are deleted.
-func (e *Engine) Reconcile(m *manifest.Manifest, opts ReconcileOpts) (*Plan, *ApplyResult) {
+// opts.Concurrency controls max parallel resources per kind (0 = sequential).
+func (e *Engine) Reconcile(ctx context.Context, m *manifest.Manifest, opts ReconcileOpts) (*Plan, *ApplyResult) {
 	plan := &Plan{}
 	result := &ApplyResult{}
 
@@ -46,17 +51,17 @@ func (e *Engine) Reconcile(m *manifest.Manifest, opts ReconcileOpts) (*Plan, *Ap
 		byKind[r.Kind] = append(byKind[r.Kind], r)
 	}
 
-	// Process in dependency order
+	// Process in dependency order (cross-kind order is always sequential)
 	for _, kind := range manifest.ApplyOrder() {
 		resources, ok := byKind[kind]
 		if !ok {
 			continue
 		}
 
-		for _, res := range resources {
-			change := e.reconcileOne(res, opts.Force)
+		// Observe phase (optionally parallel within this kind)
+		changes := e.reconcileKind(ctx, resources, opts.Force, opts.Concurrency)
+		for i, change := range changes {
 			plan.Changes = append(plan.Changes, change)
-
 			switch change.Action {
 			case ActionCreate:
 				plan.Creates++
@@ -65,23 +70,17 @@ func (e *Engine) Reconcile(m *manifest.Manifest, opts ReconcileOpts) (*Plan, *Ap
 			case ActionNoop:
 				plan.Noops++
 			}
-
-			// If error during observe, record and skip execution
 			if change.Error != "" {
-				plan.Errors = append(plan.Errors, fmt.Sprintf("%s/%s: %s", res.Kind, res.Name, change.Error))
-				continue
+				plan.Errors = append(plan.Errors, fmt.Sprintf("%s/%s: %s", resources[i].Kind, resources[i].Name, change.Error))
 			}
+		}
 
-			// Execute if not dry-run
-			if !opts.DryRun && change.Action != ActionNoop {
-				err := e.execute(change, res)
-				if err != nil {
-					result.Failed++
-					result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", res.Kind, res.Name, err))
-				} else {
-					result.Applied++
-				}
-			}
+		// Execute phase (optionally parallel within this kind)
+		if !opts.DryRun {
+			kindResult := e.executeChanges(ctx, changes, resources, opts.Concurrency)
+			result.Applied += kindResult.Applied
+			result.Failed += kindResult.Failed
+			result.Errors = append(result.Errors, kindResult.Errors...)
 		}
 	}
 
@@ -100,6 +99,78 @@ func (e *Engine) Reconcile(m *manifest.Manifest, opts ReconcileOpts) (*Plan, *Ap
 	}
 
 	return plan, result
+}
+
+// reconcileKind runs the observe phase for all resources of a single kind.
+// When concurrency <= 1, resources are processed sequentially (default).
+func (e *Engine) reconcileKind(ctx context.Context, resources []manifest.Resource, force bool, concurrency int) []Change {
+	changes := make([]Change, len(resources))
+
+	if concurrency <= 1 {
+		for i, res := range resources {
+			changes[i] = e.reconcileOne(res, force)
+		}
+		return changes
+	}
+
+	g, _ := errgroup.WithContext(ctx)
+	g.SetLimit(concurrency)
+
+	for i, res := range resources {
+		i, res := i, res
+		g.Go(func() error {
+			changes[i] = e.reconcileOne(res, force)
+			return nil // errors captured in Change.Error
+		})
+	}
+	_ = g.Wait()
+	return changes
+}
+
+// executeChanges runs the execute phase for a slice of changes.
+// When concurrency <= 1, changes are executed sequentially (default).
+func (e *Engine) executeChanges(ctx context.Context, changes []Change, resources []manifest.Resource, concurrency int) *ApplyResult {
+	result := &ApplyResult{}
+
+	if concurrency <= 1 {
+		for i, change := range changes {
+			if change.Action == ActionNoop || change.Error != "" {
+				continue
+			}
+			if err := e.execute(change, resources[i]); err != nil {
+				result.Failed++
+				result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", change.Kind, change.Name, err))
+			} else {
+				result.Applied++
+			}
+		}
+		return result
+	}
+
+	var mu sync.Mutex
+	g, _ := errgroup.WithContext(ctx)
+	g.SetLimit(concurrency)
+
+	for i, change := range changes {
+		if change.Action == ActionNoop || change.Error != "" {
+			continue
+		}
+		i, change := i, change
+		g.Go(func() error {
+			err := e.execute(change, resources[i])
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				result.Failed++
+				result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", change.Kind, change.Name, err))
+			} else {
+				result.Applied++
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+	return result
 }
 
 func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Change, *ApplyResult) {
@@ -163,59 +234,93 @@ func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Ch
 	return changes, result
 }
 
+// reconcileContext holds state passed through the subreconciler step pipeline.
+type reconcileContext struct {
+	resource manifest.Resource
+	spec     map[string]any
+	current  map[string]any
+	change   Change
+	force    bool
+}
+
+// reconcileOne runs the subreconciler pipeline: resolve → observe → compare.
 func (e *Engine) reconcileOne(res manifest.Resource, force bool) Change {
-	change := Change{
-		Kind: res.Kind,
-		Name: res.Name,
+	rc := &reconcileContext{
+		resource: res,
+		change:   Change{Kind: res.Kind, Name: res.Name},
+		force:    force,
 	}
 
-	// Resolve secrets in spec
-	spec := e.resolveSpecSecrets(res.Spec)
+	steps := []func(*reconcileContext) error{
+		e.stepResolveSecrets,
+		e.stepObserve,
+		e.stepCompare,
+	}
 
-	// Observe current state
+	for _, step := range steps {
+		if err := step(rc); err != nil {
+			break
+		}
+	}
+	return rc.change
+}
+
+// stepResolveSecrets resolves secret references (${ENV_VAR}, file://) in the resource spec.
+func (e *Engine) stepResolveSecrets(rc *reconcileContext) error {
+	rc.spec = e.resolveSpecSecrets(rc.resource.Spec)
+	return nil
+}
+
+// stepObserve queries the provider for the current state of the resource.
+func (e *Engine) stepObserve(rc *reconcileContext) error {
 	e.logger.Debug("observing resource",
-		slog.String("kind", string(res.Kind)),
-		slog.String("name", res.Name))
+		slog.String("kind", string(rc.resource.Kind)),
+		slog.String("name", rc.resource.Name))
 
-	current, err := e.provider.Observe(res.Kind, res.Name)
+	current, err := e.provider.Observe(rc.resource.Kind, rc.resource.Name)
 	if err != nil {
 		e.logger.Warn("observe failed",
-			slog.String("kind", string(res.Kind)),
-			slog.String("name", res.Name),
+			slog.String("kind", string(rc.resource.Kind)),
+			slog.String("name", rc.resource.Name),
 			slog.Any("error", err))
-		change.Action = ActionNoop
-		change.Error = fmt.Sprintf("observe failed: %v", err)
-		return change
+		rc.change.Action = ActionNoop
+		rc.change.Error = fmt.Sprintf("observe failed: %v", err)
+		return err
 	}
 
 	e.logger.Debug("observe result",
-		slog.String("kind", string(res.Kind)),
-		slog.String("name", res.Name),
+		slog.String("kind", string(rc.resource.Kind)),
+		slog.String("name", rc.resource.Name),
 		slog.Bool("exists", current != nil))
 
+	rc.current = current
+	return nil
+}
+
+// stepCompare compares desired spec against observed state to determine the action.
+func (e *Engine) stepCompare(rc *reconcileContext) error {
 	// Resource doesn't exist — create
-	if current == nil {
-		change.Action = ActionCreate
-		return change
+	if rc.current == nil {
+		rc.change.Action = ActionCreate
+		return nil
 	}
 
 	// Compare desired vs current, skipping write-only fields
-	exclude := manifest.WriteOnlyFields(res.Kind)
-	diffs := CompareSpecExcluding(spec, current, exclude)
+	exclude := manifest.WriteOnlyFields(rc.resource.Kind)
+	diffs := CompareSpecExcluding(rc.spec, rc.current, exclude)
 	if len(diffs) == 0 {
-		if force {
-			// Force re-apply even with no detected diff (covers write-only fields)
-			change.Action = ActionUpdate
-			change.Forced = true
-			return change
+		if rc.force {
+			rc.change.Action = ActionUpdate
+			rc.change.Forced = true
+		} else {
+			rc.change.Action = ActionNoop
 		}
-		change.Action = ActionNoop
-		return change
+		return nil
 	}
 
-	change.Action = ActionUpdate
-	change.Diff = diffs
-	return change
+	rc.change.Action = ActionUpdate
+	rc.change.Diff = diffs
+	return nil
 }
 
 func (e *Engine) execute(change Change, res manifest.Resource) error {

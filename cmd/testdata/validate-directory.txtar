@@ -1,0 +1,20 @@
+# Validate a directory of manifests
+exec gcplane validate -f manifests/
+stdout 'Valid: dir-test \(1 resources\)'
+
+-- manifests/base.yaml --
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: dir-test
+connection:
+  endpoint: http://localhost:18790
+  token: test-token
+
+-- manifests/providers.yaml --
+resources:
+  - kind: Provider
+    name: test-provider
+    spec:
+      type: anthropic
+      apiKey: test-key

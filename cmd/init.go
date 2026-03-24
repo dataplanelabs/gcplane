@@ -131,7 +131,7 @@ resources:
       status: active
       isDefault: true
 `, name, ep, provName, prov.displayName, prov.providerType, prov.apiBase, prov.envVar,
-			agentName, strings.Title(agentName), provName, model)
+			agentName, capitalizeFirst(agentName), provName, model)
 
 		if err := os.WriteFile("gcplane.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("write gcplane.yaml: %w", err)
@@ -160,4 +160,11 @@ func readLine(reader *bufio.Reader, defaultVal string) string {
 		return defaultVal
 	}
 	return line
+}
+
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

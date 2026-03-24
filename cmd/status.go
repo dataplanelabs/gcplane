@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
@@ -32,7 +33,7 @@ var statusCmd = &cobra.Command{
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider, nil)
-		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true})
+		plan, _ := engine.Reconcile(context.Background(), m, reconciler.ReconcileOpts{DryRun: true})
 
 		total := plan.Creates + plan.Updates + plan.Noops + plan.Deletes
 		inSync := plan.Noops

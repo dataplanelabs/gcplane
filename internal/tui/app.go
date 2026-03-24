@@ -202,7 +202,7 @@ func (a *App) refresh() {
 
 // refreshDirect does a direct dry-run reconciliation against the GoClaw API.
 func (a *App) refreshDirect() {
-	plan, _ := a.Engine.Reconcile(a.Manifest, reconciler.ReconcileOpts{DryRun: true})
+	plan, _ := a.Engine.Reconcile(context.Background(), a.Manifest, reconciler.ReconcileOpts{DryRun: true})
 	a.model.UpdatePlan(plan)
 
 	a.tapp.QueueUpdateDraw(func() {

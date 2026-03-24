@@ -1,0 +1,17 @@
+# Validate an invalid manifest - resource with empty name
+! exec gcplane validate -f manifest.yaml
+stderr 'Validation errors'
+
+-- manifest.yaml --
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: invalid-test
+connection:
+  endpoint: http://localhost:18790
+  token: test-token
+resources:
+  - kind: Provider
+    name: ''
+    spec:
+      apiKey: test-key

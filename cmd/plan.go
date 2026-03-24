@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/dataplanelabs/gcplane/internal/display"
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
@@ -43,7 +45,7 @@ Similar to 'terraform plan'.`,
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider, nil)
-		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: planPrune, Force: planForce})
+		plan, _ := engine.Reconcile(context.Background(), m, reconciler.ReconcileOpts{DryRun: true, Prune: planPrune, Force: planForce})
 
 		display.PrintPlan(plan, verbose)
 		return nil

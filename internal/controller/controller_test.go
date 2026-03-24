@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sync/atomic"
@@ -71,12 +72,13 @@ func minimalManifest() *manifest.Manifest {
 func newTestController(src *mockSource, prov reconciler.ProviderInterface) *Controller {
 	tracker := NewStatusTracker()
 	return New(Config{
-		Source:   src,
-		Provider: prov,
-		Tracker:  tracker,
-		Interval: time.Hour, // large interval — only explicit calls in tests
-		Prune:    false,
-		Logger:   slog.Default(),
+		Source:         src,
+		Provider:       prov,
+		Tracker:        tracker,
+		Interval:       time.Hour, // large interval — only explicit calls in tests
+		Prune:          false,
+		Logger:         slog.Default(),
+		DebounceWindow: 50 * time.Millisecond, // short debounce for tests
 	})
 }
 
@@ -247,17 +249,25 @@ func TestReconcileOnce_SyncedConditionOnSuccess(t *testing.T) {
 	}
 }
 
-func TestTrigger_SendsToChannel(t *testing.T) {
+func TestTrigger_SendsToChannelAfterDebounce(t *testing.T) {
 	src := &mockSource{manifest: minimalManifest(), hash: testHash}
 	ctrl := newTestController(src, &mockProvider{})
 
 	ctrl.Trigger()
 
+	// Channel should be empty immediately (debounce pending).
+	select {
+	case <-ctrl.triggerCh:
+		t.Error("expected channel empty before debounce window")
+	default:
+	}
+
+	// After debounce window, channel should receive.
 	select {
 	case <-ctrl.triggerCh:
 		// good
-	default:
-		t.Error("expected trigger channel to have a value after Trigger()")
+	case <-time.After(500 * time.Millisecond):
+		t.Error("expected trigger channel to receive after debounce window")
 	}
 }
 
@@ -267,6 +277,79 @@ func TestTrigger_NonBlocking_WhenChannelFull(t *testing.T) {
 
 	ctrl.Trigger()
 	ctrl.Trigger() // should not block even if channel is full
+}
+
+func TestTrigger_Debounce_CoalescesRapidCalls(t *testing.T) {
+	src := &mockSource{manifest: minimalManifest(), hash: ""}
+	ctrl := newTestController(src, &mockProvider{})
+	ctrl.interval = time.Hour
+
+	done := make(chan struct{})
+	go ctrl.Run(done)
+	defer close(done)
+
+	// Wait for initial reconcile.
+	time.Sleep(20 * time.Millisecond)
+	initialCalls := src.calls.Load()
+
+	// Fire many rapid Trigger() calls; they should be coalesced by debounce.
+	for i := 0; i < 10; i++ {
+		ctrl.Trigger()
+	}
+
+	// Wait for debounce window + reconcile to complete.
+	time.Sleep(200 * time.Millisecond)
+
+	added := src.calls.Load() - initialCalls
+	// All 10 triggers coalesced: expect exactly 1 additional reconcile.
+	if added != 1 {
+		t.Errorf("expected 1 coalesced reconcile after rapid triggers, got %d", added)
+	}
+}
+
+func TestTriggerAndWait_ReturnsResult(t *testing.T) {
+	src := &mockSource{manifest: minimalManifest(), hash: ""}
+	ctrl := newTestController(src, &mockProvider{})
+	ctrl.interval = time.Hour
+
+	done := make(chan struct{})
+	go ctrl.Run(done)
+	defer close(done)
+
+	// Wait for initial reconcile.
+	time.Sleep(20 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := ctrl.TriggerAndWait(ctx)
+	if err != nil {
+		t.Fatalf("TriggerAndWait returned error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("TriggerAndWait returned nil result")
+	}
+}
+
+func TestTriggerAndWait_ReturnsOnTimeout(t *testing.T) {
+	// Controller with no Run loop — TriggerAndWait will never receive a result.
+	src := &mockSource{manifest: minimalManifest(), hash: testHash}
+	ctrl := newTestController(src, &mockProvider{})
+	// Do NOT start Run — triggerCh will be sent to but reconcile will never happen.
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	result, err := ctrl.TriggerAndWait(ctx)
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	if result != nil {
+		t.Fatalf("expected nil result on timeout, got %+v", result)
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected DeadlineExceeded, got %v", err)
+	}
 }
 
 func TestGetMetrics_ReturnsPointer(t *testing.T) {
@@ -315,9 +398,10 @@ func TestController_Run_TriggerFiresImmediateReconcile(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	initialCalls := src.calls.Load()
 
-	// Trigger an immediate reconcile
+	// Trigger an immediate reconcile; debounce window is 50ms in test controller.
 	ctrl.Trigger()
-	time.Sleep(20 * time.Millisecond)
+	// Wait longer than the debounce window so the reconcile fires.
+	time.Sleep(150 * time.Millisecond)
 
 	close(done)
 	time.Sleep(10 * time.Millisecond)

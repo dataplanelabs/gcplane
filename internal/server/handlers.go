@@ -2,13 +2,16 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/controller"
 )
@@ -70,16 +73,36 @@ func (s *Server) handleTenantStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(inst.Tracker.Get())
 }
 
-func (s *Server) handleSync(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Multi-tenant: fall back to async trigger (no aggregated SyncResult yet).
 	if s.tenantManager != nil {
 		s.tenantManager.TriggerAll()
 		s.logger.Info("sync triggered for all tenants via API")
-	} else {
-		s.controller.Trigger()
-		s.logger.Info("sync triggered via API")
+		fmt.Fprint(w, `{"message":"sync triggered"}`)
+		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(w, `{"message":"sync triggered"}`)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	result, err := s.controller.TriggerAndWait(ctx)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			w.WriteHeader(http.StatusGatewayTimeout)
+			fmt.Fprint(w, `{"error":"sync timed out"}`)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"error":%q}`, err.Error())
+		return
+	}
+
+	s.logger.Info("sync completed via API",
+		"applied", result.Applied, "failed", result.Failed,
+		"creates", result.Creates, "updates", result.Updates, "noops", result.Noops)
+	json.NewEncoder(w).Encode(result)
 }
 
 func (s *Server) handleTenantSync(w http.ResponseWriter, r *http.Request) {

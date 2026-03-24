@@ -86,7 +86,7 @@ func fetchLatest(ctx context.Context) (*ReleaseInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _, _ = io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
+	defer func() { _, _ = io.Copy(io.Discard, resp.Body); _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)

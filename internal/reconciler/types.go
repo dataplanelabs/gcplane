@@ -41,9 +41,10 @@ type Plan struct {
 
 // ReconcileOpts controls reconciliation behaviour.
 type ReconcileOpts struct {
-	DryRun bool
-	Prune  bool
-	Force  bool // Force re-applies all resources, even when no diff detected
+	DryRun      bool
+	Prune       bool
+	Force       bool // Force re-applies all resources, even when no diff detected
+	Concurrency int  // max parallel resources per kind, 0 = sequential
 }
 
 // ApplyResult is the result of applying a plan.

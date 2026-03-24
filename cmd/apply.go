@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -55,7 +56,7 @@ Only manages declared resources — UI-created objects are untouched.`,
 		opts := reconciler.ReconcileOpts{Prune: applyPrune, Force: applyForce}
 
 		// Show plan first (dry-run)
-		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true, Prune: applyPrune, Force: applyForce})
+		plan, _ := engine.Reconcile(context.Background(), m, reconciler.ReconcileOpts{DryRun: true, Prune: applyPrune, Force: applyForce})
 		display.PrintPlan(plan, verbose)
 
 		if plan.Creates == 0 && plan.Updates == 0 && plan.Deletes == 0 {
@@ -82,7 +83,7 @@ Only manages declared resources — UI-created objects are untouched.`,
 
 		// Apply
 		opts.DryRun = false
-		_, result := engine.Reconcile(m, opts)
+		_, result := engine.Reconcile(context.Background(), m, opts)
 		display.PrintApplyResult(result)
 
 		writeApplyAuditLog(applyLogFile, configFile, plan, result)

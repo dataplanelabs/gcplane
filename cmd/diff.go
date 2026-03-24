@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/dataplanelabs/gcplane/internal/display"
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
@@ -29,7 +31,7 @@ var diffCmd = &cobra.Command{
 		defer provider.Close()
 
 		engine := reconciler.NewEngine(provider, nil)
-		plan, _ := engine.Reconcile(m, reconciler.ReconcileOpts{DryRun: true})
+		plan, _ := engine.Reconcile(context.Background(), m, reconciler.ReconcileOpts{DryRun: true})
 
 		display.PrintDiff(plan)
 		return nil

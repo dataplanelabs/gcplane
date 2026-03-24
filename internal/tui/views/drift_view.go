@@ -88,13 +88,13 @@ func renderDiff(diffs map[string]reconciler.FieldDiff) string {
 	sort.Strings(keys)
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("[bold]%d field(s) drifted:[-]\n\n", len(diffs)))
+	_, _ = fmt.Fprintf(&b, "[bold]%d field(s) drifted:[-]\n\n", len(diffs))
 
 	for _, k := range keys {
 		d := diffs[k]
-		b.WriteString(fmt.Sprintf("  [white]%s:[-]\n", k))
-		b.WriteString(fmt.Sprintf("    [red]- %s[-]\n", formatDiffVal(d.Old)))
-		b.WriteString(fmt.Sprintf("    [green]+ %s[-]\n", formatDiffVal(d.New)))
+		_, _ = fmt.Fprintf(&b, "  [white]%s:[-]\n", k)
+		_, _ = fmt.Fprintf(&b, "    [red]- %s[-]\n", formatDiffVal(d.Old))
+		_, _ = fmt.Fprintf(&b, "    [green]+ %s[-]\n", formatDiffVal(d.New))
 		b.WriteString("\n")
 	}
 
