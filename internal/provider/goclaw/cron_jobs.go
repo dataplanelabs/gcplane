@@ -42,6 +42,16 @@ func (p *Provider) createCronJob(key string, spec map[string]any) error {
 	params := translateSpec(spec)
 	params["name"] = key
 
+	// Resolve agent_key → agent_id (GoClaw expects UUID)
+	if agentKey, ok := params["agent_key"].(string); ok {
+		agentID, err := p.resolveAgentID(agentKey)
+		if err != nil {
+			return fmt.Errorf("cron %s: %w", key, err)
+		}
+		params["agent_id"] = agentID
+		delete(params, "agent_key")
+	}
+
 	_, err := p.ws.Call(context.Background(), "cron.create", params)
 	if err != nil {
 		return fmt.Errorf("cron.create %s: %w", key, err)
@@ -68,9 +78,21 @@ func (p *Provider) updateCronJob(key string, spec map[string]any) error {
 		jobID = strVal(current, "name")
 	}
 
+	patch := translateSpec(spec)
+
+	// Resolve agent_key → agent_id (GoClaw expects UUID)
+	if agentKey, ok := patch["agent_key"].(string); ok {
+		agentID, err := p.resolveAgentID(agentKey)
+		if err != nil {
+			return fmt.Errorf("cron %s: %w", key, err)
+		}
+		patch["agent_id"] = agentID
+		delete(patch, "agent_key")
+	}
+
 	params := map[string]any{
 		"jobId": jobID,
-		"patch": translateSpec(spec),
+		"patch": patch,
 	}
 
 	_, err = p.ws.Call(context.Background(), "cron.update", params)

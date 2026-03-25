@@ -1,6 +1,8 @@
 package goclaw
 
 import (
+	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
@@ -44,9 +46,21 @@ func TestCronJob_Observe_NotFound(t *testing.T) {
 }
 
 func TestCronJob_Create(t *testing.T) {
+	agentsHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/agents" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"agents": []map[string]any{
+					{"id": "agent-uuid-1", "agent_key": "my-bot"},
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}
+
 	p, cleanup := newWSTestServer(t, []wsResponse{
 		{method: "cron.create", ok: true, payload: map[string]any{"ok": true}},
-	}, nil)
+	}, agentsHandler)
 	defer cleanup()
 
 	err := p.Create(manifest.KindCronJob, "daily-sync", map[string]any{
