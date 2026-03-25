@@ -30,3 +30,6 @@ coverage.out
 # GoReleaser build output
 dist/
 coverage_provider.out
+
+# Repomix
+repomix-output.xml
