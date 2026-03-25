@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +41,7 @@ func TestProvider_Observe_Provider(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindProvider, "test-provider")
+	result, err := p.Observe(context.Background(), manifest.KindProvider, "test-provider")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestProvider_Observe_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindProvider, "nonexistent")
+	result, err := p.Observe(context.Background(), manifest.KindProvider, "nonexistent")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +94,7 @@ func TestProvider_Create_Provider(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindProvider, "new-provider", map[string]any{
+	err := p.Create(context.Background(), manifest.KindProvider, "new-provider", map[string]any{
 		"displayName":  "New",
 		"providerType": "openrouter",
 	})
@@ -133,7 +134,7 @@ func TestProvider_Delete_Provider(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Delete(manifest.KindProvider, "test")
+	err := p.Delete(context.Background(), manifest.KindProvider, "test")
 	if err != nil {
 		t.Fatalf("delete: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestProvider_Delete_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Delete(manifest.KindProvider, "ghost")
+	err := p.Delete(context.Background(), manifest.KindProvider, "ghost")
 	if err != nil {
 		t.Fatalf("expected no error for not-found delete, got: %v", err)
 	}
@@ -171,7 +172,7 @@ func TestProvider_ListAll_Provider(t *testing.T) {
 	}))
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindProvider)
+	infos, err := p.ListAll(context.Background(), manifest.KindProvider)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}
@@ -196,7 +197,7 @@ func TestProvider_Observe_UnknownKind(t *testing.T) {
 	}))
 	defer cleanup()
 
-	_, err := p.Observe(manifest.ResourceKind("Unknown"), "x")
+	_, err := p.Observe(context.Background(), manifest.ResourceKind("Unknown"), "x")
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
 	}
@@ -209,7 +210,7 @@ func TestProvider_Create_UnknownKind(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.ResourceKind("Unknown"), "x", nil)
+	err := p.Create(context.Background(), manifest.ResourceKind("Unknown"), "x", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
 	}

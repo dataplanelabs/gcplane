@@ -15,11 +15,11 @@ import (
 
 // ProviderInterface defines the operations a provider must support.
 type ProviderInterface interface {
-	Observe(kind manifest.ResourceKind, key string) (map[string]any, error)
-	Create(kind manifest.ResourceKind, key string, spec map[string]any) error
-	Update(kind manifest.ResourceKind, key string, spec map[string]any) error
-	Delete(kind manifest.ResourceKind, key string) error
-	ListAll(kind manifest.ResourceKind) ([]ResourceInfo, error)
+	Observe(ctx context.Context, kind manifest.ResourceKind, key string) (map[string]any, error)
+	Create(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error
+	Update(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error
+	Delete(ctx context.Context, kind manifest.ResourceKind, key string) error
+	ListAll(ctx context.Context, kind manifest.ResourceKind) ([]ResourceInfo, error)
 }
 
 // Engine is the Observe→Compare→Act reconciliation engine.
@@ -86,7 +86,7 @@ func (e *Engine) Reconcile(ctx context.Context, m *manifest.Manifest, opts Recon
 
 	// Prune phase: detect orphaned gcplane-owned resources
 	if opts.Prune {
-		pruneChanges, pruneResult := e.detectAndExecutePrunes(m, opts.DryRun)
+		pruneChanges, pruneResult := e.detectAndExecutePrunes(ctx, m, opts.DryRun)
 		plan.Changes = append(plan.Changes, pruneChanges...)
 		for _, c := range pruneChanges {
 			if c.Action == ActionDelete {
@@ -108,7 +108,7 @@ func (e *Engine) reconcileKind(ctx context.Context, resources []manifest.Resourc
 
 	if concurrency <= 1 {
 		for i, res := range resources {
-			changes[i] = e.reconcileOne(res, force)
+			changes[i] = e.reconcileOne(ctx, res, force)
 		}
 		return changes
 	}
@@ -119,7 +119,7 @@ func (e *Engine) reconcileKind(ctx context.Context, resources []manifest.Resourc
 	for i, res := range resources {
 		i, res := i, res
 		g.Go(func() error {
-			changes[i] = e.reconcileOne(res, force)
+			changes[i] = e.reconcileOne(ctx, res, force)
 			return nil // errors captured in Change.Error
 		})
 	}
@@ -137,7 +137,7 @@ func (e *Engine) executeChanges(ctx context.Context, changes []Change, resources
 			if change.Action == ActionNoop || change.Error != "" {
 				continue
 			}
-			if err := e.execute(change, resources[i]); err != nil {
+			if err := e.execute(ctx, change, resources[i]); err != nil {
 				result.Failed++
 				result.Errors = append(result.Errors, fmt.Sprintf("%s/%s: %v", change.Kind, change.Name, err))
 			} else {
@@ -157,7 +157,7 @@ func (e *Engine) executeChanges(ctx context.Context, changes []Change, resources
 		}
 		i, change := i, change
 		g.Go(func() error {
-			err := e.execute(change, resources[i])
+			err := e.execute(ctx, change, resources[i])
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -173,7 +173,7 @@ func (e *Engine) executeChanges(ctx context.Context, changes []Change, resources
 	return result
 }
 
-func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Change, *ApplyResult) {
+func (e *Engine) detectAndExecutePrunes(ctx context.Context, m *manifest.Manifest, dryRun bool) ([]Change, *ApplyResult) {
 	result := &ApplyResult{}
 	var changes []Change
 
@@ -194,7 +194,7 @@ func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Ch
 			continue
 		}
 
-		remotes, err := e.provider.ListAll(kind)
+		remotes, err := e.provider.ListAll(ctx, kind)
 		if err != nil {
 			// Can't list this kind — skip silently
 			continue
@@ -218,7 +218,7 @@ func (e *Engine) detectAndExecutePrunes(m *manifest.Manifest, dryRun bool) ([]Ch
 				slog.String("name", remote.Name))
 
 			if !dryRun {
-				if err := e.provider.Delete(kind, remote.Name); err != nil {
+				if err := e.provider.Delete(ctx, kind, remote.Name); err != nil {
 					e.logger.Error("prune failed",
 						slog.String("kind", string(kind)),
 						slog.String("name", remote.Name),
@@ -244,21 +244,21 @@ type reconcileContext struct {
 }
 
 // reconcileOne runs the subreconciler pipeline: resolve → observe → compare.
-func (e *Engine) reconcileOne(res manifest.Resource, force bool) Change {
+func (e *Engine) reconcileOne(ctx context.Context, res manifest.Resource, force bool) Change {
 	rc := &reconcileContext{
 		resource: res,
 		change:   Change{Kind: res.Kind, Name: res.Name},
 		force:    force,
 	}
 
-	steps := []func(*reconcileContext) error{
+	steps := []func(context.Context, *reconcileContext) error{
 		e.stepResolveSecrets,
 		e.stepObserve,
 		e.stepCompare,
 	}
 
 	for _, step := range steps {
-		if err := step(rc); err != nil {
+		if err := step(ctx, rc); err != nil {
 			break
 		}
 	}
@@ -266,18 +266,18 @@ func (e *Engine) reconcileOne(res manifest.Resource, force bool) Change {
 }
 
 // stepResolveSecrets resolves secret references (${ENV_VAR}, file://) in the resource spec.
-func (e *Engine) stepResolveSecrets(rc *reconcileContext) error {
+func (e *Engine) stepResolveSecrets(_ context.Context, rc *reconcileContext) error {
 	rc.spec = e.resolveSpecSecrets(rc.resource.Spec)
 	return nil
 }
 
 // stepObserve queries the provider for the current state of the resource.
-func (e *Engine) stepObserve(rc *reconcileContext) error {
+func (e *Engine) stepObserve(ctx context.Context, rc *reconcileContext) error {
 	e.logger.Debug("observing resource",
 		slog.String("kind", string(rc.resource.Kind)),
 		slog.String("name", rc.resource.Name))
 
-	current, err := e.provider.Observe(rc.resource.Kind, rc.resource.Name)
+	current, err := e.provider.Observe(ctx, rc.resource.Kind, rc.resource.Name)
 	if err != nil {
 		e.logger.Warn("observe failed",
 			slog.String("kind", string(rc.resource.Kind)),
@@ -298,7 +298,7 @@ func (e *Engine) stepObserve(rc *reconcileContext) error {
 }
 
 // stepCompare compares desired spec against observed state to determine the action.
-func (e *Engine) stepCompare(rc *reconcileContext) error {
+func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 	// Resource doesn't exist — create
 	if rc.current == nil {
 		rc.change.Action = ActionCreate
@@ -323,7 +323,7 @@ func (e *Engine) stepCompare(rc *reconcileContext) error {
 	return nil
 }
 
-func (e *Engine) execute(change Change, res manifest.Resource) error {
+func (e *Engine) execute(ctx context.Context, change Change, res manifest.Resource) error {
 	spec := e.resolveSpecSecrets(res.Spec)
 
 	switch change.Action {
@@ -331,7 +331,7 @@ func (e *Engine) execute(change Change, res manifest.Resource) error {
 		e.logger.Info("creating resource",
 			slog.String("kind", string(res.Kind)),
 			slog.String("name", res.Name))
-		if err := e.provider.Create(res.Kind, res.Name, spec); err != nil {
+		if err := e.provider.Create(ctx, res.Kind, res.Name, spec); err != nil {
 			e.logger.Error("create failed",
 				slog.String("kind", string(res.Kind)),
 				slog.String("name", res.Name),
@@ -343,7 +343,7 @@ func (e *Engine) execute(change Change, res manifest.Resource) error {
 		e.logger.Info("updating resource",
 			slog.String("kind", string(res.Kind)),
 			slog.String("name", res.Name))
-		if err := e.provider.Update(res.Kind, res.Name, spec); err != nil {
+		if err := e.provider.Update(ctx, res.Kind, res.Name, spec); err != nil {
 			e.logger.Error("update failed",
 				slog.String("kind", string(res.Kind)),
 				slog.String("name", res.Name),

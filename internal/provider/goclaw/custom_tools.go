@@ -8,8 +8,8 @@ import (
 )
 
 // observeCustomTool fetches a custom tool by name from GoClaw.
-func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
-	data, err := p.http.Get(context.Background(), "/v1/tools/custom")
+func (p *Provider) observeCustomTool(ctx context.Context, key string) (map[string]any, error) {
+	data, err := p.http.Get(ctx, "/v1/tools/custom")
 	if err != nil {
 		return nil, fmt.Errorf("list custom tools: %w", err)
 	}
@@ -22,7 +22,7 @@ func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
 	}
 
 	for _, t := range resp.Tools {
-		if strVal(t, "name") == key && p.matchesTenant(t) {
+		if strVal(t, "name") == key && p.matchesTenant(ctx, t) {
 			return translateResult(stripInternal(t)), nil
 		}
 	}
@@ -30,11 +30,11 @@ func (p *Provider) observeCustomTool(key string) (map[string]any, error) {
 }
 
 // createCustomTool creates a new custom tool in GoClaw.
-func (p *Provider) createCustomTool(key string, spec map[string]any) error {
+func (p *Provider) createCustomTool(ctx context.Context, key string, spec map[string]any) error {
 	body := translateSpec(spec)
 	body["name"] = key
 
-	_, err := p.http.Post(context.Background(), "/v1/tools/custom", body)
+	_, err := p.http.Post(ctx, "/v1/tools/custom", body)
 	if err != nil {
 		return fmt.Errorf("create custom tool %s: %w", key, err)
 	}
@@ -42,8 +42,8 @@ func (p *Provider) createCustomTool(key string, spec map[string]any) error {
 }
 
 // updateCustomTool updates an existing custom tool in GoClaw.
-func (p *Provider) updateCustomTool(key string, spec map[string]any) error {
-	current, err := p.observeCustomTool(key)
+func (p *Provider) updateCustomTool(ctx context.Context, key string, spec map[string]any) error {
+	current, err := p.observeCustomTool(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (p *Provider) updateCustomTool(key string, spec map[string]any) error {
 	}
 
 	body := translateSpec(spec)
-	_, err = p.http.Put(context.Background(), "/v1/tools/custom/"+id, body)
+	_, err = p.http.Put(ctx, "/v1/tools/custom/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("custom tool %s (id=%s) not found: %w", key, id, err)
 	}

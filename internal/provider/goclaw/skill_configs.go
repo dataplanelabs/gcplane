@@ -8,8 +8,8 @@ import (
 
 // observeSkillConfig checks if a skill has a tenant-level config override.
 // Key is the skill slug.
-func (p *Provider) observeSkillConfig(key string) (map[string]any, error) {
-	data, err := p.http.Get(context.Background(), "/v1/skills")
+func (p *Provider) observeSkillConfig(ctx context.Context, key string) (map[string]any, error) {
+	data, err := p.http.Get(ctx, "/v1/skills")
 	if err != nil {
 		return nil, fmt.Errorf("list skills: %w", err)
 	}
@@ -37,8 +37,8 @@ func (p *Provider) observeSkillConfig(key string) (map[string]any, error) {
 }
 
 // resolveSkillID looks up a skill by slug and returns its UUID.
-func (p *Provider) resolveSkillID(slug string) (string, error) {
-	data, err := p.http.Get(context.Background(), "/v1/skills")
+func (p *Provider) resolveSkillID(ctx context.Context, slug string) (string, error) {
+	data, err := p.http.Get(ctx, "/v1/skills")
 	if err != nil {
 		return "", fmt.Errorf("list skills: %w", err)
 	}
@@ -61,15 +61,15 @@ func (p *Provider) resolveSkillID(slug string) (string, error) {
 }
 
 // createSkillConfig sets a per-tenant config for a skill.
-func (p *Provider) createSkillConfig(key string, spec map[string]any) error {
-	id, err := p.resolveSkillID(key)
+func (p *Provider) createSkillConfig(ctx context.Context, key string, spec map[string]any) error {
+	id, err := p.resolveSkillID(ctx, key)
 	if err != nil {
 		return err
 	}
 
 	body := translateSpec(spec)
 	path := fmt.Sprintf("/v1/skills/%s/tenant-config", id)
-	_, err = p.http.Put(context.Background(), path, body)
+	_, err = p.http.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("set skill config %s: %w", key, err)
 	}
@@ -77,16 +77,16 @@ func (p *Provider) createSkillConfig(key string, spec map[string]any) error {
 }
 
 // updateSkillConfig is the same as create — PUT is upsert.
-func (p *Provider) updateSkillConfig(key string, spec map[string]any) error {
-	return p.createSkillConfig(key, spec)
+func (p *Provider) updateSkillConfig(ctx context.Context, key string, spec map[string]any) error {
+	return p.createSkillConfig(ctx, key, spec)
 }
 
 // deleteSkillConfig removes a per-tenant config override for a skill.
-func (p *Provider) deleteSkillConfig(key string) error {
-	id, err := p.resolveSkillID(key)
+func (p *Provider) deleteSkillConfig(ctx context.Context, key string) error {
+	id, err := p.resolveSkillID(ctx, key)
 	if err != nil {
 		return err
 	}
 	path := fmt.Sprintf("/v1/skills/%s/tenant-config", id)
-	return p.http.Delete(context.Background(), path)
+	return p.http.Delete(ctx, path)
 }

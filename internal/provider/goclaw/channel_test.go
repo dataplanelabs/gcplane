@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -31,7 +32,7 @@ func TestChannel_Observe_Found(t *testing.T) {
 	))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindChannel, "slack-bot")
+	result, err := p.Observe(context.Background(), manifest.KindChannel, "slack-bot")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -47,7 +48,7 @@ func TestChannel_Observe_NotFound(t *testing.T) {
 	p, cleanup := newTestServer(t, buildChannelHandler([]map[string]any{}, nil))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindChannel, "missing")
+	result, err := p.Observe(context.Background(), manifest.KindChannel, "missing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestChannel_Create(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindChannel, "slack-bot", map[string]any{
+	err := p.Create(context.Background(), manifest.KindChannel, "slack-bot", map[string]any{
 		"channelType": "slack",
 		"agentKey":    "my-bot",
 	})
@@ -107,7 +108,7 @@ func TestChannel_Create_AgentNotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindChannel, "slack-bot", map[string]any{
+	err := p.Create(context.Background(), manifest.KindChannel, "slack-bot", map[string]any{
 		"agentKey": "nonexistent",
 	})
 	if err == nil {
@@ -136,7 +137,7 @@ func TestChannel_Update(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindChannel, "slack-bot", map[string]any{"channelType": "telegram"})
+	err := p.Update(context.Background(), manifest.KindChannel, "slack-bot", map[string]any{"channelType": "telegram"})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -165,7 +166,7 @@ func TestChannel_Delete(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindChannel, "slack-bot"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindChannel, "slack-bot"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if !deleted {
@@ -177,7 +178,7 @@ func TestChannel_Delete_NotFound(t *testing.T) {
 	p, cleanup := newTestServer(t, buildChannelHandler([]map[string]any{}, nil))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindChannel, "ghost"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindChannel, "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -192,7 +193,7 @@ func TestChannel_ListAll(t *testing.T) {
 	))
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindChannel)
+	infos, err := p.ListAll(context.Background(), manifest.KindChannel)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

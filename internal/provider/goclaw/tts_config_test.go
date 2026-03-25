@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
@@ -15,7 +16,7 @@ func TestTTSConfig_Observe_Found(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindTTSConfig, "")
+	result, err := p.Observe(context.Background(), manifest.KindTTSConfig, "")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -37,7 +38,7 @@ func TestTTSConfig_Observe_Empty(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindTTSConfig, "")
+	result, err := p.Observe(context.Background(), manifest.KindTTSConfig, "")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestTTSConfig_Create(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Create(manifest.KindTTSConfig, "", map[string]any{
+	err := p.Create(context.Background(), manifest.KindTTSConfig, "", map[string]any{
 		"provider": "elevenlabs",
 		"voiceId":  "voice-abc",
 	})
@@ -67,7 +68,7 @@ func TestTTSConfig_Update(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Update(manifest.KindTTSConfig, "", map[string]any{
+	err := p.Update(context.Background(), manifest.KindTTSConfig, "", map[string]any{
 		"provider": "google",
 		"voiceId":  "voice-xyz",
 	})
@@ -81,7 +82,7 @@ func TestTTSConfig_Delete_Noop(t *testing.T) {
 	p, cleanup := newWSTestServer(t, nil, nil)
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindTTSConfig, ""); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindTTSConfig, ""); err != nil {
 		t.Fatalf("expected no-op delete to succeed, got: %v", err)
 	}
 }
@@ -91,7 +92,7 @@ func TestTTSConfig_ListAll_Nil(t *testing.T) {
 	p, cleanup := newWSTestServer(t, nil, nil)
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindTTSConfig)
+	infos, err := p.ListAll(context.Background(), manifest.KindTTSConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

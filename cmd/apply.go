@@ -120,7 +120,7 @@ func writeApplyAuditLog(logFile, manifestFile string, plan *reconciler.Plan, res
 		"errors":    result.Errors,
 	}
 	data, _ := json.Marshal(entry)
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return
 	}

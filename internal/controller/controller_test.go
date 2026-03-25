@@ -38,19 +38,19 @@ type mockProvider struct {
 	listErr       error
 }
 
-func (p *mockProvider) Observe(_ manifest.ResourceKind, _ string) (map[string]any, error) {
+func (p *mockProvider) Observe(_ context.Context, _ manifest.ResourceKind, _ string) (map[string]any, error) {
 	return p.observeResult, p.observeErr
 }
-func (p *mockProvider) Create(_ manifest.ResourceKind, _ string, _ map[string]any) error {
+func (p *mockProvider) Create(_ context.Context, _ manifest.ResourceKind, _ string, _ map[string]any) error {
 	return p.createErr
 }
-func (p *mockProvider) Update(_ manifest.ResourceKind, _ string, _ map[string]any) error {
+func (p *mockProvider) Update(_ context.Context, _ manifest.ResourceKind, _ string, _ map[string]any) error {
 	return p.updateErr
 }
-func (p *mockProvider) Delete(_ manifest.ResourceKind, _ string) error {
+func (p *mockProvider) Delete(_ context.Context, _ manifest.ResourceKind, _ string) error {
 	return p.deleteErr
 }
-func (p *mockProvider) ListAll(_ manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
+func (p *mockProvider) ListAll(_ context.Context, _ manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
 	return p.listResult, p.listErr
 }
 

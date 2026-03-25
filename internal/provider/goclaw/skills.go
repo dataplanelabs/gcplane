@@ -7,8 +7,8 @@ import (
 )
 
 // observeSkill fetches a skill by key from GoClaw.
-func (p *Provider) observeSkill(key string) (map[string]any, error) {
-	data, err := p.http.Get(context.Background(), "/v1/skills")
+func (p *Provider) observeSkill(ctx context.Context, key string) (map[string]any, error) {
+	data, err := p.http.Get(ctx, "/v1/skills")
 	if err != nil {
 		return nil, fmt.Errorf("list skills: %w", err)
 	}
@@ -21,7 +21,7 @@ func (p *Provider) observeSkill(key string) (map[string]any, error) {
 	}
 
 	for _, s := range resp.Skills {
-		if strVal(s, "key") == key && p.matchesTenant(s) {
+		if strVal(s, "key") == key && p.matchesTenant(ctx, s) {
 			return translateResult(stripInternal(s)), nil
 		}
 	}
@@ -30,8 +30,8 @@ func (p *Provider) observeSkill(key string) (map[string]any, error) {
 
 // updateSkill updates an existing skill in GoClaw.
 // Skills are auto-discovered; only update is supported.
-func (p *Provider) updateSkill(key string, spec map[string]any) error {
-	current, err := p.observeSkill(key)
+func (p *Provider) updateSkill(ctx context.Context, key string, spec map[string]any) error {
+	current, err := p.observeSkill(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -45,6 +45,6 @@ func (p *Provider) updateSkill(key string, spec map[string]any) error {
 	}
 
 	body := translateSpec(spec)
-	_, err = p.http.Put(context.Background(), "/v1/skills/"+id, body)
+	_, err = p.http.Put(ctx, "/v1/skills/"+id, body)
 	return err
 }

@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -18,7 +19,7 @@ func TestCronJob_Observe_Found(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindCronJob, "daily-sync")
+	result, err := p.Observe(context.Background(), manifest.KindCronJob, "daily-sync")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -36,7 +37,7 @@ func TestCronJob_Observe_NotFound(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindCronJob, "ghost")
+	result, err := p.Observe(context.Background(), manifest.KindCronJob, "ghost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,7 +64,7 @@ func TestCronJob_Create(t *testing.T) {
 	}, agentsHandler)
 	defer cleanup()
 
-	err := p.Create(manifest.KindCronJob, "daily-sync", map[string]any{
+	err := p.Create(context.Background(), manifest.KindCronJob, "daily-sync", map[string]any{
 		"schedule": "0 0 * * *",
 		"agentKey": "my-bot",
 	})
@@ -83,7 +84,7 @@ func TestCronJob_Update(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Update(manifest.KindCronJob, "daily-sync", map[string]any{"schedule": "0 6 * * *"})
+	err := p.Update(context.Background(), manifest.KindCronJob, "daily-sync", map[string]any{"schedule": "0 6 * * *"})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -95,7 +96,7 @@ func TestCronJob_Update_NotFound(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Update(manifest.KindCronJob, "ghost", map[string]any{})
+	err := p.Update(context.Background(), manifest.KindCronJob, "ghost", map[string]any{})
 	if err == nil {
 		t.Fatal("expected error updating non-existent cron job")
 	}
@@ -112,7 +113,7 @@ func TestCronJob_Delete(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindCronJob, "daily-sync"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindCronJob, "daily-sync"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 }
@@ -123,7 +124,7 @@ func TestCronJob_Delete_NotFound(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindCronJob, "ghost"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindCronJob, "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -139,7 +140,7 @@ func TestCronJob_ListAll(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindCronJob)
+	infos, err := p.ListAll(context.Background(), manifest.KindCronJob)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

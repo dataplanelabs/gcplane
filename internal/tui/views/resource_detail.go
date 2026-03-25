@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -55,7 +56,7 @@ func NewResourceDetail() *ResourceDetail {
 
 // ProviderObserver is the minimal interface needed to observe a resource.
 type ProviderObserver interface {
-	Observe(kind manifest.ResourceKind, key string) (map[string]any, error)
+	Observe(ctx context.Context, kind manifest.ResourceKind, key string) (map[string]any, error)
 }
 
 // Show loads and displays the YAML for a given resource.
@@ -66,7 +67,7 @@ func (rd *ResourceDetail) Show(kind manifest.ResourceKind, name string, provider
 	rd.TextView.ScrollToBeginning()
 
 	go func() {
-		observed, err := provider.Observe(kind, name)
+		observed, err := provider.Observe(context.Background(), kind, name)
 
 		tapp.QueueUpdateDraw(func() {
 			if err != nil {

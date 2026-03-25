@@ -65,7 +65,7 @@ Deletes in reverse dependency order for safe cascading.`,
 
 		// Backup current state before destroying
 		if destroyBackup != "" {
-			m, err := buildExportManifest(provider, ep, tok)
+			m, err := buildExportManifest(cmd.Context(), provider, ep, tok)
 			if err != nil {
 				return fmt.Errorf("backup failed: %w", err)
 			}
@@ -86,7 +86,7 @@ Deletes in reverse dependency order for safe cascading.`,
 				kind == manifest.KindBuiltinToolConfig || kind == manifest.KindSkillConfig || kind == manifest.KindMCPCredentials {
 				continue
 			}
-			infos, err := provider.ListAll(kind)
+			infos, err := provider.ListAll(cmd.Context(), kind)
 			if err != nil {
 				continue
 			}
@@ -129,7 +129,7 @@ Deletes in reverse dependency order for safe cascading.`,
 		// Execute deletions
 		var failed int
 		for _, r := range toDelete {
-			if err := provider.Delete(r.Kind, r.Name); err != nil {
+			if err := provider.Delete(cmd.Context(), r.Kind, r.Name); err != nil {
 				fmt.Printf("  \033[31mx %s/%s: %v\033[0m\n", r.Kind, r.Name, err)
 				failed++
 			} else {

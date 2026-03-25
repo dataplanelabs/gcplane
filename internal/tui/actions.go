@@ -79,7 +79,7 @@ func (a *App) deleteResource() {
 
 // doDelete runs the delete operation in a goroutine.
 func (a *App) doDelete(kind manifest.ResourceKind, name string) {
-	err := a.Provider.Delete(kind, name)
+	err := a.Provider.Delete(context.Background(), kind, name)
 
 	// Refresh to show updated state
 	a.refresh()
@@ -101,7 +101,7 @@ func (a *App) editResource() {
 	}
 
 	// Observe current spec from GoClaw
-	observed, err := a.Provider.Observe(c.Kind, c.Name)
+	observed, err := a.Provider.Observe(context.Background(), c.Kind, c.Name)
 	if err != nil {
 		a.showStatus(fmt.Sprintf("[red]Cannot edit: %s[-]", err))
 		return
@@ -173,7 +173,7 @@ func (a *App) editResource() {
 
 	// Apply the update
 	go func() {
-		err := a.Provider.Update(c.Kind, c.Name, spec)
+		err := a.Provider.Update(context.Background(), c.Kind, c.Name, spec)
 		a.refresh()
 
 		a.tapp.QueueUpdateDraw(func() {

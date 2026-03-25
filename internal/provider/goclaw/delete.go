@@ -6,8 +6,8 @@ import (
 )
 
 // deleteProvider deletes an LLM provider by name. Idempotent: returns nil if not found.
-func (p *Provider) deleteProvider(key string) error {
-	current, err := p.observeProvider(key)
+func (p *Provider) deleteProvider(ctx context.Context, key string) error {
+	current, err := p.observeProvider(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -18,12 +18,12 @@ func (p *Provider) deleteProvider(key string) error {
 	if !ok {
 		return fmt.Errorf("provider %s: missing id", key)
 	}
-	return p.http.Delete(context.Background(), "/v1/providers/"+id)
+	return p.http.Delete(ctx, "/v1/providers/"+id)
 }
 
 // deleteAgent deletes an agent by key. Idempotent: returns nil if not found.
-func (p *Provider) deleteAgent(key string) error {
-	current, err := p.observeAgent(key)
+func (p *Provider) deleteAgent(ctx context.Context, key string) error {
+	current, err := p.observeAgent(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -34,12 +34,12 @@ func (p *Provider) deleteAgent(key string) error {
 	if !ok {
 		return fmt.Errorf("agent %s: missing id", key)
 	}
-	return p.http.Delete(context.Background(), "/v1/agents/"+id)
+	return p.http.Delete(ctx, "/v1/agents/"+id)
 }
 
 // deleteChannelInstance deletes a channel instance by name. Idempotent: returns nil if not found.
-func (p *Provider) deleteChannelInstance(key string) error {
-	current, err := p.observeChannelInstance(key)
+func (p *Provider) deleteChannelInstance(ctx context.Context, key string) error {
+	current, err := p.observeChannelInstance(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -50,12 +50,12 @@ func (p *Provider) deleteChannelInstance(key string) error {
 	if !ok {
 		return fmt.Errorf("channel instance %s: missing id", key)
 	}
-	return p.http.Delete(context.Background(), "/v1/channels/instances/"+id)
+	return p.http.Delete(ctx, "/v1/channels/instances/"+id)
 }
 
 // deleteMCPServer deletes an MCP server by name. Idempotent: returns nil if not found.
-func (p *Provider) deleteMCPServer(key string) error {
-	current, err := p.observeMCPServer(key)
+func (p *Provider) deleteMCPServer(ctx context.Context, key string) error {
+	current, err := p.observeMCPServer(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -66,12 +66,12 @@ func (p *Provider) deleteMCPServer(key string) error {
 	if !ok {
 		return fmt.Errorf("mcp server %s: missing id", key)
 	}
-	return p.http.Delete(context.Background(), "/v1/mcp/servers/"+id)
+	return p.http.Delete(ctx, "/v1/mcp/servers/"+id)
 }
 
 // deleteCustomTool deletes a custom tool by name. Idempotent: returns nil if not found.
-func (p *Provider) deleteCustomTool(key string) error {
-	current, err := p.observeCustomTool(key)
+func (p *Provider) deleteCustomTool(ctx context.Context, key string) error {
+	current, err := p.observeCustomTool(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -82,15 +82,15 @@ func (p *Provider) deleteCustomTool(key string) error {
 	if !ok {
 		return fmt.Errorf("custom tool %s: missing id", key)
 	}
-	return p.http.Delete(context.Background(), "/v1/tools/custom/"+id)
+	return p.http.Delete(ctx, "/v1/tools/custom/"+id)
 }
 
 // deleteCronJob deletes a cron job by name via WS RPC. Idempotent: returns nil if not found.
-func (p *Provider) deleteCronJob(key string) error {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) deleteCronJob(ctx context.Context, key string) error {
+	if err := p.ensureWS(ctx); err != nil {
 		return err
 	}
-	current, err := p.observeCronJob(key)
+	current, err := p.observeCronJob(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -101,16 +101,16 @@ func (p *Provider) deleteCronJob(key string) error {
 	if jobID == "" {
 		jobID = strVal(current, "name")
 	}
-	_, err = p.ws.Call(context.Background(), "cron.delete", map[string]any{"jobId": jobID})
+	_, err = p.ws.Call(ctx, "cron.delete", map[string]any{"jobId": jobID})
 	return err
 }
 
 // deleteTeam deletes a team by name via WS RPC. Idempotent: returns nil if not found.
-func (p *Provider) deleteTeam(key string) error {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) deleteTeam(ctx context.Context, key string) error {
+	if err := p.ensureWS(ctx); err != nil {
 		return err
 	}
-	current, err := p.observeTeam(key)
+	current, err := p.observeTeam(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -121,6 +121,6 @@ func (p *Provider) deleteTeam(key string) error {
 	if teamID == "" {
 		teamID = strVal(current, "name")
 	}
-	_, err = p.ws.Call(context.Background(), "teams.delete", map[string]any{"teamId": teamID})
+	_, err = p.ws.Call(ctx, "teams.delete", map[string]any{"teamId": teamID})
 	return err
 }

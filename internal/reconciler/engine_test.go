@@ -22,7 +22,7 @@ func newMockProvider() *mockProvider {
 	}
 }
 
-func (m *mockProvider) Observe(kind manifest.ResourceKind, key string) (map[string]any, error) {
+func (m *mockProvider) Observe(_ context.Context, kind manifest.ResourceKind, key string) (map[string]any, error) {
 	uid := fmt.Sprintf("%s/%s", kind, key)
 	state, ok := m.observed[uid]
 	if !ok {
@@ -31,23 +31,23 @@ func (m *mockProvider) Observe(kind manifest.ResourceKind, key string) (map[stri
 	return state, nil
 }
 
-func (m *mockProvider) Create(kind manifest.ResourceKind, key string, spec map[string]any) error {
+func (m *mockProvider) Create(_ context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	uid := fmt.Sprintf("%s/%s", kind, key)
 	m.created = append(m.created, uid)
 	return nil
 }
 
-func (m *mockProvider) Update(kind manifest.ResourceKind, key string, spec map[string]any) error {
+func (m *mockProvider) Update(_ context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	uid := fmt.Sprintf("%s/%s", kind, key)
 	m.updated = append(m.updated, uid)
 	return nil
 }
 
-func (m *mockProvider) Delete(kind manifest.ResourceKind, key string) error {
+func (m *mockProvider) Delete(_ context.Context, kind manifest.ResourceKind, key string) error {
 	return nil
 }
 
-func (m *mockProvider) ListAll(kind manifest.ResourceKind) ([]ResourceInfo, error) {
+func (m *mockProvider) ListAll(_ context.Context, kind manifest.ResourceKind) ([]ResourceInfo, error) {
 	return nil, nil
 }
 
@@ -203,13 +203,13 @@ type parallelMockProvider struct {
 	current       atomic.Int64
 }
 
-func (p *parallelMockProvider) Observe(kind manifest.ResourceKind, key string) (map[string]any, error) {
+func (p *parallelMockProvider) Observe(ctx context.Context, kind manifest.ResourceKind, key string) (map[string]any, error) {
 	cur := p.current.Add(1)
 	if cur > p.maxConcurrent.Load() {
 		p.maxConcurrent.Store(cur)
 	}
 	// Yield to encourage goroutine interleaving
-	result, err := p.mockProvider.Observe(kind, key)
+	result, err := p.mockProvider.Observe(ctx, kind, key)
 	p.current.Add(-1)
 	return result, err
 }

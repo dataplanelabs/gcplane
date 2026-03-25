@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -34,7 +35,7 @@ Use --all to include all resources.`,
 		provider := goclaw.New(ep, tok)
 		defer provider.Close()
 
-		m, err := buildExportManifest(provider, ep, tok)
+		m, err := buildExportManifest(cmd.Context(), provider, ep, tok)
 		if err != nil {
 			return err
 		}
@@ -56,7 +57,7 @@ func init() {
 // internalFields are stripped from exported specs to keep manifests clean.
 var internalFields = []string{"id", "createdAt", "updatedAt", "createdBy", "created_at", "updated_at", "created_by"}
 
-func buildExportManifest(provider *goclaw.Provider, ep, tok string) (*manifest.Manifest, error) {
+func buildExportManifest(ctx context.Context, provider *goclaw.Provider, ep, tok string) (*manifest.Manifest, error) {
 	m := &manifest.Manifest{
 		APIVersion: "gcplane.io/v1",
 		Kind:       "Manifest",
@@ -65,7 +66,7 @@ func buildExportManifest(provider *goclaw.Provider, ep, tok string) (*manifest.M
 	}
 
 	for _, kind := range manifest.ApplyOrder() {
-		infos, err := provider.ListAll(kind)
+		infos, err := provider.ListAll(ctx, kind)
 		if err != nil {
 			// skip kinds that are unavailable (e.g. WS not connected)
 			continue
@@ -76,7 +77,7 @@ func buildExportManifest(provider *goclaw.Provider, ep, tok string) (*manifest.M
 				continue
 			}
 
-			observed, err := provider.Observe(kind, info.Name)
+			observed, err := provider.Observe(ctx, kind, info.Name)
 			if err != nil {
 				continue
 			}

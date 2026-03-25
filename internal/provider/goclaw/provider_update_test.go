@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -30,7 +31,7 @@ func TestProvider_Update_Provider(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindProvider, "openrouter", map[string]any{
+	err := p.Update(context.Background(), manifest.KindProvider, "openrouter", map[string]any{
 		"displayName":  "OpenRouter",
 		"providerType": "openrouter",
 	})
@@ -51,7 +52,7 @@ func TestProvider_Update_Provider_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindProvider, "ghost", map[string]any{})
+	err := p.Update(context.Background(), manifest.KindProvider, "ghost", map[string]any{})
 	if err == nil {
 		t.Fatal("expected error updating non-existent provider")
 	}
@@ -64,7 +65,7 @@ func TestProvider_Update_UnknownKind(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.ResourceKind("Unknown"), "x", nil)
+	err := p.Update(context.Background(), manifest.ResourceKind("Unknown"), "x", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
 	}
@@ -77,7 +78,7 @@ func TestProvider_Delete_UnknownKind(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Delete(manifest.ResourceKind("Unknown"), "x")
+	err := p.Delete(context.Background(), manifest.ResourceKind("Unknown"), "x")
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
 	}
@@ -90,7 +91,7 @@ func TestProvider_ListAll_UnknownKind(t *testing.T) {
 	}))
 	defer cleanup()
 
-	_, err := p.ListAll(manifest.ResourceKind("Unknown"))
+	_, err := p.ListAll(context.Background(), manifest.ResourceKind("Unknown"))
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
 	}

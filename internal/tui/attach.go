@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -180,16 +181,16 @@ type stubProvider struct {
 	baseURL string
 }
 
-func (s *stubProvider) Observe(kind manifest.ResourceKind, key string) (map[string]any, error) {
+func (s *stubProvider) Observe(_ context.Context, kind manifest.ResourceKind, key string) (map[string]any, error) {
 	return nil, fmt.Errorf("observe not available in attach mode (connected to %s)", s.baseURL)
 }
-func (s *stubProvider) Create(kind manifest.ResourceKind, key string, spec map[string]any) error {
+func (s *stubProvider) Create(_ context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	return fmt.Errorf("create not available in attach mode — use gcplane apply directly")
 }
-func (s *stubProvider) Update(kind manifest.ResourceKind, key string, spec map[string]any) error {
+func (s *stubProvider) Update(_ context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	return fmt.Errorf("update not available in attach mode — use gcplane apply directly")
 }
-func (s *stubProvider) Delete(kind manifest.ResourceKind, key string) error {
+func (s *stubProvider) Delete(_ context.Context, kind manifest.ResourceKind, key string) error {
 	return fmt.Errorf("delete not available in attach mode — use gcplane apply directly")
 }
 func (s *stubProvider) Close() error { return nil }

@@ -40,8 +40,8 @@ type Provider struct {
 	userID     string // X-GoClaw-User-Id header (default: "gcplane")
 	http       *HTTPClient
 	ws         *WSClient
-	wsOnce     sync.Once
-	wsErr      error
+	wsMu       sync.Mutex
+	wsReady    bool
 	tenantOnce sync.Once
 	tenantErr  error
 }
@@ -65,16 +65,29 @@ func New(endpoint, token string, opts ...Option) *Provider {
 	return p
 }
 
-// ensureWS lazily connects the WebSocket client on first WS resource call.
-func (p *Provider) ensureWS() error {
-	p.wsOnce.Do(func() {
-		p.wsErr = p.ws.Connect(context.Background())
-	})
-	return p.wsErr
+// ensureWS lazily connects the WebSocket client, retrying on transient failures.
+// Unlike sync.Once, a failed connection does not permanently disable WS operations.
+func (p *Provider) ensureWS(ctx context.Context) error {
+	p.wsMu.Lock()
+	defer p.wsMu.Unlock()
+
+	if p.wsReady {
+		return nil
+	}
+
+	if err := p.ws.Connect(ctx); err != nil {
+		return err
+	}
+	p.wsReady = true
+	return nil
 }
 
 // Close releases provider resources (WS connection).
 func (p *Provider) Close() error {
+	p.wsMu.Lock()
+	p.wsReady = false
+	p.wsMu.Unlock()
+
 	if p.ws != nil {
 		return p.ws.Close()
 	}
@@ -82,34 +95,34 @@ func (p *Provider) Close() error {
 }
 
 // Observe fetches the current state of a resource from GoClaw.
-func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]any, error) {
+func (p *Provider) Observe(ctx context.Context, kind manifest.ResourceKind, key string) (map[string]any, error) {
 	switch kind {
 	case manifest.KindTenant:
-		return p.observeTenant(key)
+		return p.observeTenant(ctx, key)
 	case manifest.KindProvider:
-		return p.observeProvider(key)
+		return p.observeProvider(ctx, key)
 	case manifest.KindAgent:
-		return p.observeAgent(key)
+		return p.observeAgent(ctx, key)
 	case manifest.KindChannel:
-		return p.observeChannelInstance(key)
+		return p.observeChannelInstance(ctx, key)
 	case manifest.KindMCPServer:
-		return p.observeMCPServer(key)
+		return p.observeMCPServer(ctx, key)
 	case manifest.KindSkill:
-		return p.observeSkill(key)
+		return p.observeSkill(ctx, key)
 	case manifest.KindTool:
-		return p.observeCustomTool(key)
+		return p.observeCustomTool(ctx, key)
 	case manifest.KindCronJob:
-		return p.observeCronJob(key)
+		return p.observeCronJob(ctx, key)
 	case manifest.KindAgentTeam:
-		return p.observeTeam(key)
+		return p.observeTeam(ctx, key)
 	case manifest.KindTTSConfig:
-		return p.observeTTSConfig(key)
+		return p.observeTTSConfig(ctx, key)
 	case manifest.KindBuiltinToolConfig:
-		return p.observeBuiltinToolConfig(key)
+		return p.observeBuiltinToolConfig(ctx, key)
 	case manifest.KindSkillConfig:
-		return p.observeSkillConfig(key)
+		return p.observeSkillConfig(ctx, key)
 	case manifest.KindMCPCredentials:
-		return p.observeMCPCredentials(key)
+		return p.observeMCPCredentials(ctx, key)
 	default:
 		return nil, fmt.Errorf("observe not implemented for kind %s", kind)
 	}
@@ -117,12 +130,12 @@ func (p *Provider) Observe(kind manifest.ResourceKind, key string) (map[string]a
 
 // resolveTenantUUID resolves the tenant slug to a UUID (cached after first call).
 // No-op when tenantID is empty (single-tenant mode).
-func (p *Provider) resolveTenantUUID() (string, error) {
+func (p *Provider) resolveTenantUUID(ctx context.Context) (string, error) {
 	if p.tenantID == "" {
 		return "", nil
 	}
 	p.tenantOnce.Do(func() {
-		tenant, err := p.observeTenant(p.tenantID)
+		tenant, err := p.observeTenant(ctx, p.tenantID)
 		if err != nil {
 			p.tenantErr = fmt.Errorf("resolve tenant UUID for %q: %w", p.tenantID, err)
 			return
@@ -142,10 +155,10 @@ func (p *Provider) resolveTenantUUID() (string, error) {
 }
 
 // Create creates a new resource in GoClaw.
-func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[string]any) error {
+func (p *Provider) Create(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	// Inject tenant_id UUID into spec for tenant-scoped creates
 	if p.tenantID != "" && kind != manifest.KindTenant {
-		uuid, err := p.resolveTenantUUID()
+		uuid, err := p.resolveTenantUUID(ctx)
 		if err != nil {
 			return err
 		}
@@ -154,93 +167,93 @@ func (p *Provider) Create(kind manifest.ResourceKind, key string, spec map[strin
 
 	switch kind {
 	case manifest.KindTenant:
-		return p.createTenant(key, spec)
+		return p.createTenant(ctx, key, spec)
 	case manifest.KindProvider:
-		return p.createProvider(key, spec)
+		return p.createProvider(ctx, key, spec)
 	case manifest.KindAgent:
-		return p.createAgent(key, spec)
+		return p.createAgent(ctx, key, spec)
 	case manifest.KindChannel:
-		return p.createChannelInstance(key, spec)
+		return p.createChannelInstance(ctx, key, spec)
 	case manifest.KindMCPServer:
-		return p.createMCPServer(key, spec)
+		return p.createMCPServer(ctx, key, spec)
 	case manifest.KindTool:
-		return p.createCustomTool(key, spec)
+		return p.createCustomTool(ctx, key, spec)
 	case manifest.KindCronJob:
-		return p.createCronJob(key, spec)
+		return p.createCronJob(ctx, key, spec)
 	case manifest.KindAgentTeam:
-		return p.createTeam(key, spec)
+		return p.createTeam(ctx, key, spec)
 	case manifest.KindTTSConfig:
-		return p.createTTSConfig(key, spec)
+		return p.createTTSConfig(ctx, key, spec)
 	case manifest.KindBuiltinToolConfig:
-		return p.createBuiltinToolConfig(key, spec)
+		return p.createBuiltinToolConfig(ctx, key, spec)
 	case manifest.KindSkillConfig:
-		return p.createSkillConfig(key, spec)
+		return p.createSkillConfig(ctx, key, spec)
 	case manifest.KindMCPCredentials:
-		return p.createMCPCredentials(key, spec)
+		return p.createMCPCredentials(ctx, key, spec)
 	default:
 		return fmt.Errorf("create not implemented for kind %s", kind)
 	}
 }
 
 // Update patches an existing resource in GoClaw.
-func (p *Provider) Update(kind manifest.ResourceKind, key string, spec map[string]any) error {
+func (p *Provider) Update(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	switch kind {
 	case manifest.KindTenant:
-		return p.updateTenant(key, spec)
+		return p.updateTenant(ctx, key, spec)
 	case manifest.KindProvider:
-		return p.updateProvider(key, spec)
+		return p.updateProvider(ctx, key, spec)
 	case manifest.KindAgent:
-		return p.updateAgent(key, spec)
+		return p.updateAgent(ctx, key, spec)
 	case manifest.KindChannel:
-		return p.updateChannelInstance(key, spec)
+		return p.updateChannelInstance(ctx, key, spec)
 	case manifest.KindMCPServer:
-		return p.updateMCPServer(key, spec)
+		return p.updateMCPServer(ctx, key, spec)
 	case manifest.KindSkill:
-		return p.updateSkill(key, spec)
+		return p.updateSkill(ctx, key, spec)
 	case manifest.KindTool:
-		return p.updateCustomTool(key, spec)
+		return p.updateCustomTool(ctx, key, spec)
 	case manifest.KindCronJob:
-		return p.updateCronJob(key, spec)
+		return p.updateCronJob(ctx, key, spec)
 	case manifest.KindAgentTeam:
-		return p.updateTeam(key, spec)
+		return p.updateTeam(ctx, key, spec)
 	case manifest.KindTTSConfig:
-		return p.updateTTSConfig(key, spec)
+		return p.updateTTSConfig(ctx, key, spec)
 	case manifest.KindBuiltinToolConfig:
-		return p.updateBuiltinToolConfig(key, spec)
+		return p.updateBuiltinToolConfig(ctx, key, spec)
 	case manifest.KindSkillConfig:
-		return p.updateSkillConfig(key, spec)
+		return p.updateSkillConfig(ctx, key, spec)
 	case manifest.KindMCPCredentials:
-		return p.updateMCPCredentials(key, spec)
+		return p.updateMCPCredentials(ctx, key, spec)
 	default:
 		return fmt.Errorf("update not implemented for kind %s", kind)
 	}
 }
 
 // Delete removes a resource from GoClaw. Idempotent: no-op if already absent.
-func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
+func (p *Provider) Delete(ctx context.Context, kind manifest.ResourceKind, key string) error {
 	switch kind {
 	case manifest.KindTenant:
-		return p.deleteTenant(key)
+		return p.deleteTenant(ctx, key)
 	case manifest.KindProvider:
-		return p.deleteProvider(key)
+		return p.deleteProvider(ctx, key)
 	case manifest.KindAgent:
-		return p.deleteAgent(key)
+		return p.deleteAgent(ctx, key)
 	case manifest.KindChannel:
-		return p.deleteChannelInstance(key)
+		return p.deleteChannelInstance(ctx, key)
 	case manifest.KindMCPServer:
-		return p.deleteMCPServer(key)
+		return p.deleteMCPServer(ctx, key)
 	case manifest.KindTool:
-		return p.deleteCustomTool(key)
+		return p.deleteCustomTool(ctx, key)
 	case manifest.KindCronJob:
-		return p.deleteCronJob(key)
+		return p.deleteCronJob(ctx, key)
 	case manifest.KindAgentTeam:
-		return p.deleteTeam(key)
+		return p.deleteTeam(ctx, key)
 	case manifest.KindBuiltinToolConfig:
-		return p.deleteBuiltinToolConfig(key)
+		return p.deleteBuiltinToolConfig(ctx, key)
 	case manifest.KindSkillConfig:
-		return p.deleteSkillConfig(key)
+		return p.deleteSkillConfig(ctx, key)
 	case manifest.KindMCPCredentials:
-		return p.deleteMCPCredentials(key)
+		return p.deleteMCPCredentials(ctx, key)
 	case manifest.KindSkill, manifest.KindTTSConfig:
 		return nil // not deletable
 	default:
@@ -249,26 +262,26 @@ func (p *Provider) Delete(kind manifest.ResourceKind, key string) error {
 }
 
 // ListAll returns lightweight resource references for every remote resource of a given kind.
-func (p *Provider) ListAll(kind manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
+func (p *Provider) ListAll(ctx context.Context, kind manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
 	switch kind {
 	case manifest.KindTenant:
-		return p.listAllTenants()
+		return p.listAllTenants(ctx)
 	case manifest.KindProvider:
-		return p.listAllProviders()
+		return p.listAllProviders(ctx)
 	case manifest.KindAgent:
-		return p.listAllAgents()
+		return p.listAllAgents(ctx)
 	case manifest.KindChannel:
-		return p.listAllChannels()
+		return p.listAllChannels(ctx)
 	case manifest.KindMCPServer:
-		return p.listAllMCPServers()
+		return p.listAllMCPServers(ctx)
 	case manifest.KindTool:
-		return p.listAllCustomTools()
+		return p.listAllCustomTools(ctx)
 	case manifest.KindSkill:
-		return p.listAllSkills()
+		return p.listAllSkills(ctx)
 	case manifest.KindCronJob:
-		return p.listAllCronJobs()
+		return p.listAllCronJobs(ctx)
 	case manifest.KindAgentTeam:
-		return p.listAllTeams()
+		return p.listAllTeams(ctx)
 	case manifest.KindTTSConfig, manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindMCPCredentials:
 		return nil, nil // per-tenant configs not enumerable for prune
 	default:

@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -22,7 +23,7 @@ func TestCustomTool_Observe_Found(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindTool, "my-tool")
+	result, err := p.Observe(context.Background(), manifest.KindTool, "my-tool")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -40,7 +41,7 @@ func TestCustomTool_Observe_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindTool, "ghost")
+	result, err := p.Observe(context.Background(), manifest.KindTool, "ghost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,7 +64,7 @@ func TestCustomTool_Create(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindTool, "my-tool", map[string]any{
+	err := p.Create(context.Background(), manifest.KindTool, "my-tool", map[string]any{
 		"toolType":    "http",
 		"description": "A test tool",
 	})
@@ -99,7 +100,7 @@ func TestCustomTool_Update(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindTool, "my-tool", map[string]any{"description": "updated"})
+	err := p.Update(context.Background(), manifest.KindTool, "my-tool", map[string]any{"description": "updated"})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -128,7 +129,7 @@ func TestCustomTool_Delete(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindTool, "my-tool"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindTool, "my-tool"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if !deleted {
@@ -142,7 +143,7 @@ func TestCustomTool_Delete_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindTool, "ghost"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindTool, "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -158,7 +159,7 @@ func TestCustomTool_ListAll(t *testing.T) {
 	}))
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindTool)
+	infos, err := p.ListAll(context.Background(), manifest.KindTool)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

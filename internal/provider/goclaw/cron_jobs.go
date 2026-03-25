@@ -7,12 +7,12 @@ import (
 )
 
 // observeCronJob fetches a cron job by name via WS RPC.
-func (p *Provider) observeCronJob(key string) (map[string]any, error) {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) observeCronJob(ctx context.Context, key string) (map[string]any, error) {
+	if err := p.ensureWS(ctx); err != nil {
 		return nil, fmt.Errorf("ws connect for cron: %w", err)
 	}
 
-	payload, err := p.ws.Call(context.Background(), "cron.list", nil)
+	payload, err := p.ws.Call(ctx, "cron.list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("cron.list: %w", err)
 	}
@@ -25,7 +25,7 @@ func (p *Provider) observeCronJob(key string) (map[string]any, error) {
 	}
 
 	for _, job := range resp.Jobs {
-		if strVal(job, "name") == key && p.matchesTenant(job) {
+		if strVal(job, "name") == key && p.matchesTenant(ctx, job) {
 			// agentKey/message are write-only; excluded via WriteOnlyFields(KindCronJob).
 			return translateResult(stripInternal(job)), nil
 		}
@@ -34,8 +34,8 @@ func (p *Provider) observeCronJob(key string) (map[string]any, error) {
 }
 
 // createCronJob creates a new cron job via WS RPC.
-func (p *Provider) createCronJob(key string, spec map[string]any) error {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) createCronJob(ctx context.Context, key string, spec map[string]any) error {
+	if err := p.ensureWS(ctx); err != nil {
 		return fmt.Errorf("ws connect for cron: %w", err)
 	}
 
@@ -44,7 +44,7 @@ func (p *Provider) createCronJob(key string, spec map[string]any) error {
 
 	// Resolve agent_key → agent_id (GoClaw expects UUID)
 	if agentKey, ok := params["agent_key"].(string); ok {
-		agentID, err := p.resolveAgentID(agentKey)
+		agentID, err := p.resolveAgentID(ctx, agentKey)
 		if err != nil {
 			return fmt.Errorf("cron %s: %w", key, err)
 		}
@@ -52,7 +52,7 @@ func (p *Provider) createCronJob(key string, spec map[string]any) error {
 		delete(params, "agent_key")
 	}
 
-	_, err := p.ws.Call(context.Background(), "cron.create", params)
+	_, err := p.ws.Call(ctx, "cron.create", params)
 	if err != nil {
 		return fmt.Errorf("cron.create %s: %w", key, err)
 	}
@@ -60,12 +60,12 @@ func (p *Provider) createCronJob(key string, spec map[string]any) error {
 }
 
 // updateCronJob updates an existing cron job via WS RPC.
-func (p *Provider) updateCronJob(key string, spec map[string]any) error {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) updateCronJob(ctx context.Context, key string, spec map[string]any) error {
+	if err := p.ensureWS(ctx); err != nil {
 		return fmt.Errorf("ws connect for cron: %w", err)
 	}
 
-	current, err := p.observeCronJob(key)
+	current, err := p.observeCronJob(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (p *Provider) updateCronJob(key string, spec map[string]any) error {
 
 	// Resolve agent_key → agent_id (GoClaw expects UUID)
 	if agentKey, ok := patch["agent_key"].(string); ok {
-		agentID, err := p.resolveAgentID(agentKey)
+		agentID, err := p.resolveAgentID(ctx, agentKey)
 		if err != nil {
 			return fmt.Errorf("cron %s: %w", key, err)
 		}
@@ -95,7 +95,7 @@ func (p *Provider) updateCronJob(key string, spec map[string]any) error {
 		"patch": patch,
 	}
 
-	_, err = p.ws.Call(context.Background(), "cron.update", params)
+	_, err = p.ws.Call(ctx, "cron.update", params)
 	if err != nil {
 		return fmt.Errorf("cron.update %s: %w", key, err)
 	}

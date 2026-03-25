@@ -8,8 +8,8 @@ import (
 )
 
 // observeChannelInstance fetches a channel instance by name from GoClaw.
-func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
-	data, err := p.http.Get(context.Background(), "/v1/channels/instances")
+func (p *Provider) observeChannelInstance(ctx context.Context, key string) (map[string]any, error) {
+	data, err := p.http.Get(ctx, "/v1/channels/instances")
 	if err != nil {
 		return nil, fmt.Errorf("list channel instances: %w", err)
 	}
@@ -22,7 +22,7 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 	}
 
 	for _, inst := range resp.Instances {
-		if strVal(inst, "name") == key && p.matchesTenant(inst) {
+		if strVal(inst, "name") == key && p.matchesTenant(ctx, inst) {
 			// agent_id is a UUID; manifest uses agentKey (string name).
 			delete(inst, "agent_id")
 			return translateResult(stripInternal(inst)), nil
@@ -33,13 +33,13 @@ func (p *Provider) observeChannelInstance(key string) (map[string]any, error) {
 
 // createChannelInstance creates a new channel instance in GoClaw.
 // Resolves agentKey → agent_id UUID before sending.
-func (p *Provider) createChannelInstance(key string, spec map[string]any) error {
+func (p *Provider) createChannelInstance(ctx context.Context, key string, spec map[string]any) error {
 	body := translateSpec(spec)
 	body["name"] = key
 
 	// Resolve agent_key → agent_id (GoClaw expects UUID)
 	if agentKey, ok := body["agent_key"].(string); ok {
-		agentID, err := p.resolveAgentID(agentKey)
+		agentID, err := p.resolveAgentID(ctx, agentKey)
 		if err != nil {
 			return fmt.Errorf("channel %s: %w", key, err)
 		}
@@ -47,7 +47,7 @@ func (p *Provider) createChannelInstance(key string, spec map[string]any) error 
 		delete(body, "agent_key")
 	}
 
-	_, err := p.http.Post(context.Background(), "/v1/channels/instances", body)
+	_, err := p.http.Post(ctx, "/v1/channels/instances", body)
 	if err != nil {
 		return fmt.Errorf("create channel instance %s: %w", key, err)
 	}
@@ -55,8 +55,8 @@ func (p *Provider) createChannelInstance(key string, spec map[string]any) error 
 }
 
 // updateChannelInstance updates an existing channel instance in GoClaw.
-func (p *Provider) updateChannelInstance(key string, spec map[string]any) error {
-	current, err := p.observeChannelInstance(key)
+func (p *Provider) updateChannelInstance(ctx context.Context, key string, spec map[string]any) error {
+	current, err := p.observeChannelInstance(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (p *Provider) updateChannelInstance(key string, spec map[string]any) error 
 
 	// Resolve agent_key → agent_id (GoClaw expects UUID)
 	if agentKey, ok := body["agent_key"].(string); ok {
-		agentID, err := p.resolveAgentID(agentKey)
+		agentID, err := p.resolveAgentID(ctx, agentKey)
 		if err != nil {
 			return fmt.Errorf("channel %s: %w", key, err)
 		}
@@ -81,7 +81,7 @@ func (p *Provider) updateChannelInstance(key string, spec map[string]any) error 
 		delete(body, "agent_key")
 	}
 
-	_, err = p.http.Put(context.Background(), "/v1/channels/instances/"+id, body)
+	_, err = p.http.Put(ctx, "/v1/channels/instances/"+id, body)
 	if errors.Is(err, ErrNotFound) {
 		return fmt.Errorf("channel instance %s (id=%s) not found: %w", key, id, err)
 	}

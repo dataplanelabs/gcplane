@@ -14,8 +14,8 @@ func toolName(key string) string {
 
 // observeBuiltinToolConfig checks if a builtin tool has a tenant-level config override.
 // Key is kebab-case manifest name (e.g., "exec", "web-fetch") — converted to snake_case for API.
-func (p *Provider) observeBuiltinToolConfig(key string) (map[string]any, error) {
-	data, err := p.http.Get(context.Background(), "/v1/tools/builtin")
+func (p *Provider) observeBuiltinToolConfig(ctx context.Context, key string) (map[string]any, error) {
+	data, err := p.http.Get(ctx, "/v1/tools/builtin")
 	if err != nil {
 		return nil, fmt.Errorf("list builtin tools: %w", err)
 	}
@@ -42,10 +42,10 @@ func (p *Provider) observeBuiltinToolConfig(key string) (map[string]any, error) 
 }
 
 // createBuiltinToolConfig sets a per-tenant config for a builtin tool.
-func (p *Provider) createBuiltinToolConfig(key string, spec map[string]any) error {
+func (p *Provider) createBuiltinToolConfig(ctx context.Context, key string, spec map[string]any) error {
 	body := translateSpec(spec)
 	path := fmt.Sprintf("/v1/tools/builtin/%s/tenant-config", toolName(key))
-	_, err := p.http.Put(context.Background(), path, body)
+	_, err := p.http.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("set builtin tool config %s: %w", key, err)
 	}
@@ -53,12 +53,12 @@ func (p *Provider) createBuiltinToolConfig(key string, spec map[string]any) erro
 }
 
 // updateBuiltinToolConfig is the same as create — PUT is upsert.
-func (p *Provider) updateBuiltinToolConfig(key string, spec map[string]any) error {
-	return p.createBuiltinToolConfig(key, spec)
+func (p *Provider) updateBuiltinToolConfig(ctx context.Context, key string, spec map[string]any) error {
+	return p.createBuiltinToolConfig(ctx, key, spec)
 }
 
 // deleteBuiltinToolConfig removes a per-tenant config override for a builtin tool.
-func (p *Provider) deleteBuiltinToolConfig(key string) error {
+func (p *Provider) deleteBuiltinToolConfig(ctx context.Context, key string) error {
 	path := fmt.Sprintf("/v1/tools/builtin/%s/tenant-config", toolName(key))
-	return p.http.Delete(context.Background(), path)
+	return p.http.Delete(ctx, path)
 }

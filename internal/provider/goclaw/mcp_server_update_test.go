@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -34,7 +35,7 @@ func TestMCPServer_Update(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindMCPServer, "my-mcp", map[string]any{"url": "http://new.local"})
+	err := p.Update(context.Background(), manifest.KindMCPServer, "my-mcp", map[string]any{"url": "http://new.local"})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestMCPServer_Update_WithGrantChanges(t *testing.T) {
 	defer cleanup()
 
 	// Desired: new-bot only → old-bot should be revoked, new-bot granted
-	err := p.Update(manifest.KindMCPServer, "my-mcp", map[string]any{
+	err := p.Update(context.Background(), manifest.KindMCPServer, "my-mcp", map[string]any{
 		"url":    "http://mcp.local",
 		"grants": map[string]any{"agents": []any{"new-bot"}},
 	})
@@ -108,7 +109,7 @@ func TestMCPServer_Update_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindMCPServer, "ghost", map[string]any{})
+	err := p.Update(context.Background(), manifest.KindMCPServer, "ghost", map[string]any{})
 	if err == nil {
 		t.Fatal("expected error updating non-existent mcp server")
 	}

@@ -16,10 +16,10 @@ import (
 
 // ProviderAPI is the subset of provider operations the TUI needs.
 type ProviderAPI interface {
-	Observe(kind manifest.ResourceKind, key string) (map[string]any, error)
-	Create(kind manifest.ResourceKind, key string, spec map[string]any) error
-	Update(kind manifest.ResourceKind, key string, spec map[string]any) error
-	Delete(kind manifest.ResourceKind, key string) error
+	Observe(ctx context.Context, kind manifest.ResourceKind, key string) (map[string]any, error)
+	Create(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error
+	Update(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error
+	Delete(ctx context.Context, kind manifest.ResourceKind, key string) error
 	Close() error
 }
 

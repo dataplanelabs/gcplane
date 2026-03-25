@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -124,7 +125,9 @@ func (s *Server) handleTenantSync(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if s.webhookSecret != "" {
-		body, err := io.ReadAll(r.Body)
+		// Limit webhook body to 1MB to prevent abuse.
+		const maxWebhookBody = 1 << 20
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxWebhookBody))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -157,9 +160,9 @@ func (s *Server) verifyWebhookSignature(r *http.Request, body []byte) bool {
 		return hmac.Equal([]byte(expected), []byte(sig))
 	}
 
-	// GitLab: simple token comparison
+	// GitLab: constant-time token comparison to prevent timing attacks.
 	if token := r.Header.Get("X-Gitlab-Token"); token != "" {
-		return token == s.webhookSecret
+		return subtle.ConstantTimeCompare([]byte(token), []byte(s.webhookSecret)) == 1
 	}
 
 	// No recognized header — reject if secret is configured

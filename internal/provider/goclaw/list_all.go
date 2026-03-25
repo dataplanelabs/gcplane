@@ -10,8 +10,8 @@ import (
 )
 
 // listAllProviders returns ResourceInfo for every provider in GoClaw.
-func (p *Provider) listAllProviders() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/providers")
+func (p *Provider) listAllProviders(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/providers")
 	if err != nil {
 		return nil, fmt.Errorf("list providers: %w", err)
 	}
@@ -23,7 +23,7 @@ func (p *Provider) listAllProviders() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Providers))
 	for _, prov := range resp.Providers {
-		if !p.matchesTenant(prov) {
+		if !p.matchesTenant(ctx, prov) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -36,8 +36,8 @@ func (p *Provider) listAllProviders() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllAgents returns ResourceInfo for every agent in GoClaw.
-func (p *Provider) listAllAgents() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/agents")
+func (p *Provider) listAllAgents(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/agents")
 	if err != nil {
 		return nil, fmt.Errorf("list agents: %w", err)
 	}
@@ -49,7 +49,7 @@ func (p *Provider) listAllAgents() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Agents))
 	for _, a := range resp.Agents {
-		if !p.matchesTenant(a) {
+		if !p.matchesTenant(ctx, a) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -62,8 +62,8 @@ func (p *Provider) listAllAgents() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllChannels returns ResourceInfo for every channel instance in GoClaw.
-func (p *Provider) listAllChannels() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/channels/instances")
+func (p *Provider) listAllChannels(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/channels/instances")
 	if err != nil {
 		return nil, fmt.Errorf("list channel instances: %w", err)
 	}
@@ -75,7 +75,7 @@ func (p *Provider) listAllChannels() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Instances))
 	for _, inst := range resp.Instances {
-		if !p.matchesTenant(inst) {
+		if !p.matchesTenant(ctx, inst) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -88,8 +88,8 @@ func (p *Provider) listAllChannels() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllMCPServers returns ResourceInfo for every MCP server in GoClaw.
-func (p *Provider) listAllMCPServers() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/mcp/servers")
+func (p *Provider) listAllMCPServers(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/mcp/servers")
 	if err != nil {
 		return nil, fmt.Errorf("list mcp servers: %w", err)
 	}
@@ -101,7 +101,7 @@ func (p *Provider) listAllMCPServers() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Servers))
 	for _, s := range resp.Servers {
-		if !p.matchesTenant(s) {
+		if !p.matchesTenant(ctx, s) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -114,8 +114,8 @@ func (p *Provider) listAllMCPServers() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllCustomTools returns ResourceInfo for every custom tool in GoClaw.
-func (p *Provider) listAllCustomTools() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/tools/custom")
+func (p *Provider) listAllCustomTools(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/tools/custom")
 	if err != nil {
 		return nil, fmt.Errorf("list custom tools: %w", err)
 	}
@@ -127,7 +127,7 @@ func (p *Provider) listAllCustomTools() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Tools))
 	for _, t := range resp.Tools {
-		if !p.matchesTenant(t) {
+		if !p.matchesTenant(ctx, t) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -140,8 +140,8 @@ func (p *Provider) listAllCustomTools() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllSkills returns ResourceInfo for every skill in GoClaw.
-func (p *Provider) listAllSkills() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/skills")
+func (p *Provider) listAllSkills(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/skills")
 	if err != nil {
 		return nil, fmt.Errorf("list skills: %w", err)
 	}
@@ -153,7 +153,7 @@ func (p *Provider) listAllSkills() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Skills))
 	for _, s := range resp.Skills {
-		if !p.matchesTenant(s) {
+		if !p.matchesTenant(ctx, s) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -166,11 +166,11 @@ func (p *Provider) listAllSkills() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllCronJobs returns ResourceInfo for every cron job in GoClaw via WS RPC.
-func (p *Provider) listAllCronJobs() ([]reconciler.ResourceInfo, error) {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) listAllCronJobs(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	if err := p.ensureWS(ctx); err != nil {
 		return nil, fmt.Errorf("ws connect for cron: %w", err)
 	}
-	payload, err := p.ws.Call(context.Background(), "cron.list", nil)
+	payload, err := p.ws.Call(ctx, "cron.list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("cron.list: %w", err)
 	}
@@ -182,7 +182,7 @@ func (p *Provider) listAllCronJobs() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Jobs))
 	for _, job := range resp.Jobs {
-		if !p.matchesTenant(job) {
+		if !p.matchesTenant(ctx, job) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -195,11 +195,11 @@ func (p *Provider) listAllCronJobs() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllTeams returns ResourceInfo for every team in GoClaw via WS RPC.
-func (p *Provider) listAllTeams() ([]reconciler.ResourceInfo, error) {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) listAllTeams(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	if err := p.ensureWS(ctx); err != nil {
 		return nil, fmt.Errorf("ws connect for teams: %w", err)
 	}
-	payload, err := p.ws.Call(context.Background(), "teams.list", nil)
+	payload, err := p.ws.Call(ctx, "teams.list", nil)
 	if err != nil {
 		return nil, fmt.Errorf("teams.list: %w", err)
 	}
@@ -211,7 +211,7 @@ func (p *Provider) listAllTeams() ([]reconciler.ResourceInfo, error) {
 	}
 	infos := make([]reconciler.ResourceInfo, 0, len(resp.Teams))
 	for _, team := range resp.Teams {
-		if !p.matchesTenant(team) {
+		if !p.matchesTenant(ctx, team) {
 			continue
 		}
 		infos = append(infos, reconciler.ResourceInfo{
@@ -224,8 +224,8 @@ func (p *Provider) listAllTeams() ([]reconciler.ResourceInfo, error) {
 }
 
 // listAllTenants returns ResourceInfo for every tenant in GoClaw.
-func (p *Provider) listAllTenants() ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(context.Background(), "/v1/tenants")
+func (p *Provider) listAllTenants(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/tenants")
 	if err != nil {
 		return nil, fmt.Errorf("list tenants: %w", err)
 	}

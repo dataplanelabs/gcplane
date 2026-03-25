@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -22,7 +23,7 @@ func TestAgent_Observe_Found(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindAgent, "my-agent")
+	result, err := p.Observe(context.Background(), manifest.KindAgent, "my-agent")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -43,7 +44,7 @@ func TestAgent_Observe_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindAgent, "ghost")
+	result, err := p.Observe(context.Background(), manifest.KindAgent, "ghost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestAgent_Observe_ServerError(t *testing.T) {
 	}))
 	defer cleanup()
 
-	_, err := p.Observe(manifest.KindAgent, "x")
+	_, err := p.Observe(context.Background(), manifest.KindAgent, "x")
 	if err == nil {
 		t.Fatal("expected error on 500")
 	}
@@ -78,7 +79,7 @@ func TestAgent_Create(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindAgent, "bot-one", map[string]any{
+	err := p.Create(context.Background(), manifest.KindAgent, "bot-one", map[string]any{
 		"displayName":  "Bot One",
 		"providerName": "openai",
 	})
@@ -114,7 +115,7 @@ func TestAgent_Update(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindAgent, "bot-one", map[string]any{"displayName": "New"})
+	err := p.Update(context.Background(), manifest.KindAgent, "bot-one", map[string]any{"displayName": "New"})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -143,7 +144,7 @@ func TestAgent_Delete(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindAgent, "bot-one"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindAgent, "bot-one"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if !deleted {
@@ -157,7 +158,7 @@ func TestAgent_Delete_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindAgent, "ghost"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindAgent, "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -173,7 +174,7 @@ func TestAgent_ListAll(t *testing.T) {
 	}))
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindAgent)
+	infos, err := p.ListAll(context.Background(), manifest.KindAgent)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

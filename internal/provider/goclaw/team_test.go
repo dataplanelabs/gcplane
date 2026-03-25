@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
@@ -16,7 +17,7 @@ func TestTeam_Observe_Found(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindAgentTeam, "alpha-team")
+	result, err := p.Observe(context.Background(), manifest.KindAgentTeam, "alpha-team")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestTeam_Observe_NotFound(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindAgentTeam, "ghost")
+	result, err := p.Observe(context.Background(), manifest.KindAgentTeam, "ghost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -49,7 +50,7 @@ func TestTeam_Create(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Create(manifest.KindAgentTeam, "alpha-team", map[string]any{
+	err := p.Create(context.Background(), manifest.KindAgentTeam, "alpha-team", map[string]any{
 		"description": "Alpha team",
 	})
 	if err != nil {
@@ -68,7 +69,7 @@ func TestTeam_Update(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Update(manifest.KindAgentTeam, "alpha-team", map[string]any{"description": "Updated"})
+	err := p.Update(context.Background(), manifest.KindAgentTeam, "alpha-team", map[string]any{"description": "Updated"})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -80,7 +81,7 @@ func TestTeam_Update_NotFound(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	err := p.Update(manifest.KindAgentTeam, "ghost", map[string]any{})
+	err := p.Update(context.Background(), manifest.KindAgentTeam, "ghost", map[string]any{})
 	if err == nil {
 		t.Fatal("expected error updating non-existent team")
 	}
@@ -97,7 +98,7 @@ func TestTeam_Delete(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindAgentTeam, "alpha-team"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindAgentTeam, "alpha-team"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 }
@@ -108,7 +109,7 @@ func TestTeam_Delete_NotFound(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindAgentTeam, "ghost"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindAgentTeam, "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -124,7 +125,7 @@ func TestTeam_ListAll(t *testing.T) {
 	}, nil)
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindAgentTeam)
+	infos, err := p.ListAll(context.Background(), manifest.KindAgentTeam)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

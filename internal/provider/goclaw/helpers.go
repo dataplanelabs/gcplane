@@ -19,8 +19,8 @@ func translateResult(result map[string]any) map[string]any {
 }
 
 // resolveAgentID looks up an agent by key and returns its UUID.
-func (p *Provider) resolveAgentID(agentKey string) (string, error) {
-	data, err := p.http.Get(context.Background(), "/v1/agents")
+func (p *Provider) resolveAgentID(ctx context.Context, agentKey string) (string, error) {
+	data, err := p.http.Get(ctx, "/v1/agents")
 	if err != nil {
 		return "", fmt.Errorf("list agents: %w", err)
 	}
@@ -68,7 +68,7 @@ func stripInternal(m map[string]any) map[string]any {
 // matchesTenant returns true if the resource belongs to the provider's tenant.
 // Always true if provider is not tenant-scoped (single-tenant mode).
 // When the API response lacks tenant_id, trusts API header-based scoping.
-func (p *Provider) matchesTenant(resource map[string]any) bool {
+func (p *Provider) matchesTenant(ctx context.Context, resource map[string]any) bool {
 	if p.tenantID == "" {
 		return true
 	}
@@ -76,7 +76,7 @@ func (p *Provider) matchesTenant(resource map[string]any) bool {
 	if tid == "" {
 		return true // API doesn't include tenant_id — trust header scoping
 	}
-	uuid, err := p.resolveTenantUUID()
+	uuid, err := p.resolveTenantUUID(ctx)
 	if err != nil || uuid == "" {
 		return true
 	}

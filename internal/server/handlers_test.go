@@ -35,13 +35,17 @@ func (s *stubSource) Fetch() (*manifest.Manifest, string, error) {
 // stubProvider is a no-op provider for handler tests.
 type stubProvider struct{}
 
-func (p *stubProvider) Observe(_ manifest.ResourceKind, _ string) (map[string]any, error) {
+func (p *stubProvider) Observe(_ context.Context, _ manifest.ResourceKind, _ string) (map[string]any, error) {
 	return map[string]any{}, nil
 }
-func (p *stubProvider) Create(_ manifest.ResourceKind, _ string, _ map[string]any) error { return nil }
-func (p *stubProvider) Update(_ manifest.ResourceKind, _ string, _ map[string]any) error { return nil }
-func (p *stubProvider) Delete(_ manifest.ResourceKind, _ string) error                   { return nil }
-func (p *stubProvider) ListAll(_ manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
+func (p *stubProvider) Create(_ context.Context, _ manifest.ResourceKind, _ string, _ map[string]any) error {
+	return nil
+}
+func (p *stubProvider) Update(_ context.Context, _ manifest.ResourceKind, _ string, _ map[string]any) error {
+	return nil
+}
+func (p *stubProvider) Delete(_ context.Context, _ manifest.ResourceKind, _ string) error { return nil }
+func (p *stubProvider) ListAll(_ context.Context, _ manifest.ResourceKind) ([]reconciler.ResourceInfo, error) {
 	return nil, nil
 }
 

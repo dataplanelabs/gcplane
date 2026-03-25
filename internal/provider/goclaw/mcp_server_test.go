@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -33,7 +34,7 @@ func TestMCPServer_Observe_Found(t *testing.T) {
 	))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindMCPServer, "my-mcp")
+	result, err := p.Observe(context.Background(), manifest.KindMCPServer, "my-mcp")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestMCPServer_Observe_NotFound(t *testing.T) {
 	p, cleanup := newTestServer(t, mcpHandler([]map[string]any{}, nil, nil))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindMCPServer, "ghost")
+	result, err := p.Observe(context.Background(), manifest.KindMCPServer, "ghost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +83,7 @@ func TestMCPServer_Create_NoGrants(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindMCPServer, "my-mcp", map[string]any{
+	err := p.Create(context.Background(), manifest.KindMCPServer, "my-mcp", map[string]any{
 		"url": "http://mcp.local",
 	})
 	if err != nil {
@@ -125,7 +126,7 @@ func TestMCPServer_Create_WithGrants(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Create(manifest.KindMCPServer, "my-mcp", map[string]any{
+	err := p.Create(context.Background(), manifest.KindMCPServer, "my-mcp", map[string]any{
 		"url":    "http://mcp.local",
 		"grants": map[string]any{"agents": []any{"bot"}},
 	})
@@ -159,7 +160,7 @@ func TestMCPServer_Delete(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindMCPServer, "my-mcp"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindMCPServer, "my-mcp"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if !deleted {
@@ -171,7 +172,7 @@ func TestMCPServer_Delete_NotFound(t *testing.T) {
 	p, cleanup := newTestServer(t, mcpHandler([]map[string]any{}, nil, nil))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindMCPServer, "ghost"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindMCPServer, "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -187,7 +188,7 @@ func TestMCPServer_ListAll(t *testing.T) {
 	}))
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindMCPServer)
+	infos, err := p.ListAll(context.Background(), manifest.KindMCPServer)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

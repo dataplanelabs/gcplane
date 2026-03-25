@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -22,7 +23,7 @@ func TestSkill_Observe_Found(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindSkill, "web-search")
+	result, err := p.Observe(context.Background(), manifest.KindSkill, "web-search")
 	if err != nil {
 		t.Fatalf("observe: %v", err)
 	}
@@ -40,7 +41,7 @@ func TestSkill_Observe_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.Observe(manifest.KindSkill, "missing-skill")
+	result, err := p.Observe(context.Background(), manifest.KindSkill, "missing-skill")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestSkill_Update(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.Update(manifest.KindSkill, "web-search", map[string]any{"enabled": false})
+	err := p.Update(context.Background(), manifest.KindSkill, "web-search", map[string]any{"enabled": false})
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestSkill_Delete_Noop(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.Delete(manifest.KindSkill, "web-search"); err != nil {
+	if err := p.Delete(context.Background(), manifest.KindSkill, "web-search"); err != nil {
 		t.Fatalf("expected no-op delete to succeed, got: %v", err)
 	}
 	if called {
@@ -107,7 +108,7 @@ func TestSkill_ListAll(t *testing.T) {
 	}))
 	defer cleanup()
 
-	infos, err := p.ListAll(manifest.KindSkill)
+	infos, err := p.ListAll(context.Background(), manifest.KindSkill)
 	if err != nil {
 		t.Fatalf("listAll: %v", err)
 	}

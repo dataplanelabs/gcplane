@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // Sentinel errors for HTTP response classification.
@@ -42,7 +43,7 @@ func NewHTTPClient(baseURL, token, tenantID, userID string) *HTTPClient {
 	return &HTTPClient{
 		baseURL:    baseURL,
 		token:      token,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 		headers:    headers,
 	}
 }
@@ -101,7 +102,9 @@ func (c *HTTPClient) do(ctx context.Context, method, path string, body io.Reader
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	// Limit response body to 10MB to prevent OOM on large/malicious responses.
+	const maxResponseSize = 10 << 20
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}

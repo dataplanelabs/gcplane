@@ -15,12 +15,12 @@ func isMethodUnsupported(err error) bool {
 
 // observeTTSConfig fetches the global TTS config via WS RPC.
 // Returns nil if TTS is not supported by the GoClaw version.
-func (p *Provider) observeTTSConfig(_ string) (map[string]any, error) {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) observeTTSConfig(ctx context.Context, _ string) (map[string]any, error) {
+	if err := p.ensureWS(ctx); err != nil {
 		return nil, fmt.Errorf("ws connect for tts: %w", err)
 	}
 
-	payload, err := p.ws.Call(context.Background(), "tts.get", nil)
+	payload, err := p.ws.Call(ctx, "tts.get", nil)
 	if err != nil {
 		if isMethodUnsupported(err) {
 			return nil, nil // TTS not supported by this GoClaw version
@@ -40,18 +40,18 @@ func (p *Provider) observeTTSConfig(_ string) (map[string]any, error) {
 }
 
 // createTTSConfig sets the global TTS config via WS RPC (same as update).
-func (p *Provider) createTTSConfig(_ string, spec map[string]any) error {
-	return p.updateTTSConfig("", spec)
+func (p *Provider) createTTSConfig(ctx context.Context, _ string, spec map[string]any) error {
+	return p.updateTTSConfig(ctx, "", spec)
 }
 
 // updateTTSConfig updates the global TTS config via WS RPC.
 // Returns error if TTS is not supported by the GoClaw version.
-func (p *Provider) updateTTSConfig(_ string, spec map[string]any) error {
-	if err := p.ensureWS(); err != nil {
+func (p *Provider) updateTTSConfig(ctx context.Context, _ string, spec map[string]any) error {
+	if err := p.ensureWS(ctx); err != nil {
 		return fmt.Errorf("ws connect for tts: %w", err)
 	}
 
-	_, err := p.ws.Call(context.Background(), "tts.set", translateSpec(spec))
+	_, err := p.ws.Call(ctx, "tts.set", translateSpec(spec))
 	if err != nil {
 		if isMethodUnsupported(err) {
 			return fmt.Errorf("tts.set: TTS not supported by this GoClaw version")

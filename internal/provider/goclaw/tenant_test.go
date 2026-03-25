@@ -1,6 +1,7 @@
 package goclaw
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -27,7 +28,7 @@ func TestTenant_Observe_Found(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.observeTenant("acme")
+	result, err := p.observeTenant(context.Background(), "acme")
 	if err != nil {
 		t.Fatalf("observeTenant: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestTenant_Observe_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.observeTenant("ghost")
+	result, err := p.observeTenant(context.Background(), "ghost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestTenant_Observe_ServerError(t *testing.T) {
 	}))
 	defer cleanup()
 
-	_, err := p.observeTenant("acme")
+	_, err := p.observeTenant(context.Background(), "acme")
 	if err == nil {
 		t.Fatal("expected error on 500")
 	}
@@ -95,7 +96,7 @@ func TestTenant_Observe_MultipleTenantsMatchesCorrectOne(t *testing.T) {
 	}))
 	defer cleanup()
 
-	result, err := p.observeTenant("widgets")
+	result, err := p.observeTenant(context.Background(), "widgets")
 	if err != nil {
 		t.Fatalf("observeTenant: %v", err)
 	}
@@ -124,7 +125,7 @@ func TestTenant_Create(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.createTenant("new-tenant", map[string]any{
+	err := p.createTenant(context.Background(), "new-tenant", map[string]any{
 		"name": "New Tenant Corp",
 	})
 	if err != nil {
@@ -152,7 +153,7 @@ func TestTenant_Create_CamelCaseTranslation(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.createTenant("tenant-with-config", map[string]any{
+	err := p.createTenant(context.Background(), "tenant-with-config", map[string]any{
 		"name":        "Tenant",
 		"displayName": "Display Name",
 	})
@@ -185,7 +186,7 @@ func TestTenant_Update(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.updateTenant("acme", map[string]any{"name": "New Name"})
+	err := p.updateTenant(context.Background(), "acme", map[string]any{"name": "New Name"})
 	if err != nil {
 		t.Fatalf("updateTenant: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestTenant_Update_NotFound(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.updateTenant("ghost", map[string]any{"name": "New"})
+	err := p.updateTenant(context.Background(), "ghost", map[string]any{"name": "New"})
 	if err == nil {
 		t.Fatal("expected error when tenant not found for update")
 	}
@@ -220,7 +221,7 @@ func TestTenant_Update_MissingID(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.updateTenant("acme", map[string]any{"name": "New"})
+	err := p.updateTenant(context.Background(), "acme", map[string]any{"name": "New"})
 	if err == nil {
 		t.Fatal("expected error when tenant id is missing")
 	}
@@ -246,7 +247,7 @@ func TestTenant_Delete(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.deleteTenant("acme"); err != nil {
+	if err := p.deleteTenant(context.Background(), "acme"); err != nil {
 		t.Fatalf("deleteTenant: %v", err)
 	}
 	if !deleted {
@@ -260,7 +261,7 @@ func TestTenant_Delete_NotFound_Idempotent(t *testing.T) {
 	}))
 	defer cleanup()
 
-	if err := p.deleteTenant("ghost"); err != nil {
+	if err := p.deleteTenant(context.Background(), "ghost"); err != nil {
 		t.Fatalf("idempotent delete should not error: %v", err)
 	}
 }
@@ -279,7 +280,7 @@ func TestTenant_Delete_MissingID(t *testing.T) {
 	}))
 	defer cleanup()
 
-	err := p.deleteTenant("acme")
+	err := p.deleteTenant(context.Background(), "acme")
 	if err == nil {
 		t.Fatal("expected error when tenant id is missing for delete")
 	}

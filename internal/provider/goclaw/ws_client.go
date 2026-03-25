@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -63,22 +64,25 @@ func (c *WSClient) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	url := "ws://" + c.endpoint + "/ws"
-	if len(c.endpoint) > 5 && c.endpoint[:5] == "https" {
-		url = "wss://" + c.endpoint[8:] + "/ws"
-	} else if len(c.endpoint) > 7 && c.endpoint[:7] == "http://" {
-		url = "ws://" + c.endpoint[7:] + "/ws"
-	} else if len(c.endpoint) > 8 && c.endpoint[:8] == "https://" {
-		url = "wss://" + c.endpoint[8:] + "/ws"
+	wsURL := "ws://" + c.endpoint + "/ws"
+	if parsed, err := url.Parse(c.endpoint); err == nil && parsed.Scheme != "" {
+		switch parsed.Scheme {
+		case "https", "wss":
+			parsed.Scheme = "wss"
+		default:
+			parsed.Scheme = "ws"
+		}
+		parsed.Path = "/ws"
+		wsURL = parsed.String()
 	}
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 	}
 
-	conn, _, err := dialer.DialContext(ctx, url, nil)
+	conn, _, err := dialer.DialContext(ctx, wsURL, nil)
 	if err != nil {
-		return fmt.Errorf("ws dial %s: %w", url, err)
+		return fmt.Errorf("ws dial %s: %w", wsURL, err)
 	}
 	c.conn = conn
 
@@ -138,16 +142,22 @@ func (c *WSClient) Call(ctx context.Context, method string, params any) (json.Ra
 		return nil, fmt.Errorf("ws write %s: %w", method, err)
 	}
 
-	// Read frames until we get matching response ID
+	// Read frames until we get matching response ID.
+	// Set read deadline from context so ReadJSON unblocks on cancellation.
 	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
+		if deadline, ok := ctx.Deadline(); ok {
+			_ = c.conn.SetReadDeadline(deadline)
+		} else {
+			// Default 60s read deadline to prevent indefinite hangs.
+			_ = c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		}
 
 		var resp responseFrame
 		if err := c.conn.ReadJSON(&resp); err != nil {
+			// Check if context was cancelled while blocked on read.
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			return nil, fmt.Errorf("ws read %s: %w", method, err)
 		}
 
