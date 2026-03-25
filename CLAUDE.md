@@ -50,4 +50,4 @@ mise run setup         # start GoClaw docker + apply config
 ```
 
 ## GoClaw Compatibility
-Tested against `ghcr.io/nextlevelbuilder/goclaw:1.2.0-full`
+Tested against `ghcr.io/nextlevelbuilder/goclaw:full` (v2.x)

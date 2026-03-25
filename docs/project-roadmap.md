@@ -69,18 +69,6 @@
 - Configurable auto-refresh with manual refresh option
 - Context-based clean shutdown
 
-### v0.8.0 (2026-03-24) — First-Class Multi-Tenant
-- Tenant CRUD: `Tenant` resource kind with kebab-case slug validation
-- Per-tenant config resources: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`
-- Connection scoping: `connection.tenantId` + `GCPLANE_TENANT_ID` env var
-- Provider option pattern: `goclaw.New(...Option)` with `WithTenantID()`
-- HTTP tenant header: `X-GoClaw-Tenant-Id` on all REST requests
-- WebSocket tenant support: `tenant_id` in connect handshake
-- Internal fields expansion: `tenant_id`, `tenant_name`, `tenant_slug` stripped from observe
-- 13 resource kinds (up from 9)
-- Multi-tenant example: `examples/multi-tenant/` with _system/ + acme-corp/ + globex-inc/
-- GoClaw v1.2.0 tenant isolation validated via 12 new tests
-
 ### v0.7.2 (2026-03-25) — Channel Credentials & Tenant Isolation
 - **Channel credentials restructured**: Bot tokens moved from top-level to `credentials` object
   - Telegram: `credentials.token` (single token)
@@ -95,14 +83,35 @@
 - **Write-only fields**: `systemPrompt` added to agent write-only fields (GoClaw doesn't persist via agent API)
 - **Multi-tenant example**: New channel example for acme-corp tenant in local-dev-mt setup
 
-## Next: v0.9.0 — Advanced Features
+### v0.8.0 (2026-03-24) — First-Class Multi-Tenant
+- Tenant CRUD: `Tenant` resource kind with kebab-case slug validation
+- Per-tenant config resources: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`
+- Connection scoping: `connection.tenantId` + `GCPLANE_TENANT_ID` env var
+- Provider option pattern: `goclaw.New(...Option)` with `WithTenantID()`
+- HTTP tenant header: `X-GoClaw-Tenant-Id` on all REST requests
+- WebSocket tenant support: `tenant_id` in connect handshake
+- Internal fields expansion: `tenant_id`, `tenant_name`, `tenant_slug` stripped from observe
+- 13 resource kinds (up from 9)
+- Multi-tenant example: `examples/multi-tenant/` with _system/ + acme-corp/ + startup-io/
+- GoClaw v1.2.0 tenant isolation validated via 12 new tests
 
-### P1: Config File Support
-- Support `GCPLANE_CONFIG` env var for custom config paths
-- Config file validation and schema documentation
+## Planned: v0.9.0 — Advanced Features
 
-### P2: Advanced Audit & Export
+### P1: Enhanced Filtering & Export
 - Export audit trail as JSON/CSV
 - Integration with external logging systems
 - Audit event filtering and search
 - Enhanced `gcplane export` with filtering options
+
+### P2: Config File Support
+- Support `GCPLANE_CONFIG` env var for custom config paths
+- Config file validation and schema documentation
+
+## Release Timeline
+
+| Version | Status | Release Date | Focus |
+|---------|--------|--------------|-------|
+| v0.1–v0.7.0 | Released | 2026-03-17 to 2026-03-18 | Foundation → Interactive UI |
+| **v0.7.2** | **Latest** | **2026-03-25** | **Credentials, Tenant Isolation** |
+| v0.8.0 | Released | 2026-03-24 | First-class Multi-tenant |
+| v0.9.0 | Planned | TBD | Advanced Features |

@@ -1,0 +1,429 @@
+# GCPlane Codebase Summary
+
+Generated: 2026-03-25 | Based on repomix analysis and v0.7.2 release
+
+## Overview
+
+GCPlane is a declarative GitOps control plane for managing GoClaw deployments. Single binary, under 10 deps, pure Go 1.25.8. Total codebase: ~14,788 LOC across cmd/ and internal/ packages with 161+ tests (81.3% coverage).
+
+## Quick Stats
+
+| Metric | Value |
+|--------|-------|
+| **Language** | Go 1.25.8 |
+| **Total Dependencies** | 5 direct |
+| **Test Coverage** | 81.3% (161+ tests) |
+| **Codebase Lines** | ~14,788 LOC |
+| **Binary Size** | Single statically-linked executable |
+| **Resource Kinds** | 13 (Tenant + 9 core + 3 config) |
+| **Transport Protocols** | HTTP REST + WebSocket RPC v3 |
+
+## Technology Stack
+
+### Core Dependencies
+- **gorilla/websocket** v1.5.3 — WebSocket RPC protocol
+- **cobra** v1.10.2 — CLI framework
+- **gopkg.in/yaml.v3** v3.0.1 — YAML parsing
+- **tview** v0.42.0 — Terminal UI
+- **tcell/v2** v2.8.1 — Terminal rendering
+
+### Build & Deployment
+- **Go 1.25.8** minimum (no CGO required)
+- **Docker** for containerization
+- **Kustomize** for k8s deployments (base + 3 overlays: dev, staging, prod)
+- **GitHub Actions** for CI/CD (golangci-lint-action v7, release workflows)
+
+## Project Structure
+
+### cmd/ — CLI Commands (10 files, ~800 LOC)
+| Command | Purpose | Status |
+|---------|---------|--------|
+| `root.go` | Version, global flags, update checker | v0.6.0+ |
+| `config.go` | Connection resolution (flags > env > manifest) | v0.1.0+ |
+| `validate.go` | Schema validation (no GoClaw connection) | v0.1.0+ |
+| `plan.go` | Dry-run reconciliation + --prune detection | v0.1.0+ |
+| `apply.go` | Execute mutations with confirmation | v0.1.0+ |
+| `serve.go` | Continuous reconciliation (file/git sources) | v0.1.0+ |
+| `top.go` | Interactive k9s-style TUI dashboard | v0.7.0+ |
+| `diff.go` | Drift detection (compare vs live) | v0.2.0+ |
+| `export.go` | Export GoClaw state as manifest YAML | v0.2.0+ |
+| `destroy.go` | Remove all gcplane-managed resources | v0.4.0+ |
+
+### internal/manifest/ — YAML Manifest Handling (~1,100 LOC)
+**Purpose**: Load, parse, validate, and compose YAML manifests
+
+| File | Responsibility |
+|------|-----------------|
+| `types.go` | Manifest, Resource, ResourceKind, Metadata structures |
+| `loader.go` | File/directory loading, merging, secret resolution |
+| `validate.go` | Schema validation rules for all resource kinds |
+| `field_config.go` | WriteOnlyFields, ResourceDefaults per kind |
+| `composite.go` | CompositeDefinition expansion via text/template |
+| `delete_order.go` | Reverse dependency order for safe prune |
+| `filter.go` | Label-based resource filtering |
+| `validate_refs.go` | Reference validation (provider → agent, etc.) |
+
+### internal/provider/goclaw/ — GoClaw API Client (~2,100 LOC)
+**Purpose**: HTTP REST + WebSocket RPC communication with GoClaw
+
+**Architecture**:
+- `provider.go` — Provider struct, routing dispatcher, Option pattern
+- `http_client.go` — Authenticated HTTP client with tenant headers
+- `ws_client.go` — WebSocket RPC v3 handshake, tenant_id support
+- `helpers.go` — stripInternal, strVal, translateResult utilities
+
+**Resource Implementations** (per-file):
+- `agents.go` — Agent CRUD (HTTP, deletable)
+- `channels.go` — Channel CRUD (HTTP, credentials nested)
+- `providers.go` — Provider CRUD (HTTP, API key masking)
+- `mcp_servers.go` — MCPServer CRUD (HTTP)
+- `skills.go` — Skill observe/update only (HTTP, not deletable)
+- `custom_tools.go` — Tool CRUD (HTTP)
+- `tenants.go` — Tenant CRUD (system scope only)
+- `builtin_tool_configs.go` — Per-tenant builtin tool config
+- `skill_configs.go` — Per-tenant skill enable/disable
+- `mcp_credentials.go` — Per-user MCP server credentials
+- `cron_jobs.go` — CronJob CRUD (WebSocket, deletable, agent_key resolution)
+- `teams.go` — AgentTeam CRUD (WebSocket, deletable)
+- `tts_config.go` — TTSConfig observe/update (WebSocket, not deletable)
+
+### internal/reconciler/ — Observe→Compare→Act Engine (~600 LOC)
+**Purpose**: Reconciliation logic for dry-run and apply modes
+
+| File | Responsibility |
+|------|-----------------|
+| `engine.go` | Main reconciliation loop, prune detection, secret resolution |
+| `compare.go` | Deep spec comparison, field-level diffs, masked field skipping |
+| `types.go` | Plan, Change, FieldDiff, ApplyResult structures |
+
+### internal/controller/ — Reconciliation Loop (~500 LOC)
+**Purpose**: Continuous reconciliation server for serve mode
+
+| File | Responsibility |
+|------|-----------------|
+| `controller.go` | Main loop with interval, graceful shutdown |
+| `status.go` | k8s-style status conditions (Synced/Error/Drifted) |
+| `tenant_manager.go` | Multi-tenant mode: per-tenant controllers |
+| `metrics.go` | Prometheus metrics export |
+
+### internal/source/ — Manifest Source Abstraction (~400 LOC)
+**Purpose**: File and Git manifest sources with change detection
+
+| File | Responsibility |
+|------|-----------------|
+| `source.go` | Source interface (GetManifest, HasChanged) |
+| `file_source.go` | File watching with SHA256 change detection |
+| `git_source.go` | Git clone/fetch with branch checkout, SHA detection |
+
+### internal/server/ — HTTP Server (~300 LOC)
+**Purpose**: Health, metrics, status, and webhook endpoints for serve mode
+
+| File | Responsibility |
+|------|-----------------|
+| `server.go` | Server startup, graceful shutdown, middleware |
+| `handlers.go` | /healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git |
+
+### internal/tui/ — Interactive Terminal UI (~3,500 LOC)
+**Purpose**: k9s-style resource browser with real-time monitoring
+
+| File | Responsibility |
+|------|-----------------|
+| `app.go` | Main app, layout, refresh loop, keybinding dispatch |
+| `model.go` | Thread-safe shared state, resource cache |
+| `keybindings.go` | Vim-style mode dispatch (browse, search, detail, drift, help) |
+| `views/resource_table.go` | Resource list with status coloring (InSync/Drifted/Missing/Error/Extra) |
+| `views/resource_detail.go` | YAML view with syntax highlighting |
+| `views/drift_view.go` | Field-level drift comparison (red/green diff) |
+
+### Other Packages
+
+#### internal/display/ (~200 LOC)
+- `plan.go` — Terraform-style colored output (+ create, ~ update, - delete)
+
+#### internal/keyconv/ (~80 LOC)
+- `keyconv.go` — Bidirectional camelCase ↔ snake_case translation
+
+#### internal/secrets/ (~100 LOC)
+- `resolver.go` — ${ENV_VAR}, file://, SOPS support
+
+#### internal/notifier/ (~200 LOC)
+- `notifier.go` — Webhook notifications on drift
+- `formats.go` — Slack, Discord, Google Chat, Teams, Telegram payloads
+
+### examples/ — Reference Manifests
+- **minimal.yaml** — Bare minimum (1 provider, 1 agent)
+- **production.yaml** — Production checklist (multi-provider, security)
+- **local-dev/** — Full-featured example (9 agents, 3 teams, 3 MCP, 2 channels, 3 crons)
+- **local-dev-mt/** — Multi-tenant example (_system/, acme-corp/, startup-io/)
+- **composite-example.yaml** — ChatBot composite (Agent + Channel template)
+- **tenant-structure/** — Hierarchical tenant organization (dev/prod overlays)
+
+### deploy/ — Kubernetes Manifests (kustomize)
+- **base/** — Deployment, Service, ConfigMap, ServiceAccount
+- **overlays/dev/** — Dev environment (1 replica, lower resources)
+- **overlays/staging/** — Staging environment
+- **overlays/prod/** — Production (2 replicas, higher resources)
+
+### .github/workflows/ — CI/CD Automation
+- **ci.yml** — Lint, test, build on push
+- **e2e.yml** — E2E tests against GoClaw 1.2.0 (reset + apply + destroy)
+- **release.yml** — Build + publish multi-platform releases (GitHub, Docker Hub, ghcr.io)
+- **upstream-check.yml** — Weekly check for GoClaw updates
+
+## Resource Kinds (13 total)
+
+### System Scope (1)
+| Kind | Create | Update | Delete | Transport | Notes |
+|------|--------|--------|--------|-----------|-------|
+| `Tenant` | ✓ | ✓ | ✓ | HTTP | v0.8.0+, system scope only |
+
+### Core Resources (9)
+| Kind | Create | Update | Delete | Transport | Notes |
+|------|--------|--------|--------|-----------|-------|
+| `Provider` | ✓ | ✓ | ✓ | HTTP | API keys masked as *** |
+| `Agent` | ✓ | ✓ | ✓ | HTTP | systemPrompt write-only |
+| `Channel` | ✓ | ✓ | ✓ | HTTP | Credentials nested in object |
+| `MCPServer` | ✓ | ✓ | ✓ | HTTP | — |
+| `Skill` | — | ✓ | — | HTTP | Auto-discovered, not deletable |
+| `Tool` | ✓ | ✓ | ✓ | HTTP | Aliases: CustomTool, BuiltinTool |
+| `CronJob` | ✓ | ✓ | ✓ | WebSocket | agent_key → agent_id resolved |
+| `AgentTeam` | ✓ | ✓ | ✓ | WebSocket | v2 settings (notifications, delivery mode) |
+| `TTSConfig` | — | ✓ | — | WebSocket | GoClaw-managed, not deletable |
+
+### Config Resources (3)
+| Kind | Create | Update | Delete | Transport | Notes |
+|------|--------|--------|--------|-----------|-------|
+| `BuiltinToolConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant, v0.8.0+ |
+| `SkillConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant, v0.8.0+ |
+| `MCPCredentials` | ✓ | ✓ | ✓ | HTTP | Per-user, v0.8.0+ |
+
+### Dependency Order
+```
+Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig
+  → MCPServer → MCPCredentials → Tool → Channel → CronJob → AgentTeam → TTSConfig
+```
+
+Prune deletes in reverse order.
+
+## Key Architectural Patterns
+
+### 1. Provider Option Pattern
+Flexible, composable configuration without constructor parameters:
+```go
+provider := goclaw.New(ep, tok,
+  goclaw.WithTenantID("acme-corp"),
+  goclaw.WithHTTPClient(customClient),
+)
+```
+
+### 2. Observe→Compare→Act
+Standard GitOps reconciliation flow:
+1. **Observe**: Query GoClaw state via HTTP/WS
+2. **Compare**: Deep diff (skip masked/write-only fields)
+3. **Act**: Create/update/delete in dependency order
+
+### 3. Tenant Isolation Pattern
+Multi-tenant safety via:
+- **Observation filtering**: `matchesTenant()` on all listAll results
+- **Creation injection**: Tenant UUID resolved and injected
+- **Resource filtering**: Only tenant-scoped resources matched
+
+### 4. camelCase Manifest Convention
+Kubernetes-style camelCase in manifests; internal `keyconv` translates to snake_case for GoClaw API.
+
+### 5. Prune Safety
+- Opt-in via `--prune` flag or manifest `prune: true`
+- Only deletes `gcplane.io/managed: true` resources
+- Deletes in reverse dependency order
+- Continue-on-error per resource
+
+### 6. Secret Handling
+- Support `${ENV_VAR}` and `file://path` patterns
+- API keys masked as `"***"` — skip in comparison
+- Resolved at reconciliation time, not load
+
+### 7. No Local State
+GoClaw API is single source of truth. GCPlane carries no local state (SQLite removed v0.5.0+).
+
+### 8. Natural Key Resolution
+GoClaw uses UUIDs internally. GCPlane manifests use human-readable names. Resolution: list → filter by name → extract UUID.
+
+## Testing
+
+### Test Coverage
+- **Overall**: 81.3% (161+ tests)
+- **Provider**: 81.9% (HTTP + WS mock tests)
+- **Source**: 86.0% (FileSource dirs + GitSource)
+- **Controller**: 91.4% (reconcile loop + metrics)
+- **Reconciler**: High coverage via table-driven tests
+
+### Test Organization
+- Unit tests alongside source files (`*_test.go`)
+- Table-driven test patterns for complex logic
+- Mock `ProviderInterface` for reconciler tests
+- `t.TempDir()` for file-based tests (auto-cleanup)
+- No external services required for unit tests
+
+### E2E Testing
+- **scripts/test-e2e.sh** — Reset GoClaw + apply/plan/destroy + verify
+- **CI/CD pipeline** — Runs against GoClaw 1.2.0 on every PR
+- Test commands: `mise run test` (unit), `mise run test:e2e` (integration)
+
+## Version & Compatibility
+
+### GCPlane Versions
+| Version | Release Date | Major Features |
+|---------|-------------|----------------|
+| v0.1.0 | 2026-03-17 | Foundation: YAML manifests, 9 kinds, validate/plan/apply/serve |
+| v0.2.x | 2026-03-17 | Diff, Export, MCP grants, Channel display names |
+| v0.3.0 | 2026-03-17 | Multi-tenant serve, per-tenant endpoints, webhook verification |
+| v0.4.0 | 2026-03-17 | Composites, destroy, label filtering |
+| v0.5.0 | 2026-03-17 | Stability, 81% test coverage, security hardening, k8s deploy |
+| v0.6.0 | 2026-03-18 | Enhanced init, auto-discovery, audit logging, version updates |
+| v0.7.0 | 2026-03-18 | Interactive TUI (top command), vim keybindings |
+| **v0.7.2** | **2026-03-25** | **Channel credentials restructure, tenant isolation enforcement** |
+| v0.8.0 | 2026-03-24 | First-class multi-tenant: Tenant CRUD, per-tenant config, 13 kinds |
+| v0.9.0 | Planned | Config file support, advanced audit/export, enhanced filtering |
+
+### GoClaw Compatibility
+Tested against: **ghcr.io/nextlevelbuilder/goclaw:full** (v2.x)
+
+**RPC Protocol**: v3 (WebSocket)
+- Connect handshake: token, user_id, optional tenant_id
+- Tenant headers: X-GoClaw-Tenant-Id, X-GoClaw-User-Id
+
+### Channel Credentials Structure (v0.7.2+)
+Moved from top-level to nested `credentials` object:
+- **Telegram**: `credentials.token` (single token)
+- **Slack**: `credentials.botToken` + `credentials.appToken`
+- Other types follow similar patterns
+
+### Write-Only Fields
+Excluded from comparison to prevent false diffs:
+- Agent: systemPrompt
+- Provider: (varies by provider type)
+- Channel: credentials object contents
+
+## Development Workflow
+
+### Local Setup
+```bash
+cp .env.example .env  # Fill in GOCLAW_TOKEN, ANTHROPIC_API_KEY, etc.
+mise run setup         # Start GoClaw docker + apply examples
+```
+
+### Testing
+```bash
+mise run test          # Unit tests
+mise run test:e2e      # E2E tests (reset + apply + destroy)
+mise run reset         # Wipe GoClaw + re-apply manifest
+mise run serve         # Continuous reconciliation (watch examples/local-dev.yaml)
+```
+
+### Building
+```bash
+go build -ldflags="-X github.com/dataplanelabs/gcplane/cmd.Version=$(git describe --tags)" -o gcplane .
+```
+
+### CI/CD Trigger
+- **CI**: Push to any branch → lint + test + build
+- **E2E**: CI passes → reset GoClaw 1.2.0 + run integration tests
+- **Release**: Tag `v*` → build + publish multi-platform (Linux, macOS, Windows) + Docker (ghcr.io)
+- **Upstream Check**: Weekly cron → verify GoClaw compatibility
+
+## Notable Implementation Details
+
+### 1. Diff & Export Are Implemented
+- `diff` command (v0.2.0+): Compare manifest vs live state, show field-level diffs
+- `export` command (v0.2.0+): Dump GoClaw state as manifest YAML (with --all flag)
+
+### 2. Agent Key Resolution (v0.7.2+)
+CronJob `agentKey` field (human-readable name) now resolved in both create and update paths via `agent_id` UUID injection.
+
+### 3. Tenant UUID Caching
+Multi-tenant mode caches tenant slug → UUID mapping to avoid redundant API calls during bulk operations.
+
+### 4. stripInternal Helper
+Removes API-internal fields (`tenant_id`, `tenant_name`, `tenant_slug`) from observe results to prevent contamination of manifest comparisons.
+
+### 5. Field Masking Skip
+Comparator identifies `"***"` values in GoClaw responses (API-masked sensitive fields) and skips them in diff calculation.
+
+### 6. Composite Expansion
+Text/template-based abstraction: `CompositeDefinition` expanded at load time (e.g., ChatBot → Agent + Channel).
+
+### 7. Label Filtering
+Manifest resources tagged with labels (e.g., `app: web`); GCPlane reconciles via `--label app=web` flag matching.
+
+## Dependencies Management
+
+### Direct Dependencies (5)
+| Package | Version | Usage |
+|---------|---------|-------|
+| gorilla/websocket | v1.5.3 | WebSocket RPC |
+| cobra | v1.10.2 | CLI |
+| gopkg.in/yaml.v3 | v3.0.1 | YAML parsing |
+| tview | v0.42.0 | Terminal UI |
+| tcell/v2 | v2.8.1 | Terminal rendering |
+
+### Indirect Dependencies
+- Go stdlib: net, http, encoding/json, os, io, context, sync, fmt, time, log/slog, etc.
+
+### Dependency Management
+- Go modules (go.mod, go.sum)
+- No automatic updates; reviewed on release
+- Upstream compatibility checked weekly (see CI/CD workflows)
+
+## Performance Characteristics
+
+### Reconciliation
+- **Observe Phase**: Parallel HTTP + WS requests (concurrent within package)
+- **Compare Phase**: Deep spec comparison (skipfield optimization for write-only)
+- **Act Phase**: Dependency-ordered sequential execution (parallel per-level possible)
+- **Typical Cycle**: 30s default interval (serve mode)
+
+### Resource Listing
+- **HTTP Resources**: GET /resources endpoint, single call
+- **WebSocket Resources**: RPC call per kind (lazy WS init)
+- **Tenant Filtering**: Applied post-fetch (cached UUID resolution)
+
+### Memory
+- No persistent state; manifest + live state in memory during reconciliation
+- TUI refresh: incremental state update (atomic writes)
+- WS connection pooling (one per provider instance)
+
+## Security Considerations
+
+### Credential Masking
+- API keys returned as `"***"` from GoClaw; GCPlane respects masking
+- Secrets never logged (log/slog structured logging with redaction)
+
+### Tenant Isolation
+- Multi-tenant HTTP headers (X-GoClaw-Tenant-Id) enforced on all requests
+- Observation filtering prevents cross-tenant data leakage
+- Tenant UUID resolution cached to prevent enumeration attacks
+
+### Resource Ownership
+- Only gcplane-managed resources (created_by=gcplane) pruned
+- User confirmation required before destructive operations
+
+### Secret Resolution
+- ${ENV_VAR} and file:// patterns resolved securely
+- SOPS support for encrypted secrets in git
+- Resolved at reconciliation time, not load
+
+## Known Limitations & Edge Cases
+
+1. **Skill/TTSConfig Not Deletable**: GoClaw manages these; GCPlane can only update
+2. **Masked Fields**: Comparison skips API-masked fields (*** values); may miss real drift if GoClaw API changes masking behavior
+3. **Natural Key Assumption**: GCPlane assumes resource `name` fields are unique within scope; duplicate names cause undefined behavior
+4. **WS Lazy Init**: WebSocket connection established on first WS resource access; failures here propagate
+5. **Composite Expansion**: One-shot at load time; no dynamic re-composition on serve mode changes
+
+## Related Documentation
+- [`./project-roadmap.md`](./project-roadmap.md) — Version history & feature timeline
+- [`./system-architecture.md`](./system-architecture.md) — Design patterns & data flow
+- [`./code-standards.md`](./code-standards.md) — Naming, patterns, testing conventions
+- [`./usage-guide.md`](./usage-guide.md) — CLI commands & deployment
+- [`./manifest-reference.md`](./manifest-reference.md) — Resource schema & examples
+- [`./tenant-structure.md`](./tenant-structure.md) — Multi-tenant patterns & layouts

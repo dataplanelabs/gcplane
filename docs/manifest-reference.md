@@ -1,5 +1,12 @@
 # Manifest Reference
 
+## Version Compatibility
+
+| GCPlane | Requires | RPC |
+|---------|----------|-----|
+| v0.1–v0.7.2 | GoClaw 1.2.0+ | v3 |
+| v0.8.0+ | GoClaw 1.2.0+ | v3 |
+
 ## Format
 
 gcplane uses declarative YAML manifests following k8s conventions (camelCase keys, `apiVersion`/`kind`/`spec` pattern).

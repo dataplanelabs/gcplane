@@ -13,6 +13,21 @@ cd gcplane
 go build -o gcplane .
 ```
 
+## Version & Requirements
+
+**GCPlane v0.7.2+** requires **GoClaw 1.2.0+** with RPC v3 support.
+
+| Requirement | Version |
+|-------------|---------|
+| Go | 1.25.8+ (build only) |
+| GoClaw | 1.2.0+ (runtime) |
+| Docker | (optional, for local dev) |
+
+Check your GCPlane version:
+```bash
+gcplane version
+```
+
 ## Quick Start
 
 ### 1. Create a manifest
@@ -80,19 +95,19 @@ gcplane apply -f gcplane.yaml --auto-approve
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `init` | Generate a starter manifest interactively (supports provider type selection: anthropic, openai, openrouter, custom) |
-| `validate` | Validate manifest schema (no GoClaw connection) |
-| `plan` | Show changes required (dry-run) |
-| `apply` | Apply manifest to reach desired state |
-| `status` | Quick resource count and sync state summary |
-| `destroy` | Remove all gcplane-managed resources from GoClaw |
-| `serve` | Continuous reconciliation service with file/git sources |
-| `top` | Interactive TUI for monitoring GoClaw resources (k9s-style dashboard) |
-| `diff` | Quick drift detection (coming soon) |
-| `export` | Export GoClaw state as YAML (coming soon) |
-| `version` | Print version |
+| Command | Description | Since |
+|---------|-------------|-------|
+| `init` | Generate a starter manifest interactively (supports provider type selection: anthropic, openai, openrouter, custom) | v0.6.0 |
+| `validate` | Validate manifest schema (no GoClaw connection) | v0.1.0 |
+| `plan` | Show changes required (dry-run) | v0.1.0 |
+| `apply` | Apply manifest to reach desired state | v0.1.0 |
+| `status` | Quick resource count and sync state summary | v0.1.0 |
+| `destroy` | Remove all gcplane-managed resources from GoClaw | v0.4.0 |
+| `serve` | Continuous reconciliation service with file/git sources | v0.1.0 |
+| `top` | Interactive TUI for monitoring GoClaw resources (k9s-style dashboard) | v0.7.0 |
+| `diff` | Show drift between manifest and live state | v0.2.0 |
+| `export` | Export GoClaw state as YAML manifest | v0.2.0 |
+| `version` | Print version and check for updates | v0.6.0 |
 
 ## Global Flags
 
@@ -185,6 +200,28 @@ Plan: 1 to create, 1 to update, 0 unchanged.
 - `+` (green) — resource will be created
 - `~` (yellow) — resource will be updated, with field diffs
 - `=` (dim) — no changes (verbose mode only)
+
+## Version Command
+
+Check your installed GCPlane version and receive notifications about updates:
+
+```bash
+gcplane version
+```
+
+Output:
+```
+GCPlane v0.7.2
+Update available: v0.8.0 (released 2026-03-24)
+```
+
+The update checker:
+- Runs in background (non-blocking)
+- Checks GitHub API for new releases
+- Caches result for 24 hours
+- Prints notification to stderr
+
+To disable update checks, set `GCPLANE_SKIP_UPDATE_CHECK=1`.
 
 ## Serve Mode
 

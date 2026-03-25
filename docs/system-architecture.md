@@ -122,6 +122,39 @@ gcplane/
     └── local-dev.yaml               # Full-featured example (4 providers, agents, channels, tools, crons)
 ```
 
+## Version & Compatibility
+
+### GCPlane Versions
+| Version | Release | Focus |
+|---------|---------|-------|
+| v0.1–v0.7.0 | 2026-03-17–18 | Foundation → Interactive TUI |
+| **v0.7.2** | **2026-03-25** | **Credentials, Tenant Isolation** |
+| v0.8.0 | 2026-03-24 | First-class Multi-tenant (13 kinds) |
+| v0.9.0 | Planned | Advanced filtering & export |
+
+### GoClaw Compatibility Matrix
+
+| GCPlane | Tested GoClaw | RPC Protocol | Key Features |
+|---------|---------------|--------------|--------------|
+| v0.7.x+ | 2.x | v3 | 13 kinds (Tenant + config), full multi-tenant |
+
+**Tested Image**: `ghcr.io/nextlevelbuilder/goclaw:full` (v2.x)
+
+### Dependency Versions
+| Dependency | Version | Usage |
+|------------|---------|-------|
+| Go | 1.25.8+ | Language |
+| gorilla/websocket | 1.5.3 | RPC v3 protocol |
+| cobra | 1.10.2 | CLI framework |
+| gopkg.in/yaml.v3 | 3.0.1 | Manifest parsing |
+| tview | 0.42.0 | Terminal UI |
+| tcell/v2 | 2.8.1 | Terminal rendering |
+
+### RPC Protocol (v3)
+- **WebSocket handshake**: `{"token": "...", "user_id": "...", "tenant_id": "..."}`
+- **Tenant headers**: `X-GoClaw-Tenant-Id`, `X-GoClaw-User-Id` on HTTP requests
+- **Status**: Stable, tested against GoClaw 1.2.0
+
 ## Key Design Decisions
 
 ### Dual Transport

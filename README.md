@@ -201,11 +201,9 @@ mise run serve
 
 | GCPlane | GoClaw | Tested |
 |---------|--------|--------|
-| v0.6.x | 1.2.0+ | CI E2E |
-| v0.5.x | 0.4.x | Manual |
-| v0.1.x–v0.4.x | 0.4.x | Manual |
+| v0.7.x+ | 2.x | CI E2E |
 
-GCPlane is tested against [GoClaw](https://github.com/nextlevelbuilder/goclaw) `1.2.0` in CI. The E2E workflow spins up GoClaw via `ghcr.io/nextlevelbuilder/goclaw:1.2.0` with PostgreSQL and runs validate, plan, apply, diff, export, and destroy commands.
+GCPlane is tested against [GoClaw](https://github.com/nextlevelbuilder/goclaw) `v2.x` in CI. The E2E workflow spins up GoClaw via `ghcr.io/nextlevelbuilder/goclaw:full` with PostgreSQL and runs validate, plan, apply, diff, export, and destroy commands.
 
 ## License
 

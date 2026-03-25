@@ -6,11 +6,39 @@
 - **Self-Contained**: Binary includes all logic. Config via env vars + YAML manifest. No external config services.
 
 ## Language & Tooling
-- **Go 1.25+** (pure Go, no CGO dependencies)
-- **Cobra** for CLI commands
-- **YAML v3** for manifest parsing
-- **gorilla/websocket** for WS RPC
-- **modernc.org/sqlite** for pure-Go SQLite
+- **Go 1.25.8+** (pure Go, no CGO dependencies)
+- **Cobra 1.10.2** for CLI commands
+- **YAML v3 3.0.1** for manifest parsing
+- **gorilla/websocket 1.5.3** for WS RPC
+- **tview 0.42.0** for terminal UI
+- **tcell/v2 2.8.1** for terminal rendering
+
+## Version Management
+
+### Build-Time Versioning
+GCPlane version set at build time via `-ldflags`:
+```bash
+go build -ldflags="-X github.com/dataplanelabs/gcplane/cmd.Version=$(git describe --tags)" -o gcplane .
+```
+
+Default version (when unset): `"dev"`
+
+### Version Checking
+- **Update Checker**: Queries GitHub API (internal/update/update.go)
+- **Cache TTL**: 24 hours
+- **Trigger**: On every command start (background goroutine)
+- **User Notification**: Printed to stderr if newer version available
+
+### Semantic Versioning
+GCPlane follows semver:
+- **Major**: Breaking API changes, significant feature rewrites
+- **Minor**: New features, non-breaking enhancements
+- **Patch**: Bug fixes, security patches
+
+Examples:
+- v0.7.0 → v0.7.2: Patch (credentials restructure, bug fixes)
+- v0.7.2 → v0.8.0: Minor (new Tenant resource kind, multi-tenant mode)
+- v0.x → v1.0: Reserved for production-grade stability
 
 ## File Organization
 - `cmd/` — CLI commands, one file per command
@@ -65,7 +93,7 @@ Options are variadic functions that modify Provider state, enabling flexible, co
 
 ## Tenant Isolation Pattern
 
-In multi-tenant mode, enforce isolation via:
+In multi-tenant mode (v0.8.0+), enforce isolation via:
 
 **1. Observation filtering** — Apply `matchesTenant()` to all observe/listAll results:
 ```go
@@ -89,3 +117,20 @@ if p.tenantID != "" {
 - Single-tenant mode (no tenant ID): always true
 - Multi-tenant: filters by `tenant_id` field in response
 - Header-based scoping fallback if field absent
+
+**4. HTTP headers** — Tenant headers on all requests:
+```go
+req.Header.Set("X-GoClaw-Tenant-Id", p.tenantID)
+req.Header.Set("X-GoClaw-User-Id", p.userID)
+```
+
+**5. WebSocket handshake** — Tenant ID in connect message:
+```json
+{"token": "...", "user_id": "...", "tenant_id": "..."}
+```
+
+**Examples**:
+- Acme Corp agents: `examples/local-dev-mt/acme-corp/agents.yaml` (tenant: acme-corp)
+- Startup IO agents: `examples/local-dev-mt/startup-io/agents.yaml` (tenant: startup-io)
+
+**Testing**: 12 tenant isolation tests in internal/provider/goclaw/tenant_test.go

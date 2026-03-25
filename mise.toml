@@ -1,6 +1,6 @@
 [env]
 _.file = ".env"
-BINARY = "gcplane"
+BINARY = "./gcplane"
 F = "examples/local-dev"
 GOCLAW_DIR = "../../nextlevelbuilder/goclaw"
 
