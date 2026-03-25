@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BINARY="${BINARY:-./gcplane}"
-F="${F:-examples/local-dev.yaml}"
+F="${F:-examples/local-dev}"
 PASS=0
 FAIL=0
 
@@ -73,7 +73,7 @@ test_destroy() {
 run_test "destroy" test_destroy
 
 # ============================================================
-# Multi-Tenant Tests (requires GoClaw v1.2.0+ with tenant API)
+# Multi-Tenant Tests (requires GoClaw v2.x with tenant API)
 # ============================================================
 MT="examples/local-dev-mt"
 GOCLAW_EP="${GCPLANE_ENDPOINT:-http://localhost:18790}"
@@ -138,7 +138,7 @@ if tenant_api_available; then
 
 else
   echo ""
-  echo "SKIP: Multi-tenant tests (tenant API not available — need GoClaw v1.2.0+)"
+  echo "SKIP: Multi-tenant tests (tenant API not available — need GoClaw v2.x)"
 fi
 
 # --- Summary ---

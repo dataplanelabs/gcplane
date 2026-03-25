@@ -5,90 +5,67 @@ on:
   workflow_dispatch:       # manual trigger
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
   issues: write
 
 env:
   UPSTREAM_IMAGE: ghcr.io/nextlevelbuilder/goclaw
+  # Last known GoClaw version (updated manually after verifying E2E)
+  KNOWN_VERSION: "v2.13.0-full"
 
 jobs:
-  check-and-bump:
+  check-upstream:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get current pinned version
-        id: current
+      - name: Check latest upstream version
+        id: check
         run: |
-          VERSION=$(grep 'GOCLAW_VERSION' .github/workflows/e2e.yml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Current pinned: $VERSION"
-
-      - name: Check latest upstream
-        id: latest
-        run: |
-          docker pull ${{ env.UPSTREAM_IMAGE }}:latest --quiet
-          LATEST=$(docker inspect ${{ env.UPSTREAM_IMAGE }}:latest --format '{{index .Config.Labels "org.opencontainers.image.version"}}' 2>/dev/null || echo "unknown")
-          echo "version=$LATEST" >> $GITHUB_OUTPUT
+          docker pull ${{ env.UPSTREAM_IMAGE }}:full --quiet
+          LATEST=$(docker inspect ${{ env.UPSTREAM_IMAGE }}:full \
+            --format '{{index .Config.Labels "org.opencontainers.image.version"}}' 2>/dev/null || echo "unknown")
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
           echo "Latest upstream: $LATEST"
 
-      - name: Bump version in files
-        if: steps.current.outputs.version != steps.latest.outputs.version && steps.latest.outputs.version != 'unknown'
-        id: bump
-        run: |
-          CURRENT="${{ steps.current.outputs.version }}"
-          LATEST="${{ steps.latest.outputs.version }}"
-          LATEST_SHORT=$(echo "$LATEST" | sed 's/-full$//')
-
-          # Update e2e.yml
-          sed -i "s|GOCLAW_VERSION: \"$CURRENT\"|GOCLAW_VERSION: \"$LATEST\"|" .github/workflows/e2e.yml
-
-          # Update README compatibility table
-          sed -i "s|$CURRENT|$LATEST_SHORT|g" README.md
-          # Fix the -full suffix back in e2e reference if README picked it up
-          sed -i "s|$LATEST_SHORT-full|$LATEST|g" README.md
-
-          echo "bumped=true" >> $GITHUB_OUTPUT
-          echo "Bumped: $CURRENT → $LATEST"
-
-      - name: Create PR
-        if: steps.bump.outputs.bumped == 'true'
-        run: |
-          CURRENT="${{ steps.current.outputs.version }}"
-          LATEST="${{ steps.latest.outputs.version }}"
-          BRANCH="chore/bump-goclaw-${LATEST}"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Check if branch already exists
-          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
-            echo "PR branch already exists, skipping"
-            exit 0
+          if [ "$LATEST" = "${{ env.KNOWN_VERSION }}" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No change detected"
+          elif [ "$LATEST" = "unknown" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Could not detect version"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "New version detected: $LATEST (was ${{ env.KNOWN_VERSION }})"
           fi
 
-          git checkout -b "$BRANCH"
-          git add .github/workflows/e2e.yml README.md
-          git commit -m "chore: bump GoClaw test version ${CURRENT} → ${LATEST}"
-          git push origin "$BRANCH"
+      - name: Check for existing issue
+        if: steps.check.outputs.changed == 'true'
+        id: existing
+        run: |
+          EXISTING=$(gh issue list --label upstream --state open --json number --jq 'length')
+          echo "count=$EXISTING" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-          gh pr create \
-            --title "chore: bump GoClaw test version ${CURRENT} → ${LATEST}" \
+      - name: Create issue for new version
+        if: steps.check.outputs.changed == 'true' && steps.existing.outputs.count == '0'
+        run: |
+          LATEST="${{ steps.check.outputs.latest }}"
+          gh issue create \
+            --title "chore: GoClaw upstream updated to ${LATEST}" \
             --body "$(cat <<EOF
           ## Upstream Update
 
-          GoClaw released a new version.
+          GoClaw \`full\` tag updated.
 
-          - **Current:** \`${CURRENT}\`
+          - **Known:** \`${{ env.KNOWN_VERSION }}\`
           - **New:** \`${LATEST}\`
 
-          ### Changes
-          - Updated \`GOCLAW_VERSION\` in \`.github/workflows/e2e.yml\`
-          - Updated compatibility table in \`README.md\`
-
-          ### Test Plan
-          - [ ] E2E tests pass with new version
+          ### Action Required
+          - [ ] Verify E2E tests pass (they run against \`full\` tag automatically)
+          - [ ] Update \`KNOWN_VERSION\` in \`.github/workflows/upstream-check.yml\`
+          - [ ] Check for breaking API changes
           EOF
           )" \
             --label "upstream,chore"

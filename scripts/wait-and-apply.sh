@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BINARY="${BINARY:-./gcplane}"
-F="${F:-examples/local-dev.yaml}"
+F="${F:-examples/local-dev}"
 MAX_WAIT=60
 
 echo "Waiting for GoClaw to be ready..."
