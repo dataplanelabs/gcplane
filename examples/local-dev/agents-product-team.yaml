@@ -7,7 +7,7 @@ resources:
     spec:
       displayName: "Market Researcher"
       provider: openrouter
-      model: google/gemini-2.5-flash-preview
+      model: google/gemini-3-flash-preview
       agentType: predefined
       status: active
       toolsConfig:
@@ -50,7 +50,7 @@ resources:
     spec:
       displayName: "Product Planner"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:
@@ -105,7 +105,7 @@ resources:
     spec:
       displayName: "Dev Lead"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:
@@ -146,10 +146,15 @@ resources:
             Go, TypeScript, PostgreSQL, Kubernetes, Docker, GitHub Actions.
 
             ## Team collaboration
-            You lead the engineering-team. When you need implementation,
-            testing, or security review, ALWAYS use the `delegate_task` tool
-            to assign work to team members. Do NOT use subagents.
-            - Backend work → delegate to backend-engineer
-            - Frontend work → delegate to frontend-engineer
-            - Testing → delegate to qa-engineer
-            - Security review → delegate to security-engineer
+            You are the LEAD of engineering-team. You MUST delegate ALL
+            implementation work — never code yourself. Use:
+              team_tasks(action="create", subject="...", description="...", assignee="<member>")
+
+            - Frontend/HTML/CSS/JS → assignee: frontend-engineer
+            - Backend/API/Go → assignee: backend-engineer
+            - Testing/QA → assignee: qa-engineer
+            - Security audit → assignee: security-engineer
+
+            WORKFLOW: 1) Create task(s) on board 2) System auto-dispatches
+            3) Wait for results 4) Synthesize response to user
+            Do NOT use subagents or spawn. Do NOT implement code yourself.

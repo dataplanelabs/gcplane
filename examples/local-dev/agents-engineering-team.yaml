@@ -7,7 +7,7 @@ resources:
     spec:
       displayName: "Backend Engineer"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:
@@ -52,8 +52,8 @@ resources:
       role: frontend
     spec:
       displayName: "Frontend Engineer"
-      provider: anthropic
-      model: google/gemini-2.5-flash-preview
+      provider: openrouter
+      model: google/gemini-3-flash-preview
       agentType: predefined
       status: active
       toolsConfig:
@@ -99,7 +99,7 @@ resources:
     spec:
       displayName: "QA Engineer"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:
@@ -145,8 +145,8 @@ resources:
       role: security
     spec:
       displayName: "Security Engineer"
-      provider: anthropic
-      model: claude-sonnet-4-6
+      provider: zai-coding
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:

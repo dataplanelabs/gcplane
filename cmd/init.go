@@ -32,7 +32,7 @@ var providers = map[string]providerTemplate{
 	"openrouter": {
 		displayName: "OpenRouter", providerType: "openrouter",
 		apiBase: "https://openrouter.ai/api/v1", envVar: "OPENROUTER_API_KEY",
-		defaultModel: "google/gemini-2.5-flash-preview",
+		defaultModel: "google/gemini-3-flash-preview",
 	},
 }
 

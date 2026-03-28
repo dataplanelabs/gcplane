@@ -7,7 +7,7 @@ resources:
     spec:
       displayName: "Support Bot"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:
@@ -57,7 +57,7 @@ resources:
     spec:
       displayName: "DevOps Engineer"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: predefined
       status: active
       toolsConfig:

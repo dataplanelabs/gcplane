@@ -4,7 +4,7 @@ resources:
     spec:
       displayName: "Assistant"
       provider: zai-coding
-      model: glm-5-turbo
+      model: glm-5.1
       agentType: open
       status: active
       isDefault: true
