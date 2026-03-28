@@ -109,20 +109,18 @@ func (p *Provider) Observe(ctx context.Context, kind manifest.ResourceKind, key 
 		return p.observeMCPServer(ctx, key)
 	case manifest.KindSkill:
 		return p.observeSkill(ctx, key)
-	case manifest.KindTool:
-		return p.observeCustomTool(ctx, key)
 	case manifest.KindCronJob:
 		return p.observeCronJob(ctx, key)
 	case manifest.KindAgentTeam:
 		return p.observeTeam(ctx, key)
-	case manifest.KindTTSConfig:
-		return p.observeTTSConfig(ctx, key)
 	case manifest.KindBuiltinToolConfig:
 		return p.observeBuiltinToolConfig(ctx, key)
 	case manifest.KindSkillConfig:
 		return p.observeSkillConfig(ctx, key)
 	case manifest.KindMCPCredentials:
 		return p.observeMCPCredentials(ctx, key)
+	case manifest.KindSystemConfig:
+		return p.observeSystemConfig(ctx, key)
 	default:
 		return nil, fmt.Errorf("observe not implemented for kind %s", kind)
 	}
@@ -176,20 +174,18 @@ func (p *Provider) Create(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.createChannelInstance(ctx, key, spec)
 	case manifest.KindMCPServer:
 		return p.createMCPServer(ctx, key, spec)
-	case manifest.KindTool:
-		return p.createCustomTool(ctx, key, spec)
 	case manifest.KindCronJob:
 		return p.createCronJob(ctx, key, spec)
 	case manifest.KindAgentTeam:
 		return p.createTeam(ctx, key, spec)
-	case manifest.KindTTSConfig:
-		return p.createTTSConfig(ctx, key, spec)
 	case manifest.KindBuiltinToolConfig:
 		return p.createBuiltinToolConfig(ctx, key, spec)
 	case manifest.KindSkillConfig:
 		return p.createSkillConfig(ctx, key, spec)
 	case manifest.KindMCPCredentials:
 		return p.createMCPCredentials(ctx, key, spec)
+	case manifest.KindSystemConfig:
+		return p.createSystemConfig(ctx, key, spec)
 	default:
 		return fmt.Errorf("create not implemented for kind %s", kind)
 	}
@@ -210,20 +206,18 @@ func (p *Provider) Update(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.updateMCPServer(ctx, key, spec)
 	case manifest.KindSkill:
 		return p.updateSkill(ctx, key, spec)
-	case manifest.KindTool:
-		return p.updateCustomTool(ctx, key, spec)
 	case manifest.KindCronJob:
 		return p.updateCronJob(ctx, key, spec)
 	case manifest.KindAgentTeam:
 		return p.updateTeam(ctx, key, spec)
-	case manifest.KindTTSConfig:
-		return p.updateTTSConfig(ctx, key, spec)
 	case manifest.KindBuiltinToolConfig:
 		return p.updateBuiltinToolConfig(ctx, key, spec)
 	case manifest.KindSkillConfig:
 		return p.updateSkillConfig(ctx, key, spec)
 	case manifest.KindMCPCredentials:
 		return p.updateMCPCredentials(ctx, key, spec)
+	case manifest.KindSystemConfig:
+		return p.updateSystemConfig(ctx, key, spec)
 	default:
 		return fmt.Errorf("update not implemented for kind %s", kind)
 	}
@@ -242,8 +236,6 @@ func (p *Provider) Delete(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.deleteChannelInstance(ctx, key)
 	case manifest.KindMCPServer:
 		return p.deleteMCPServer(ctx, key)
-	case manifest.KindTool:
-		return p.deleteCustomTool(ctx, key)
 	case manifest.KindCronJob:
 		return p.deleteCronJob(ctx, key)
 	case manifest.KindAgentTeam:
@@ -254,7 +246,9 @@ func (p *Provider) Delete(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.deleteSkillConfig(ctx, key)
 	case manifest.KindMCPCredentials:
 		return p.deleteMCPCredentials(ctx, key)
-	case manifest.KindSkill, manifest.KindTTSConfig:
+	case manifest.KindSystemConfig:
+		return p.deleteSystemConfig(ctx, key)
+	case manifest.KindSkill:
 		return nil // not deletable
 	default:
 		return fmt.Errorf("delete not implemented for kind %s", kind)
@@ -274,15 +268,13 @@ func (p *Provider) ListAll(ctx context.Context, kind manifest.ResourceKind) ([]r
 		return p.listAllChannels(ctx)
 	case manifest.KindMCPServer:
 		return p.listAllMCPServers(ctx)
-	case manifest.KindTool:
-		return p.listAllCustomTools(ctx)
 	case manifest.KindSkill:
 		return p.listAllSkills(ctx)
 	case manifest.KindCronJob:
 		return p.listAllCronJobs(ctx)
 	case manifest.KindAgentTeam:
 		return p.listAllTeams(ctx)
-	case manifest.KindTTSConfig, manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindMCPCredentials:
+	case manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindSystemConfig, manifest.KindMCPCredentials:
 		return nil, nil // per-tenant configs not enumerable for prune
 	default:
 		return nil, fmt.Errorf("list not implemented for kind %s", kind)

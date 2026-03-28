@@ -121,14 +121,17 @@ resources:
         agents: [support-bot, data-analyst]
 
   # ============================================================
-  # TTS Config
+  # System Configs
   # ============================================================
-  - kind: TTSConfig
-    name: global
+  - kind: SystemConfig
+    name: tts.mode
     spec:
-      mode: "off"
-      provider: edge
-      voice: en-US-AriaNeural
+      value: "off"
+
+  - kind: SystemConfig
+    name: tts.provider
+    spec:
+      value: edge
 
   # ============================================================
   # Teams

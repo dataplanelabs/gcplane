@@ -35,12 +35,11 @@ const (
 	KindCronJob           ResourceKind = "CronJob"
 	KindMCPServer         ResourceKind = "MCPServer"
 	KindSkill             ResourceKind = "Skill"
-	KindTool              ResourceKind = "Tool"
 	KindAgentTeam         ResourceKind = "AgentTeam"
-	KindTTSConfig         ResourceKind = "TTSConfig"
 	KindBuiltinToolConfig ResourceKind = "BuiltinToolConfig"
 	KindSkillConfig       ResourceKind = "SkillConfig"
 	KindMCPCredentials    ResourceKind = "MCPCredentials"
+	KindSystemConfig      ResourceKind = "SystemConfig"
 )
 
 // Resource is a generic managed resource with kind + name + arbitrary spec.
@@ -62,12 +61,11 @@ func ApplyOrder() []ResourceKind {
 		KindSkill,             // depends on Agent for grants
 		KindBuiltinToolConfig, // configures builtin tools per tenant
 		KindSkillConfig,       // configures skills per tenant
+		KindSystemConfig,      // key-value system configs per tenant
 		KindMCPServer,         // depends on Agent for grants
 		KindMCPCredentials,    // per-user MCP creds, after MCPServer
-		KindTool,              // depends on Agent
 		KindChannel,           // depends on Agent
 		KindCronJob,           // depends on Agent
 		KindAgentTeam,         // no strict deps
-		KindTTSConfig,         // global, no deps
 	}
 }

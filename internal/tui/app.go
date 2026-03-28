@@ -407,13 +407,12 @@ var kindAliases = map[string]manifest.ResourceKind{
 	"mcp":       manifest.KindMCPServer,
 	"mcpserver": manifest.KindMCPServer,
 	"skill":     manifest.KindSkill,
-	"tool":      manifest.KindTool,
-	"cron":      manifest.KindCronJob,
-	"cronjob":   manifest.KindCronJob,
-	"team":      manifest.KindAgentTeam,
-	"agentteam": manifest.KindAgentTeam,
-	"tts":       manifest.KindTTSConfig,
-	"ttsconfig": manifest.KindTTSConfig,
+	"cron":         manifest.KindCronJob,
+	"cronjob":      manifest.KindCronJob,
+	"team":         manifest.KindAgentTeam,
+	"agentteam":    manifest.KindAgentTeam,
+	"sysconfig":    manifest.KindSystemConfig,
+	"systemconfig": manifest.KindSystemConfig,
 }
 
 // executeCommand processes : commands (kind switching, quit, etc.)

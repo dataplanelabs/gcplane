@@ -69,22 +69,6 @@ func (p *Provider) deleteMCPServer(ctx context.Context, key string) error {
 	return p.http.Delete(ctx, "/v1/mcp/servers/"+id)
 }
 
-// deleteCustomTool deletes a custom tool by name. Idempotent: returns nil if not found.
-func (p *Provider) deleteCustomTool(ctx context.Context, key string) error {
-	current, err := p.observeCustomTool(ctx, key)
-	if err != nil {
-		return err
-	}
-	if current == nil {
-		return nil
-	}
-	id, ok := current["id"].(string)
-	if !ok {
-		return fmt.Errorf("custom tool %s: missing id", key)
-	}
-	return p.http.Delete(ctx, "/v1/tools/custom/"+id)
-}
-
 // deleteCronJob deletes a cron job by name via WS RPC. Idempotent: returns nil if not found.
 func (p *Provider) deleteCronJob(ctx context.Context, key string) error {
 	if err := p.ensureWS(ctx); err != nil {

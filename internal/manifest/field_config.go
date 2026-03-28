@@ -11,11 +11,10 @@ var writeOnlyFields = map[ResourceKind][]string{
 	KindMCPServer:         {"grants"},
 	KindCronJob:           {"agentKey", "message"},
 	KindAgentTeam:         {"lead", "members", "displayName"},
-	KindTool:              {},
 	KindSkill:             {},
-	KindTTSConfig:         {},
 	KindBuiltinToolConfig: {},
 	KindSkillConfig:       {},
+	KindSystemConfig:      {},
 	KindMCPCredentials:    {"credentials"}, // credentials are write-only (encrypted)
 }
 

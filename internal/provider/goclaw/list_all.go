@@ -113,32 +113,6 @@ func (p *Provider) listAllMCPServers(ctx context.Context) ([]reconciler.Resource
 	return infos, nil
 }
 
-// listAllCustomTools returns ResourceInfo for every custom tool in GoClaw.
-func (p *Provider) listAllCustomTools(ctx context.Context) ([]reconciler.ResourceInfo, error) {
-	data, err := p.http.Get(ctx, "/v1/tools/custom")
-	if err != nil {
-		return nil, fmt.Errorf("list custom tools: %w", err)
-	}
-	var resp struct {
-		Tools []map[string]any `json:"tools"`
-	}
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("parse custom tools response: %w", err)
-	}
-	infos := make([]reconciler.ResourceInfo, 0, len(resp.Tools))
-	for _, t := range resp.Tools {
-		if !p.matchesTenant(ctx, t) {
-			continue
-		}
-		infos = append(infos, reconciler.ResourceInfo{
-			Kind:      manifest.KindTool,
-			Name:      strVal(t, "name"),
-			CreatedBy: strVal(t, "created_by"),
-		})
-	}
-	return infos, nil
-}
-
 // listAllSkills returns ResourceInfo for every skill in GoClaw.
 func (p *Provider) listAllSkills(ctx context.Context) ([]reconciler.ResourceInfo, error) {
 	data, err := p.http.Get(ctx, "/v1/skills")

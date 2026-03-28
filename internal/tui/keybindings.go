@@ -16,17 +16,16 @@ const (
 
 // kindByNumber maps number keys to resource kinds following ApplyOrder.
 // 0=All, 1=Provider, 2=Agent, 3=Channel, 4=MCPServer, 5=Skill,
-// 6=Tool, 7=CronJob, 8=AgentTeam, 9=TTSConfig
+// 6=CronJob, 7=AgentTeam, 8=SystemConfig
 var kindByNumber = map[rune]manifest.ResourceKind{
 	'1': manifest.KindProvider,
 	'2': manifest.KindAgent,
 	'3': manifest.KindChannel,
 	'4': manifest.KindMCPServer,
 	'5': manifest.KindSkill,
-	'6': manifest.KindTool,
-	'7': manifest.KindCronJob,
-	'8': manifest.KindAgentTeam,
-	'9': manifest.KindTTSConfig,
+	'6': manifest.KindCronJob,
+	'7': manifest.KindAgentTeam,
+	'8': manifest.KindSystemConfig,
 }
 
 // KeyHandler dispatches key events based on the current input mode.

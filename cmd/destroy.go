@@ -82,8 +82,9 @@ Deletes in reverse dependency order for safe cascading.`,
 		// Discover all gcplane-managed resources in reverse dependency order
 		var toDelete []reconciler.ResourceInfo
 		for _, kind := range manifest.DeleteOrder() {
-			if kind == manifest.KindSkill || kind == manifest.KindTTSConfig ||
-				kind == manifest.KindBuiltinToolConfig || kind == manifest.KindSkillConfig || kind == manifest.KindMCPCredentials {
+			if kind == manifest.KindSkill ||
+				kind == manifest.KindBuiltinToolConfig || kind == manifest.KindSkillConfig ||
+				kind == manifest.KindSystemConfig || kind == manifest.KindMCPCredentials {
 				continue
 			}
 			infos, err := provider.ListAll(cmd.Context(), kind)

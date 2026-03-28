@@ -90,7 +90,7 @@ func TestPrintDiff_WithDrift_NoPanic(t *testing.T) {
 			},
 			{Kind: manifest.KindChannel, Name: "orphan", Action: reconciler.ActionDelete},
 			{Kind: manifest.KindMCPServer, Name: "ok", Action: reconciler.ActionNoop},
-			{Kind: manifest.KindTool, Name: "errored", Action: reconciler.ActionNoop, Error: "observe failed"},
+			{Kind: manifest.KindSkill, Name: "errored", Action: reconciler.ActionNoop, Error: "observe failed"},
 		},
 		Creates: 1,
 		Updates: 1,

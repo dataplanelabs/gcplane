@@ -7,6 +7,9 @@ import (
 
 var keyRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
+// sysConfigKeyRe matches GoClaw system config keys (alphanumeric, dots, underscores, hyphens).
+var sysConfigKeyRe = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,100}$`)
+
 // validKinds is the set of supported resource kinds.
 var validKinds = map[ResourceKind]bool{
 	KindTenant:            true,
@@ -16,11 +19,10 @@ var validKinds = map[ResourceKind]bool{
 	KindCronJob:           true,
 	KindMCPServer:         true,
 	KindSkill:             true,
-	KindTool:              true,
 	KindAgentTeam:         true,
-	KindTTSConfig:         true,
 	KindBuiltinToolConfig: true,
 	KindSkillConfig:       true,
+	KindSystemConfig:      true,
 	KindMCPCredentials:    true,
 }
 
@@ -46,6 +48,10 @@ func Validate(m *Manifest) []error {
 
 		if r.Name == "" {
 			errs = append(errs, fmt.Errorf("%s: name is required", prefix))
+		} else if r.Kind == KindSystemConfig {
+			if !sysConfigKeyRe.MatchString(r.Name) {
+				errs = append(errs, fmt.Errorf("%s: name %q must match [a-zA-Z0-9._-]{1,100}", prefix, r.Name))
+			}
 		} else if !keyRe.MatchString(r.Name) {
 			errs = append(errs, fmt.Errorf("%s: name %q must be kebab-case (a-z0-9, hyphens)", prefix, r.Name))
 		}

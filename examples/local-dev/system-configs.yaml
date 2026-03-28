@@ -1,0 +1,15 @@
+resources:
+  - kind: SystemConfig
+    name: tts.provider
+    spec:
+      value: "edge"
+
+  - kind: SystemConfig
+    name: tts.auto
+    spec:
+      value: "off"
+
+  - kind: SystemConfig
+    name: tts.mode
+    spec:
+      value: "off"

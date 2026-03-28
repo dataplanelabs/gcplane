@@ -63,6 +63,43 @@ test_serve() {
 }
 run_test "serve" test_serve
 
+# --- SystemConfig CRUD ---
+test_system_config() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  cat > "$tmpdir/manifest.yaml" <<'YAML'
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: syscfg-test
+connection:
+  endpoint: http://localhost:18790
+  token: ${GOCLAW_TOKEN}
+resources:
+  - kind: SystemConfig
+    name: gcplane.e2e.test
+    spec:
+      value: "hello"
+YAML
+
+  # Apply
+  $BINARY apply -f "$tmpdir" --auto-approve
+
+  # Idempotent
+  $BINARY plan -f "$tmpdir" | grep -q "0 to create, 0 to update"
+
+  # Update value
+  sed -i.bak 's/hello/world/' "$tmpdir/manifest.yaml" && rm -f "$tmpdir/manifest.yaml.bak"
+  $BINARY plan -f "$tmpdir" | grep -q "1 to update"
+  $BINARY apply -f "$tmpdir" --auto-approve
+  $BINARY plan -f "$tmpdir" | grep -q "0 to create, 0 to update"
+
+  # Cleanup
+  $BINARY destroy -f "$tmpdir" --auto-approve
+  rm -rf "$tmpdir"
+}
+run_test "system-config-crud" test_system_config
+
 # --- Destroy ---
 test_destroy() {
   $BINARY apply -f examples/minimal.yaml --auto-approve
