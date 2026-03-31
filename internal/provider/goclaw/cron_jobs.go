@@ -34,22 +34,24 @@ func (p *Provider) observeCronJob(ctx context.Context, key string) (map[string]a
 }
 
 // createCronJob creates a new cron job via WS RPC.
+// Note: GoClaw's cron RPC uses camelCase JSON (unlike HTTP resources which use snake_case),
+// so we pass the manifest spec directly without snake_case translation.
 func (p *Provider) createCronJob(ctx context.Context, key string, spec map[string]any) error {
 	if err := p.ensureWS(ctx); err != nil {
 		return fmt.Errorf("ws connect for cron: %w", err)
 	}
 
-	params := translateSpec(spec)
+	params := copyMap(spec)
 	params["name"] = key
 
-	// Resolve agent_key → agent_id (GoClaw expects UUID)
-	if agentKey, ok := params["agent_key"].(string); ok {
+	// Resolve agentKey → agentId (GoClaw expects UUID)
+	if agentKey, ok := params["agentKey"].(string); ok {
 		agentID, err := p.resolveAgentID(ctx, agentKey)
 		if err != nil {
 			return fmt.Errorf("cron %s: %w", key, err)
 		}
-		params["agent_id"] = agentID
-		delete(params, "agent_key")
+		params["agentId"] = agentID
+		delete(params, "agentKey")
 	}
 
 	_, err := p.ws.Call(ctx, "cron.create", params)
@@ -60,6 +62,7 @@ func (p *Provider) createCronJob(ctx context.Context, key string, spec map[strin
 }
 
 // updateCronJob updates an existing cron job via WS RPC.
+// Note: GoClaw's cron RPC uses camelCase JSON, so no snake_case translation needed.
 func (p *Provider) updateCronJob(ctx context.Context, key string, spec map[string]any) error {
 	if err := p.ensureWS(ctx); err != nil {
 		return fmt.Errorf("ws connect for cron: %w", err)
@@ -78,16 +81,16 @@ func (p *Provider) updateCronJob(ctx context.Context, key string, spec map[strin
 		jobID = strVal(current, "name")
 	}
 
-	patch := translateSpec(spec)
+	patch := copyMap(spec)
 
-	// Resolve agent_key → agent_id (GoClaw expects UUID)
-	if agentKey, ok := patch["agent_key"].(string); ok {
+	// Resolve agentKey → agentId (GoClaw expects UUID)
+	if agentKey, ok := patch["agentKey"].(string); ok {
 		agentID, err := p.resolveAgentID(ctx, agentKey)
 		if err != nil {
 			return fmt.Errorf("cron %s: %w", key, err)
 		}
-		patch["agent_id"] = agentID
-		delete(patch, "agent_key")
+		patch["agentId"] = agentID
+		delete(patch, "agentKey")
 	}
 
 	params := map[string]any{

@@ -94,6 +94,10 @@ resources:
       message: "Generate daily status report and send to #reports channel"
       agentKey: support-bot
       enabled: true
+      deliver: true
+      deliverChannel: slack
+      deliverTo: "#reports"
+      stateless: true
 
   - kind: CronJob
     name: weekly-digest
@@ -105,6 +109,7 @@ resources:
       message: "Create weekly digest of all support conversations"
       agentKey: support-bot
       enabled: true
+      stateless: false
 
   # ============================================================
   # MCP Servers

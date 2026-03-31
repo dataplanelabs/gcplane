@@ -20,6 +20,10 @@ resources:
       message: "Generate weekly data quality and pipeline health report. Include error rates, latency trends, and storage growth."
       agentKey: report-builder
       enabled: true
+      deliver: true
+      deliverChannel: telegram
+      deliverTo: "@data-team"
+      stateless: true
 
   - kind: CronJob
     name: daily-infra-check
@@ -31,6 +35,8 @@ resources:
       message: "Check k8s cluster health: pod restarts, resource usage, pending alerts. Report issues."
       agentKey: devops-engineer
       enabled: true
+      wakeHeartbeat: true
+      stateless: false
 
   - kind: CronJob
     name: weekly-security-scan
