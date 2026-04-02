@@ -139,6 +139,41 @@ func TestCopyMap(t *testing.T) {
 	}
 }
 
+func TestStripInternal_AgentConfigFields(t *testing.T) {
+	input := map[string]any{
+		"id":                  "uuid-1",
+		"agent_key":           "my-agent",
+		"context_window":      200000,
+		"max_tool_iterations": 50,
+		"tools_config":        map[string]any{"profile": "coding"},
+		"sandbox_config":      map[string]any{},
+		"other_config":        map[string]any{},
+		"created_at":          "2024-01-01",
+	}
+
+	result := stripInternal(input)
+
+	// context_window and max_tool_iterations are now observable (removed from internalFields)
+	if result["context_window"] != 200000 {
+		t.Errorf("expected context_window to survive, got %v", result["context_window"])
+	}
+	if result["max_tool_iterations"] != 50 {
+		t.Errorf("expected max_tool_iterations to survive, got %v", result["max_tool_iterations"])
+	}
+
+	// Complex JSONB configs should still be stripped
+	for _, f := range []string{"tools_config", "sandbox_config", "other_config"} {
+		if _, ok := result[f]; ok {
+			t.Errorf("expected JSONB config %q to be stripped", f)
+		}
+	}
+
+	// Timestamps should still be stripped
+	if _, ok := result["created_at"]; ok {
+		t.Error("expected created_at to be stripped")
+	}
+}
+
 func TestStrVal_NilMap(t *testing.T) {
 	// should not panic on nil map
 	defer func() {

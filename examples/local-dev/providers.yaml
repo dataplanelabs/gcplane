@@ -42,3 +42,7 @@ resources:
       apiBase: https://api.openai.com/v1
       apiKey: ${GOCLAW_OPENAI_API_KEY}
       enabled: true
+      settings:
+        embedding:
+          enabled: true
+          model: text-embedding-3-small

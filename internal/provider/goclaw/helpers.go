@@ -47,12 +47,16 @@ func (p *Provider) resolveAgentID(ctx context.Context, agentKey string) (string,
 // Note: "id" is intentionally excluded — update/delete paths need it to resolve
 // the resource UUID before issuing PUT/DELETE requests.
 var internalFields = []string{
+	// Timestamps & ownership
 	"created_at", "updated_at", "created_by", "owner_id",
+	// Tenant metadata
 	"tenant_id", "tenant_name", "tenant_slug",
+	// Workspace (managed by GoClaw UI)
 	"restrict_to_workspace", "workspace",
-	"context_window", "max_tool_iterations",
-	"compaction_config", "memory_config", "context_pruning",
-	"sandbox_config", "subagents_config", "other_config",
+	// Complex JSONB configs (managed by GoClaw UI, not manifests)
+	"tools_config", "sandbox_config", "subagents_config",
+	"memory_config", "compaction_config", "context_pruning", "other_config",
+	// Accounting & metadata
 	"frontmatter", "budget_monthly_cents",
 	"agent_count", "has_credentials", "credentials",
 }

@@ -5,8 +5,14 @@ package manifest
 // These fields are excluded from comparison during reconciliation.
 var writeOnlyFields = map[ResourceKind][]string{
 	KindTenant:            {},
-	KindProvider:          {},
-	KindAgent:             {"contextFiles", "systemPrompt"},
+	KindProvider:          {"apiKey"},
+	KindAgent: {
+		"contextFiles", "systemPrompt",
+		// Complex JSONB configs — sent on create/update but not compared
+		// (managed via GoClaw UI at runtime, stripped from observe by internalFields)
+		"toolsConfig", "sandboxConfig", "subagentsConfig",
+		"memoryConfig", "compactionConfig", "contextPruning", "otherConfig",
+	},
 	KindChannel:           {"agentKey", "credentials", "config"},
 	KindMCPServer:         {"grants"},
 	KindCronJob:           {"agentKey", "message"},

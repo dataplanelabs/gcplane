@@ -6,6 +6,15 @@ import (
 	"fmt"
 )
 
+// cronInternalFields are CronJob-specific fields returned by GoClaw WS RPC (camelCase)
+// that should be stripped from observe results. The generic internalFields list uses
+// snake_case and doesn't match these.
+// Note: "createdBy" is defensive — GoClaw's CronJob struct currently lacks this field,
+// but stripping it prevents phantom diffs if GoClaw adds it later.
+var cronInternalFields = []string{
+	"tenantId", "userId", "payload", "state", "createdAtMs", "updatedAtMs", "createdBy",
+}
+
 // observeCronJob fetches a cron job by name via WS RPC.
 func (p *Provider) observeCronJob(ctx context.Context, key string) (map[string]any, error) {
 	if err := p.ensureWS(ctx); err != nil {
@@ -26,8 +35,13 @@ func (p *Provider) observeCronJob(ctx context.Context, key string) (map[string]a
 
 	for _, job := range resp.Jobs {
 		if strVal(job, "name") == key && p.matchesTenant(ctx, job) {
-			// agentKey/message are write-only; excluded via WriteOnlyFields(KindCronJob).
-			return translateResult(stripInternal(job)), nil
+			result := translateResult(stripInternal(job))
+			// Strip CronJob-specific internal fields (WS RPC returns camelCase,
+			// which stripInternal's snake_case list doesn't catch).
+			for _, f := range cronInternalFields {
+				delete(result, f)
+			}
+			return result, nil
 		}
 	}
 	return nil, nil

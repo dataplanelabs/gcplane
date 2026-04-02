@@ -37,13 +37,21 @@ func TestCronJob_Observe_WithNewFields(t *testing.T) {
 			"jobs": []map[string]any{
 				{
 					"id": "j1", "name": "daily-report",
+					"tenantId":       "t-uuid",
+					"agentId":        "a-uuid",
+					"userId":         "u1",
 					"enabled":        true,
 					"stateless":      false,
 					"deliver":        true,
 					"deliverChannel": "telegram",
 					"deliverTo":      "@admin",
 					"wakeHeartbeat":  true,
+					"deleteAfterRun": false,
 					"schedule":       map[string]any{"kind": "cron", "expr": "0 9 * * *"},
+					"payload":        map[string]any{"kind": "chat", "message": "hello"},
+					"state":          map[string]any{"lastStatus": "ok"},
+					"createdAtMs":    1711929600000,
+					"updatedAtMs":    1711929600000,
 				},
 			},
 		}},
@@ -57,7 +65,8 @@ func TestCronJob_Observe_WithNewFields(t *testing.T) {
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	// New fields should be present in observe result (camelCase from API)
+
+	// Config fields should be observable
 	if result["stateless"] != false {
 		t.Errorf("expected stateless=false, got %v", result["stateless"])
 	}
@@ -72,6 +81,21 @@ func TestCronJob_Observe_WithNewFields(t *testing.T) {
 	}
 	if result["wakeHeartbeat"] != true {
 		t.Errorf("expected wakeHeartbeat=true, got %v", result["wakeHeartbeat"])
+	}
+	if result["deleteAfterRun"] != false {
+		t.Errorf("expected deleteAfterRun=false, got %v", result["deleteAfterRun"])
+	}
+
+	// Internal fields should be stripped (CronJob camelCase stripping)
+	for _, f := range []string{"tenantId", "userId", "payload", "state", "createdAtMs", "updatedAtMs"} {
+		if _, exists := result[f]; exists {
+			t.Errorf("internal field %q should be stripped from observe result", f)
+		}
+	}
+
+	// agentId should still be present (passthrough for direct UUID use cases)
+	if result["agentId"] != "a-uuid" {
+		t.Errorf("expected agentId=a-uuid, got %v", result["agentId"])
 	}
 }
 

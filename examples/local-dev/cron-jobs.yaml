@@ -70,3 +70,15 @@ resources:
       message: "Check LLM provider health: response latencies, error rates, cost trends. Flag any degradation or pricing changes."
       agentKey: ml-engineer
       enabled: true
+
+  - kind: CronJob
+    name: monthly-cleanup
+    spec:
+      schedule:
+        kind: cron
+        expr: "0 3 1 * *"
+        tz: Asia/Saigon
+      message: "Archive old sessions and clean up stale data. Report storage savings."
+      agentKey: devops-engineer
+      enabled: true
+      stateless: true

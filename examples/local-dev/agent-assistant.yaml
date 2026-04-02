@@ -8,6 +8,8 @@ resources:
       agentType: open
       status: active
       isDefault: true
+      contextWindow: 200000
+      maxToolIterations: 50
       toolsConfig:
         profile: coding
       contextFiles:
