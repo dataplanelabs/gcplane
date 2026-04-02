@@ -2,13 +2,13 @@
 
 ## Overview
 
-GCPlane v0.8.0+ supports two multi-tenant deployment models:
+GCPlane v1.0.0 supports two multi-tenant deployment models:
 
 1. **Single GoClaw, multiple tenants** (SaaS model, recommended)
    - One GoClaw instance with tenant isolation via `connection.tenantId` header
    - Tenant CRUD via `Tenant` resource kind
-   - Per-tenant configs: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`
-   - GoClaw v1.2.0+ required
+   - Per-tenant configs: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`, `SystemConfig`
+   - GoClaw 2.x required
 
 2. **Multiple GoClaw instances** (federated model)
    - Each tenant = dedicated GoClaw endpoint
@@ -31,7 +31,7 @@ goclaw-config/
 
 Run with: `gcplane serve --tenants-dir ./goclaw-config/`
 
-## Isolation Model (GoClaw v1.2.0+)
+## Isolation Model (GoClaw 2.x)
 
 | Boundary | Isolation Level | Notes |
 |----------|----------------|-------|
@@ -68,6 +68,13 @@ After creating a tenant, use a tenant-bound API key to configure:
   name: my-skill-slug
   spec:
     enabled: false
+
+# Per-tenant system settings (v1.0.0+)
+- kind: SystemConfig
+  name: feature-flags
+  spec:
+    key1: value1
+    key2: value2
 
 # Per-user MCP server credentials
 - kind: MCPCredentials

@@ -1,15 +1,14 @@
-# GCPlane
+# GCPlane (v1.0.0 — stable since 2026-04-02)
 
 Declarative GitOps control plane for GoClaw. Manages AI agents, providers, channels, MCP servers, cron jobs, and teams through YAML manifests.
 
 ## Core Principles
 - **Deploy-Anywhere**: Single binary for local, VPS, k8s. No platform lock-in.
-- **Minimal Dependencies**: Under 10 deps. Stdlib preferred. No SDKs for simple HTTP calls.
+- **Minimal Dependencies**: Stdlib preferred. No SDKs for simple HTTP calls.
 - **Self-Contained**: Config via env vars + YAML manifest only.
 
 ## Tech Stack
 - Go 1.25, Cobra CLI, gorilla/websocket, gopkg.in/yaml.v3
-- No ORM, no heavy deps — 5 total dependencies
 - GoClaw API: HTTP REST + WebSocket RPC v3
 
 ## Architecture
@@ -18,7 +17,7 @@ cmd/              — CLI commands (validate, plan, apply, diff, export, serve, 
 internal/
   manifest/       — YAML loader, validator, composites, labels, field config
   reconciler/     — Observe→Compare→Act engine with ReconcileOpts (DryRun, Prune)
-  provider/goclaw — GoClaw API client (HTTP + WS) for 9 resource types
+  provider/goclaw — GoClaw API client (HTTP + WS) for 12 resource types
   keyconv/        — camelCase↔snake_case key translation
   controller/     — Reconcile loop, status tracker, tenant manager
   server/         — HTTP endpoints (health, metrics, status, sync, webhook)
@@ -30,10 +29,13 @@ internal/
 
 ## Key Patterns
 - Manifest uses camelCase (k8s convention), provider translates to snake_case for GoClaw API
-- `WriteOnlyFields` in `manifest/field_config.go` — fields excluded from comparison (secrets, grants, tokens)
+- `WriteOnlyFields` in `manifest/field_config.go` — fields excluded from comparison (secrets, grants, tokens, JSONB configs)
 - `stripInternal` in `provider/goclaw/helpers.go` — removes API-internal fields from observe results
+- CronJob observe has additional camelCase stripping (WS RPC returns camelCase unlike HTTP)
 - Prune: `--prune` flag, deletes in reverse `DeleteOrder()`, only `created_by=gcplane`
 - Composites: `CompositeDefinition` expanded during load via Go `text/template`
+- Agent `contextWindow` and `maxToolIterations` are observable (manageable from manifests)
+- Provider `apiKey` is write-only (masked as "***" in API responses)
 
 ## Testing
 ```bash

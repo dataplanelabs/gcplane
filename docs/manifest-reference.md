@@ -4,8 +4,7 @@
 
 | GCPlane | Requires | RPC |
 |---------|----------|-----|
-| v0.1–v0.7.2 | GoClaw 1.2.0+ | v3 |
-| v0.8.0+ | GoClaw 1.2.0+ | v3 |
+| v1.0.0+ | GoClaw 2.x | v3 |
 
 ## Format
 
@@ -31,7 +30,7 @@ resources:
 
 | Kind | Transport | Deletable | Description |
 |------|-----------|-----------|-------------|
-| `Tenant` | HTTP | Yes | Tenant definition (system scope only, requires GoClaw v1.2.0+) |
+| `Tenant` | HTTP | Yes | Tenant definition (system scope only) |
 | `Provider` | HTTP | Yes | LLM provider (Anthropic, OpenAI, etc.) |
 | `Agent` | HTTP | Yes | AI agent with model + config |
 | `Channel` | HTTP | Yes | Messaging channel (Telegram, Discord, etc.) |
@@ -39,15 +38,14 @@ resources:
 | `Skill` | HTTP | No | Agent skill (update only, auto-discovered, GoClaw-managed) |
 | `BuiltinToolConfig` | HTTP | Yes | Per-tenant builtin tool enable/disable |
 | `SkillConfig` | HTTP | Yes | Per-tenant skill enable/disable |
-| `Tool` | HTTP | Yes | Custom tool definition |
+| `SystemConfig` | HTTP | Yes | Per-tenant key-value system settings |
+| `MCPCredentials` | HTTP | Yes | Per-user MCP server credentials |
 | `CronJob` | WebSocket | Yes | Scheduled task |
 | `AgentTeam` | WebSocket | Yes | Agent team |
-| `TTSConfig` | WebSocket | No | Text-to-speech settings (GoClaw-managed) |
-| `MCPCredentials` | HTTP | Yes | Per-user MCP server credentials |
 
-Resources are applied in dependency order: Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → MCPServer → MCPCredentials → Tool → Channel → CronJob → AgentTeam → TTSConfig. Prune deletes in reverse order.
+Resources are applied in dependency order: Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → AgentTeam. Prune deletes in reverse order.
 
-**Note:** Skill and TTSConfig are managed by GoClaw and cannot be deleted by gcplane. BuiltinToolConfig, SkillConfig, and MCPCredentials are not enumerable for prune.
+**Note:** Skill is managed by GoClaw and cannot be deleted by gcplane. BuiltinToolConfig, SkillConfig, SystemConfig, and MCPCredentials are not enumerable for prune.
 
 ## Channel Configuration
 
@@ -288,7 +286,7 @@ gcplane apply -f manifest.yaml --prune
 **Safety guarantees:**
 - Prune is opt-in (requires explicit `--prune` flag or `prune: true` in manifest)
 - Only deletes gcplane-owned resources (marked with `gcplane.io/managed: true`)
-- Skill and TTSConfig are excluded (GoClaw-managed, cannot be deleted)
+- Skill is excluded (GoClaw-managed, cannot be deleted)
 - Deletes happen in reverse dependency order (safe cascading)
 - Shows warning when deletions > 0: `N to create, N to update, N to delete`
 - Continue-on-error: one delete failure doesn't block others

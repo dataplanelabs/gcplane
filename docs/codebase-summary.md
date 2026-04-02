@@ -1,21 +1,21 @@
 # GCPlane Codebase Summary
 
-Generated: 2026-03-25 | Based on repomix analysis and v0.7.2 release
+Generated: 2026-04-03 | Based on repomix analysis and v1.0.0 release
 
 ## Overview
 
-GCPlane is a declarative GitOps control plane for managing GoClaw deployments. Single binary, under 10 deps, pure Go 1.25.8. Total codebase: ~14,788 LOC across cmd/ and internal/ packages with 161+ tests (81.3% coverage).
+GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deployments. Single binary, under 10 deps, pure Go 1.25. Total codebase: ~14,778 LOC across cmd/ and internal/ packages with 161+ tests (81.3% coverage).
 
 ## Quick Stats
 
 | Metric | Value |
 |--------|-------|
-| **Language** | Go 1.25.8 |
+| **Language** | Go 1.25+ |
 | **Total Dependencies** | 5 direct |
 | **Test Coverage** | 81.3% (161+ tests) |
-| **Codebase Lines** | ~14,788 LOC |
+| **Codebase Lines** | ~14,778 LOC |
 | **Binary Size** | Single statically-linked executable |
-| **Resource Kinds** | 13 (Tenant + 9 core + 3 config) |
+| **Resource Kinds** | 12 (Tenant + 8 core + 3 config) |
 | **Transport Protocols** | HTTP REST + WebSocket RPC v3 |
 
 ## Technology Stack
@@ -35,7 +35,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 
 ## Project Structure
 
-### cmd/ — CLI Commands (10 files, ~800 LOC)
+### cmd/ — CLI Commands (13 files, ~1372 LOC)
 | Command | Purpose | Status |
 |---------|---------|--------|
 | `root.go` | Version, global flags, update checker | v0.6.0+ |
@@ -49,7 +49,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `export.go` | Export GoClaw state as manifest YAML | v0.2.0+ |
 | `destroy.go` | Remove all gcplane-managed resources | v0.4.0+ |
 
-### internal/manifest/ — YAML Manifest Handling (~1,100 LOC)
+### internal/manifest/ — YAML Manifest Handling (~1330 LOC)
 **Purpose**: Load, parse, validate, and compose YAML manifests
 
 | File | Responsibility |
@@ -63,7 +63,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `filter.go` | Label-based resource filtering |
 | `validate_refs.go` | Reference validation (provider → agent, etc.) |
 
-### internal/provider/goclaw/ — GoClaw API Client (~2,100 LOC)
+### internal/provider/goclaw/ — GoClaw API Client (~4852 LOC)
 **Purpose**: HTTP REST + WebSocket RPC communication with GoClaw
 
 **Architecture**:
@@ -78,16 +78,15 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 - `providers.go` — Provider CRUD (HTTP, API key masking)
 - `mcp_servers.go` — MCPServer CRUD (HTTP)
 - `skills.go` — Skill observe/update only (HTTP, not deletable)
-- `custom_tools.go` — Tool CRUD (HTTP)
 - `tenants.go` — Tenant CRUD (system scope only)
 - `builtin_tool_configs.go` — Per-tenant builtin tool config
 - `skill_configs.go` — Per-tenant skill enable/disable
 - `mcp_credentials.go` — Per-user MCP server credentials
+- `system_configs.go` — Per-tenant system settings (NEW in v1.0.0)
 - `cron_jobs.go` — CronJob CRUD (WebSocket, deletable, agent_key resolution)
 - `teams.go` — AgentTeam CRUD (WebSocket, deletable)
-- `tts_config.go` — TTSConfig observe/update (WebSocket, not deletable)
 
-### internal/reconciler/ — Observe→Compare→Act Engine (~600 LOC)
+### internal/reconciler/ — Observe→Compare→Act Engine (~947 LOC)
 **Purpose**: Reconciliation logic for dry-run and apply modes
 
 | File | Responsibility |
@@ -96,7 +95,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `compare.go` | Deep spec comparison, field-level diffs, masked field skipping |
 | `types.go` | Plan, Change, FieldDiff, ApplyResult structures |
 
-### internal/controller/ — Reconciliation Loop (~500 LOC)
+### internal/controller/ — Reconciliation Loop (~1438 LOC)
 **Purpose**: Continuous reconciliation server for serve mode
 
 | File | Responsibility |
@@ -106,7 +105,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `tenant_manager.go` | Multi-tenant mode: per-tenant controllers |
 | `metrics.go` | Prometheus metrics export |
 
-### internal/source/ — Manifest Source Abstraction (~400 LOC)
+### internal/source/ — Manifest Source Abstraction (~768 LOC)
 **Purpose**: File and Git manifest sources with change detection
 
 | File | Responsibility |
@@ -115,7 +114,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `file_source.go` | File watching with SHA256 change detection |
 | `git_source.go` | Git clone/fetch with branch checkout, SHA detection |
 
-### internal/server/ — HTTP Server (~300 LOC)
+### internal/server/ — HTTP Server (~519 LOC)
 **Purpose**: Health, metrics, status, and webhook endpoints for serve mode
 
 | File | Responsibility |
@@ -123,7 +122,7 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `server.go` | Server startup, graceful shutdown, middleware |
 | `handlers.go` | /healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git |
 
-### internal/tui/ — Interactive Terminal UI (~3,500 LOC)
+### internal/tui/ — Interactive Terminal UI (~2191 LOC)
 **Purpose**: k9s-style resource browser with real-time monitoring
 
 | File | Responsibility |
@@ -137,18 +136,24 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 
 ### Other Packages
 
-#### internal/display/ (~200 LOC)
+#### internal/display/ (~284 LOC)
 - `plan.go` — Terraform-style colored output (+ create, ~ update, - delete)
 
-#### internal/keyconv/ (~80 LOC)
+#### internal/keyconv/ (~271 LOC)
 - `keyconv.go` — Bidirectional camelCase ↔ snake_case translation
 
-#### internal/secrets/ (~100 LOC)
+#### internal/secrets/ (~129 LOC)
 - `resolver.go` — ${ENV_VAR}, file://, SOPS support
 
-#### internal/notifier/ (~200 LOC)
+#### internal/notifier/ (~359 LOC)
 - `notifier.go` — Webhook notifications on drift
 - `formats.go` — Slack, Discord, Google Chat, Teams, Telegram payloads
+
+#### internal/update/ (~318 LOC)
+- `update.go` — Self-update checker via GitHub Releases
+
+#### internal/tui/ (~2191 LOC)
+- 12 files for k9s-style interactive TUI dashboard
 
 ### examples/ — Reference Manifests
 - **minimal.yaml** — Bare minimum (1 provider, 1 agent)
@@ -170,14 +175,14 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 - **release.yml** — Build + publish multi-platform releases (GitHub, Docker Hub, ghcr.io)
 - **upstream-check.yml** — Weekly check for GoClaw updates
 
-## Resource Kinds (13 total)
+## Resource Kinds (12 total)
 
 ### System Scope (1)
 | Kind | Create | Update | Delete | Transport | Notes |
 |------|--------|--------|--------|-----------|-------|
 | `Tenant` | ✓ | ✓ | ✓ | HTTP | v0.8.0+, system scope only |
 
-### Core Resources (9)
+### Core Resources (8)
 | Kind | Create | Update | Delete | Transport | Notes |
 |------|--------|--------|--------|-----------|-------|
 | `Provider` | ✓ | ✓ | ✓ | HTTP | API keys masked as *** |
@@ -185,10 +190,8 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `Channel` | ✓ | ✓ | ✓ | HTTP | Credentials nested in object |
 | `MCPServer` | ✓ | ✓ | ✓ | HTTP | — |
 | `Skill` | — | ✓ | — | HTTP | Auto-discovered, not deletable |
-| `Tool` | ✓ | ✓ | ✓ | HTTP | Aliases: CustomTool, BuiltinTool |
 | `CronJob` | ✓ | ✓ | ✓ | WebSocket | agent_key → agent_id resolved |
 | `AgentTeam` | ✓ | ✓ | ✓ | WebSocket | v2 settings (notifications, delivery mode) |
-| `TTSConfig` | — | ✓ | — | WebSocket | GoClaw-managed, not deletable |
 
 ### Config Resources (3)
 | Kind | Create | Update | Delete | Transport | Notes |
@@ -196,11 +199,12 @@ GCPlane is a declarative GitOps control plane for managing GoClaw deployments. S
 | `BuiltinToolConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant, v0.8.0+ |
 | `SkillConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant, v0.8.0+ |
 | `MCPCredentials` | ✓ | ✓ | ✓ | HTTP | Per-user, v0.8.0+ |
+| `SystemConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant system settings, v1.0.0+ |
 
 ### Dependency Order
 ```
 Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig
-  → MCPServer → MCPCredentials → Tool → Channel → CronJob → AgentTeam → TTSConfig
+  → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → AgentTeam
 ```
 
 Prune deletes in reverse order.
@@ -281,9 +285,9 @@ GoClaw uses UUIDs internally. GCPlane manifests use human-readable names. Resolu
 | v0.5.0 | 2026-03-17 | Stability, 81% test coverage, security hardening, k8s deploy |
 | v0.6.0 | 2026-03-18 | Enhanced init, auto-discovery, audit logging, version updates |
 | v0.7.0 | 2026-03-18 | Interactive TUI (top command), vim keybindings |
-| **v0.7.2** | **2026-03-25** | **Channel credentials restructure, tenant isolation enforcement** |
+| v0.7.2 | 2026-03-25 | Channel credentials restructure, tenant isolation enforcement |
 | v0.8.0 | 2026-03-24 | First-class multi-tenant: Tenant CRUD, per-tenant config, 13 kinds |
-| v0.9.0 | Planned | Config file support, advanced audit/export, enhanced filtering |
+| **v1.0.0** | **2026-04-02** | **Production release: Stable API, removed Tool/TTSConfig, added SystemConfig, 12 kinds** |
 
 ### GoClaw Compatibility
 Tested against: **ghcr.io/nextlevelbuilder/goclaw:full** (v2.x)
@@ -414,11 +418,12 @@ Manifest resources tagged with labels (e.g., `app: web`); GCPlane reconciles via
 
 ## Known Limitations & Edge Cases
 
-1. **Skill/TTSConfig Not Deletable**: GoClaw manages these; GCPlane can only update
+1. **Skill Not Deletable**: GoClaw manages this; GCPlane can only update
 2. **Masked Fields**: Comparison skips API-masked fields (*** values); may miss real drift if GoClaw API changes masking behavior
 3. **Natural Key Assumption**: GCPlane assumes resource `name` fields are unique within scope; duplicate names cause undefined behavior
 4. **WS Lazy Init**: WebSocket connection established on first WS resource access; failures here propagate
 5. **Composite Expansion**: One-shot at load time; no dynamic re-composition on serve mode changes
+6. **SystemConfig, SkillConfig, BuiltinToolConfig, MCPCredentials**: Not enumerable for prune (GoClaw design limitation)
 
 ## Related Documentation
 - [`./project-roadmap.md`](./project-roadmap.md) — Version history & feature timeline

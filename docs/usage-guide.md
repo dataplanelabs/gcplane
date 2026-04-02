@@ -15,12 +15,12 @@ go build -o gcplane .
 
 ## Version & Requirements
 
-**GCPlane v0.7.2+** requires **GoClaw 1.2.0+** with RPC v3 support.
+**GCPlane v1.0.0+** requires **GoClaw 2.x** with RPC v3 support.
 
 | Requirement | Version |
 |-------------|---------|
-| Go | 1.25.8+ (build only) |
-| GoClaw | 1.2.0+ (runtime) |
+| Go | 1.25+ (build only) |
+| GoClaw | 2.x (runtime) |
 | Docker | (optional, for local dev) |
 
 Check your GCPlane version:
@@ -107,7 +107,7 @@ gcplane apply -f gcplane.yaml --auto-approve
 | `top` | Interactive TUI for monitoring GoClaw resources (k9s-style dashboard) | v0.7.0 |
 | `diff` | Show drift between manifest and live state | v0.2.0 |
 | `export` | Export GoClaw state as YAML manifest | v0.2.0 |
-| `version` | Print version and check for updates | v0.6.0 |
+| `version` | Print version and check for updates (with 24h cache) | v0.6.0 |
 
 ## Global Flags
 
@@ -151,15 +151,18 @@ gcplane apply -f gcplane.yaml --auto-approve
 
 | Kind | Transport | Operations |
 |------|-----------|------------|
+| `Tenant` | HTTP | create, update, delete, list (system scope only) |
 | `Provider` | HTTP | create, update, delete, list |
 | `Agent` | HTTP | create, update, delete, list |
 | `Channel` | HTTP | create, update, delete, list |
 | `MCPServer` | HTTP | create, update, delete, list |
-| `Skill` | HTTP | update only (auto-discovered) |
-| `Tool` | HTTP | create, update, delete, list |
+| `Skill` | HTTP | update only (auto-discovered, not deletable) |
+| `BuiltinToolConfig` | HTTP | create, update, delete, list (per-tenant) |
+| `SkillConfig` | HTTP | create, update, delete, list (per-tenant) |
+| `MCPCredentials` | HTTP | create, update, delete, list (per-user) |
+| `SystemConfig` | HTTP | create, update, delete, list (per-tenant, v1.0.0+) |
 | `CronJob` | WebSocket | create, update, delete, list |
 | `AgentTeam` | WebSocket | create, update, delete, list |
-| `TTSConfig` | WebSocket | update only (GoClaw-managed) |
 
 ### Secret Resolution
 
@@ -211,8 +214,8 @@ gcplane version
 
 Output:
 ```
-GCPlane v0.7.2
-Update available: v0.8.0 (released 2026-03-24)
+GCPlane v1.0.0
+You are on the latest version.
 ```
 
 The update checker:
@@ -264,12 +267,12 @@ gcplane top -f manifest.yaml --endpoint http://localhost:8080
 
 ### Features
 
-- **Resource Browser**: Browse all 9 resource kinds (Provider, Agent, Channel, MCPServer, Skill, Tool, CronJob, AgentTeam, TTSConfig)
+- **Resource Browser**: Browse all 12 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, CronJob, AgentTeam)
 - **Status Coloring**: InSync (green), Drifted (yellow), Missing/Error (red), Extra (blue)
 - **YAML View**: Press Enter to view full resource YAML with syntax highlighting
 - **Drift Details**: Press `d` to see field-level drift comparison
 - **Vim Keybindings**: j/k navigate, g/G jump to start/end, q quit, ? help, : commands, / search
-- **Kind Filtering**: Number keys 0-9 or type `:agent`, `:provider`, `:mcp`, `:cron`, `:team`, `:tts`, `:all`
+- **Kind Filtering**: Number keys or type `:agent`, `:provider`, `:mcp`, `:cron`, `:team`, etc.
 - **Auto-Refresh**: Configurable interval (default 10s), press `r` for manual refresh
 - **Search**: Press `/` to filter by resource name (case-insensitive)
 

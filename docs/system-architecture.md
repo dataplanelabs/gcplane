@@ -83,14 +83,13 @@ gcplane/
 │   │   ├── channels.go              # Channel CRUD
 │   │   ├── mcp_servers.go           # MCP server CRUD
 │   │   ├── skills.go                # Skill observe/update (not deletable)
-│   │   ├── tools.go                 # Tool CRUD
 │   │   ├── cron_jobs.go             # Cron job CRUD (WS, deletable)
 │   │   ├── teams.go                 # Team CRUD (WS, deletable)
-│   │   ├── tts_config.go            # TTS config (WS, not deletable)
 │   │   ├── tenants.go               # Tenant CRUD (system scope only)
 │   │   ├── builtin_tool_configs.go  # Per-tenant builtin tool config
 │   │   ├── skill_configs.go         # Per-tenant skill enable/disable
 │   │   ├── mcp_credentials.go       # Per-user MCP server credentials
+│   │   ├── system_configs.go        # Per-tenant system settings
 │   │   └── tenant_test.go           # Tenant resource tests (12 tests)
 │   ├── controller/                  # Reconciliation loop + status tracking
 │   │   ├── controller.go            # Main loop with interval + graceful shutdown
@@ -136,14 +135,14 @@ gcplane/
 
 | GCPlane | Tested GoClaw | RPC Protocol | Key Features |
 |---------|---------------|--------------|--------------|
-| v0.7.x+ | 2.x | v3 | 13 kinds (Tenant + config), full multi-tenant |
+| v1.0.0+ | 2.x | v3 | 12 kinds (Tenant + config), full multi-tenant, stable API |
 
 **Tested Image**: `ghcr.io/nextlevelbuilder/goclaw:full` (v2.x)
 
 ### Dependency Versions
 | Dependency | Version | Usage |
 |------------|---------|-------|
-| Go | 1.25.8+ | Language |
+| Go | 1.25+ | Language |
 | gorilla/websocket | 1.5.3 | RPC v3 protocol |
 | cobra | 1.10.2 | CLI framework |
 | gopkg.in/yaml.v3 | 3.0.1 | Manifest parsing |
@@ -158,8 +157,8 @@ gcplane/
 ## Key Design Decisions
 
 ### Dual Transport
-- **HTTP REST**: Primary for Provider, Agent, Channel, MCPServer, Skill, Tool (support Create/Update/Delete/List)
-- **WebSocket RPC v3**: CronJob, Team, TTSConfig (no HTTP endpoints in GoClaw; support Create/Update/Delete/List)
+- **HTTP REST**: Primary for Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig (support Create/Update/Delete/List)
+- **WebSocket RPC v3**: CronJob, AgentTeam (no HTTP endpoints in GoClaw; support Create/Update/Delete/List)
 - WS connection is lazy-initialized on first WS resource access
 
 ### Credential Structure
@@ -178,14 +177,15 @@ GoClaw uses UUIDs internally. GCPlane uses human-readable natural keys (`name` f
 
 ### Dependency Ordering
 Resources processed in dependency order:
-Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → MCPServer → MCPCredentials → Tool → Channel → CronJob → AgentTeam → TTSConfig
+Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → AgentTeam
 
 Prune deletes in reverse order (safe cascading).
 
 ### Prune Safety
 - Prune is opt-in (requires `--prune` flag or manifest `prune: true`)
 - Only deletes resources marked with `gcplane.io/managed: true` (GCPlane-owned)
-- Skill and TTSConfig are excluded (GoClaw manages these)
+- Skill is excluded (GoClaw manages this; not deletable)
+- SystemConfig, SkillConfig, BuiltinToolConfig, MCPCredentials not enumerable for prune (GoClaw design)
 - Deletes happen in reverse dependency order to prevent cascade failures
 - Continue-on-error per-resource; one failure doesn't block others
 

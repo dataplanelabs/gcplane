@@ -95,23 +95,20 @@
 - Multi-tenant example: `examples/multi-tenant/` with _system/ + acme-corp/ + startup-io/
 - GoClaw v1.2.0 tenant isolation validated via 12 new tests
 
-## Planned: v0.9.0 — Advanced Features
-
-### P1: Enhanced Filtering & Export
-- Export audit trail as JSON/CSV
-- Integration with external logging systems
-- Audit event filtering and search
-- Enhanced `gcplane export` with filtering options
-
-### P2: Config File Support
-- Support `GCPLANE_CONFIG` env var for custom config paths
-- Config file validation and schema documentation
+### v1.0.0 (2026-04-02) — Production Release (Stable)
+- Removed CustomTool (Tool) and TTSConfig resource types from codebase
+- Added SystemConfig resource type for per-tenant system settings
+- Fixed CronJob WS RPC key format and agent_key resolution
+- Reduced resource kinds from 13 to 12 (removed Tool and TTSConfig)
+- Hardened safety, security, and context propagation across provider layer
+- Updated model references in examples to latest (claude-sonnet-4-20250514)
+- Stable API — backward compatible, production-ready
 
 ## Release Timeline
 
 | Version | Status | Release Date | Focus |
 |---------|--------|--------------|-------|
 | v0.1–v0.7.0 | Released | 2026-03-17 to 2026-03-18 | Foundation → Interactive UI |
-| **v0.7.2** | **Latest** | **2026-03-25** | **Credentials, Tenant Isolation** |
+| v0.7.2 | Released | 2026-03-25 | Credentials, Tenant Isolation |
 | v0.8.0 | Released | 2026-03-24 | First-class Multi-tenant |
-| v0.9.0 | Planned | TBD | Advanced Features |
+| **v1.0.0** | **Latest** | **2026-04-02** | **Production Release (Stable)** |

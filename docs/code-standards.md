@@ -6,7 +6,7 @@
 - **Self-Contained**: Binary includes all logic. Config via env vars + YAML manifest. No external config services.
 
 ## Language & Tooling
-- **Go 1.25.8+** (pure Go, no CGO dependencies)
+- **Go 1.25+** (pure Go, no CGO dependencies)
 - **Cobra 1.10.2** for CLI commands
 - **YAML v3 3.0.1** for manifest parsing
 - **gorilla/websocket 1.5.3** for WS RPC
@@ -38,7 +38,7 @@ GCPlane follows semver:
 Examples:
 - v0.7.0 → v0.7.2: Patch (credentials restructure, bug fixes)
 - v0.7.2 → v0.8.0: Minor (new Tenant resource kind, multi-tenant mode)
-- v0.x → v1.0: Reserved for production-grade stability
+- v0.8.0 → v1.0.0: Major (production release, stable API, removed Tool/TTSConfig, added SystemConfig)
 
 ## File Organization
 - `cmd/` — CLI commands, one file per command
