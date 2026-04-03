@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -60,15 +61,13 @@ func TestStatusTracker_SetCondition_Upsert(t *testing.T) {
 		t.Errorf("expected 2 conditions after upsert, got %d", len(s.Conditions))
 	}
 
-	var synced *Condition
-	for i := range s.Conditions {
-		if s.Conditions[i].Type == ConditionSynced {
-			synced = &s.Conditions[i]
-		}
-	}
-	if synced == nil {
+	idx := slices.IndexFunc(s.Conditions, func(c Condition) bool {
+		return c.Type == ConditionSynced
+	})
+	if idx == -1 {
 		t.Fatal("Synced condition not found")
 	}
+	synced := s.Conditions[idx]
 	if synced.Status != "True" {
 		t.Errorf("expected Synced=True, got %s", synced.Status)
 	}
@@ -143,7 +142,7 @@ func TestStatusTracker_ConcurrentReadWrite(t *testing.T) {
 	tracker := NewStatusTracker()
 	var wg sync.WaitGroup
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -235,17 +236,14 @@ func TestReconcileOnce_SyncedConditionOnSuccess(t *testing.T) {
 	ctrl.reconcileOnce()
 
 	status := ctrl.tracker.Get()
-	var synced *Condition
-	for i := range status.Conditions {
-		if status.Conditions[i].Type == ConditionSynced {
-			synced = &status.Conditions[i]
-		}
-	}
-	if synced == nil {
+	idx := slices.IndexFunc(status.Conditions, func(c Condition) bool {
+		return c.Type == ConditionSynced
+	})
+	if idx == -1 {
 		t.Fatal("expected Synced condition to be set")
 	}
-	if synced.Status != "True" {
-		t.Errorf("expected Synced=True, got %s", synced.Status)
+	if status.Conditions[idx].Status != "True" {
+		t.Errorf("expected Synced=True, got %s", status.Conditions[idx].Status)
 	}
 }
 
@@ -293,7 +291,7 @@ func TestTrigger_Debounce_CoalescesRapidCalls(t *testing.T) {
 	initialCalls := src.calls.Load()
 
 	// Fire many rapid Trigger() calls; they should be coalesced by debounce.
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		ctrl.Trigger()
 	}
 
@@ -467,7 +465,7 @@ func TestMetrics_Snapshot_ThreadSafe(t *testing.T) {
 		}
 	}()
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		_ = m.Snapshot()
 	}
 	close(done)

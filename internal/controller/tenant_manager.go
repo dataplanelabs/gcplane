@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -158,9 +159,7 @@ func (tm *TenantManager) All() map[string]*TenantInstance {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 	out := make(map[string]*TenantInstance, len(tm.tenants))
-	for k, v := range tm.tenants {
-		out[k] = v
-	}
+	maps.Copy(out, tm.tenants)
 	return out
 }
 
