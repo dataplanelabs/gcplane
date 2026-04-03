@@ -1,0 +1,12 @@
+{{- if and .Values.manifest (not .Values.manifestConfigMap) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gcplane.fullname" . }}-manifest
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gcplane.labels" . | nindent 4 }}
+data:
+  manifest.yaml: |
+    {{- .Values.manifest | nindent 4 }}
+{{- end }}

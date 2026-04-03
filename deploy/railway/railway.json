@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "gcplane serve -f /config/manifest.yaml --interval 30s",
+    "healthcheckPath": "/healthz",
+    "healthcheckTimeout": 3,
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

@@ -1,0 +1,112 @@
+# GCPlane manifest — VPS deployment example
+# Copy to /etc/gcplane/manifest.yaml and customize.
+#
+# Secrets are resolved from environment variables at runtime.
+# Set them in /etc/gcplane/gcplane.env (mode 600).
+#
+# Full reference: examples/minimal.yaml, examples/production.yaml
+
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  # Logical name for this deployment — appears in logs and status output.
+  name: my-deployment
+  # Arbitrary label for environment grouping (dev / staging / prod).
+  environment: prod
+
+connection:
+  # HTTP(S) endpoint of your GoClaw instance.
+  # Example self-hosted: http://127.0.0.1:18790
+  # Example managed:     https://goclaw.example.com
+  endpoint: http://127.0.0.1:18790
+  # API token — keep in .env, never hardcode here.
+  token: ${GOCLAW_TOKEN}
+
+resources:
+  # ----------------------------------------------------------------
+  # LLM Provider
+  # At least one provider is required for agents to function.
+  # ----------------------------------------------------------------
+  - kind: Provider
+    name: anthropic
+    spec:
+      displayName: "Anthropic"
+      providerType: anthropic_native
+      apiBase: https://api.anthropic.com
+      # apiKey is write-only — set in .env as ANTHROPIC_API_KEY.
+      apiKey: ${ANTHROPIC_API_KEY}
+      enabled: true
+
+  # Uncomment to add OpenAI as a second provider.
+  # - kind: Provider
+  #   name: openai
+  #   spec:
+  #     displayName: "OpenAI"
+  #     providerType: openai_compat
+  #     apiBase: https://api.openai.com/v1
+  #     apiKey: ${OPENAI_API_KEY}
+  #     enabled: true
+
+  # ----------------------------------------------------------------
+  # Agent
+  # ----------------------------------------------------------------
+  - kind: Agent
+    name: assistant
+    spec:
+      displayName: "Assistant"
+      # Must match a Provider name defined above.
+      provider: anthropic
+      # Model ID as accepted by the provider.
+      model: claude-sonnet-4-20250514
+      # open = users can start new conversations
+      # predefined = system-initiated only (cron, webhooks)
+      agentType: open
+      status: active
+      toolsConfig:
+        # Profiles: minimal | coding | full
+        profile: minimal
+
+  # ----------------------------------------------------------------
+  # Channel (optional)
+  # Connect the agent to a messaging platform.
+  # ----------------------------------------------------------------
+  # - kind: Channel
+  #   name: telegram-support
+  #   spec:
+  #     channelType: telegram
+  #     agentKey: assistant
+  #     credentials:
+  #       token: ${TELEGRAM_BOT_TOKEN}
+  #     config:
+  #       dmPolicy: allow
+
+  # ----------------------------------------------------------------
+  # Cron Job (optional)
+  # Schedule a recurring message to an agent.
+  # ----------------------------------------------------------------
+  # - kind: CronJob
+  #   name: daily-summary
+  #   spec:
+  #     schedule:
+  #       kind: cron
+  #       expr: "0 9 * * *"
+  #       tz: UTC
+  #     message: "Generate a daily status summary."
+  #     agentKey: assistant
+  #     enabled: true
+  #     stateless: true
+
+  # ----------------------------------------------------------------
+  # MCP Server (optional)
+  # Grant tool access to one or more agents.
+  # ----------------------------------------------------------------
+  # - kind: MCPServer
+  #   name: github-mcp
+  #   spec:
+  #     transport: stdio
+  #     command: npx
+  #     args: ["-y", "@modelcontextprotocol/server-github"]
+  #     env:
+  #       GITHUB_TOKEN: ${GITHUB_TOKEN}
+  #     grants:
+  #       agents: [assistant]

@@ -1,0 +1,48 @@
+spec:
+  name: gcplane
+  region: nyc
+
+  services:
+    - name: gcplane
+      image:
+        registry_type: GHCR
+        registry: dataplanelabs
+        repository: gcplane
+        tag: latest
+      run_command: gcplane serve -f /config/manifest.yaml --interval 30s
+      http_port: 8480
+      instance_size_slug: basic-xxs
+      instance_count: 1
+
+      health_check:
+        http_path: /healthz
+        port: 8480
+        initial_delay_seconds: 10
+        period_seconds: 30
+        timeout_seconds: 5
+        failure_threshold: 3
+        success_threshold: 1
+
+      envs:
+        - key: GOCLAW_TOKEN
+          scope: RUN_TIME
+          type: SECRET
+        - key: GCPLANE_LOG_FORMAT
+          scope: RUN_TIME
+          value: json
+
+# -------------------------------------------------------------------
+# IMPORTANT: manifest.yaml is not persisted on DO App Platform.
+# Two options:
+#
+# Option A — Bake manifest.yaml into a custom image:
+#   FROM ghcr.io/dataplanelabs/gcplane:latest
+#   COPY manifest.yaml /config/manifest.yaml
+#
+# Option B — Git source mode (recommended, no image rebuild needed):
+#   Replace run_command above with:
+#     gcplane serve --repo https://github.com/your-org/manifests.git \
+#       --branch main --path gcplane/manifest.yaml --interval 30s
+#   Then add git credentials to envs if the repo is private:
+#     GCPLANE_GIT_TOKEN (SECRET)
+# -------------------------------------------------------------------

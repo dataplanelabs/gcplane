@@ -1,0 +1,39 @@
+[Unit]
+Description=GCPlane GitOps Controller (git source)
+Documentation=https://github.com/dataplanelabs/gcplane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gcplane
+Group=gcplane
+EnvironmentFile=/etc/gcplane/gcplane.env
+
+ExecStart=/usr/local/bin/gcplane serve \
+  --repo ${GCPLANE_GIT_REPO} \
+  --branch ${GCPLANE_GIT_BRANCH:-main} \
+  --path ${GCPLANE_GIT_PATH:-manifest.yaml} \
+  --interval ${GCPLANE_INTERVAL:-30s}
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+# Structured JSON logging for journald
+Environment=GCPLANE_LOG_FORMAT=json
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gcplane
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+
+[Install]
+WantedBy=multi-user.target

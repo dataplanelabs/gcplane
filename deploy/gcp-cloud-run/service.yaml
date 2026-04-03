@@ -1,0 +1,60 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: gcplane
+  annotations:
+    run.googleapis.com/ingress: internal
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+    spec:
+      containers:
+        - image: ghcr.io/dataplanelabs/gcplane:latest
+          args:
+            - serve
+            - -f
+            - /config/manifest.yaml
+            - --interval
+            - 30s
+          ports:
+            - name: h2c
+              containerPort: 8480
+          resources:
+            limits:
+              memory: 128Mi
+              cpu: 250m
+          env:
+            - name: GOCLAW_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: goclaw-token
+                  key: latest
+            # Uncomment provider API keys as needed:
+            # - name: ANTHROPIC_API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: anthropic-api-key
+            #       key: latest
+            # - name: OPENAI_API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: openai-api-key
+            #       key: latest
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8480
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: manifest
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: manifest
+          secret:
+            secretName: gcplane-manifest

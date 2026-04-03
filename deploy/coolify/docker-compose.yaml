@@ -1,0 +1,23 @@
+services:
+  gcplane:
+    image: ghcr.io/dataplanelabs/gcplane:latest
+    command:
+      - serve
+      - -f
+      - /config/manifest.yaml
+      - --interval
+      - "30s"
+    ports:
+      - "8480:8480"
+    volumes:
+      - ./manifest.yaml:/config/manifest.yaml:ro
+    environment:
+      GOCLAW_TOKEN: ${GOCLAW_TOKEN}
+      GCPLANE_LOG_FORMAT: json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8480/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

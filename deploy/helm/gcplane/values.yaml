@@ -1,0 +1,47 @@
+image:
+  repository: ghcr.io/dataplanelabs/gcplane
+  tag: ""  # defaults to Chart.appVersion
+  pullPolicy: IfNotPresent
+
+serve:
+  interval: "30s"
+  prune: false
+  source: file  # file | git
+  git:
+    url: ""
+    branch: main
+    path: manifest.yaml
+  webhookSecret: ""
+
+manifest: ""  # inline manifest YAML (used when source=file)
+manifestConfigMap: ""  # use existing ConfigMap name instead of inline
+
+env: {}
+envFrom: []
+existingSecret: ""  # name of existing Secret for env vars
+
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 50m
+  limits:
+    memory: 128Mi
+    cpu: 200m
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+
+ingress:
+  enabled: false
+  className: ""
+  hosts: []
+  tls: []
+
+tenantsDir: ""  # multi-tenant mode
+
+serviceAccount:
+  create: true
+  name: ""
+
+replicaCount: 1

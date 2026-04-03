@@ -1,0 +1,60 @@
+apiVersion: gcplane.io/v1
+kind: Manifest
+metadata:
+  name: my-deployment
+  environment: prod
+
+# GoClaw connection — endpoint is the URL of your GoClaw instance
+connection:
+  endpoint: https://goclaw.example.com
+  token: ${GOCLAW_TOKEN}
+
+resources:
+  # --- LLM Provider ---
+  # apiKey is write-only: never shown in drift comparisons
+  - kind: Provider
+    name: anthropic
+    spec:
+      displayName: "Anthropic"
+      providerType: anthropic_native
+      apiBase: https://api.anthropic.com
+      apiKey: ${ANTHROPIC_API_KEY}
+      enabled: true
+
+  # --- Agent ---
+  - kind: Agent
+    name: assistant
+    spec:
+      displayName: "Assistant"
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      agentType: predefined
+      status: active
+      toolsConfig:
+        profile: coding
+      contextFiles:
+        - name: IDENTITY.md
+          content: |
+            You are a helpful assistant.
+            Be concise and professional.
+
+  # --- Channel (optional) ---
+  # - kind: Channel
+  #   name: telegram-support
+  #   spec:
+  #     channelType: telegram
+  #     agentKey: assistant
+  #     credentials:
+  #       token: ${TELEGRAM_BOT_TOKEN}
+
+  # --- Cron Job (optional) ---
+  # - kind: CronJob
+  #   name: daily-report
+  #   spec:
+  #     schedule:
+  #       kind: cron
+  #       expr: "0 9 * * *"
+  #       tz: UTC
+  #     message: "Generate daily status report"
+  #     agentKey: assistant
+  #     enabled: true
