@@ -5,6 +5,7 @@ package secrets
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -32,14 +33,19 @@ func ResolveEnvVars(s string) (string, error) {
 }
 
 // ResolveFileRef reads a file:// reference and returns its contents.
+// Rejects paths containing ".." traversal sequences to prevent reading arbitrary files.
 func ResolveFileRef(s string) (string, error) {
-	if !strings.HasPrefix(s, "file://") {
+	path, ok := strings.CutPrefix(s, "file://")
+	if !ok {
 		return s, nil
 	}
-	path := strings.TrimPrefix(s, "file://")
-	data, err := os.ReadFile(path)
+	cleaned := filepath.Clean(path)
+	if strings.Contains(cleaned, "..") {
+		return "", fmt.Errorf("secret file path %q contains path traversal", path)
+	}
+	data, err := os.ReadFile(cleaned)
 	if err != nil {
-		return "", fmt.Errorf("read secret file %s: %w", path, err)
+		return "", fmt.Errorf("read secret file %s: %w", cleaned, err)
 	}
 	return strings.TrimSpace(string(data)), nil
 }
@@ -47,7 +53,7 @@ func ResolveFileRef(s string) (string, error) {
 // Resolve applies all secret resolution strategies to a string value.
 func Resolve(s string) (string, error) {
 	// file:// takes precedence (entire value is a file ref)
-	if strings.HasPrefix(s, "file://") {
+	if _, ok := strings.CutPrefix(s, "file://"); ok {
 		return ResolveFileRef(s)
 	}
 	// env var substitution

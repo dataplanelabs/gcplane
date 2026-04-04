@@ -254,3 +254,77 @@ func TestHandleMetrics(t *testing.T) {
 		t.Fatal("expected non-empty metrics body")
 	}
 }
+
+func TestHandleMetrics_PrometheusFormat(t *testing.T) {
+	s := newTestServer()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	w := httptest.NewRecorder()
+	s.handleMetrics(w, req)
+
+	body := w.Body.String()
+	for _, want := range []string{
+		"gcplane_sync_total",
+		"gcplane_sync_duration_seconds",
+		"gcplane_last_sync_timestamp",
+		"gcplane_drift_detected_total",
+		"gcplane_drift_resources",
+		"# HELP",
+		"# TYPE",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics body missing %q", want)
+		}
+	}
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "text/plain") {
+		t.Errorf("expected text/plain content-type, got %q", ct)
+	}
+}
+
+func TestHandleTenantStatus_NotMultiTenant(t *testing.T) {
+	s := newTestServer() // no tenantManager
+	req := httptest.NewRequest("GET", "/api/v1/status/acme", nil)
+	w := httptest.NewRecorder()
+	s.handleTenantStatus(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "multi-tenant not enabled") {
+		t.Errorf("expected 'multi-tenant not enabled', got %q", w.Body.String())
+	}
+}
+
+func TestHandleTenantSync_NotMultiTenant(t *testing.T) {
+	s := newTestServer() // no tenantManager
+	req := httptest.NewRequest("POST", "/api/v1/sync/acme", nil)
+	w := httptest.NewRecorder()
+	s.handleTenantSync(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "multi-tenant not enabled") {
+		t.Errorf("expected 'multi-tenant not enabled', got %q", w.Body.String())
+	}
+}
+
+func TestWebhook_SecretConfigured_NoHeaders(t *testing.T) {
+	s := newTestServerWithSecret("my-secret")
+	req := httptest.NewRequest("POST", "/api/v1/webhook/git", strings.NewReader("{}"))
+	// No X-Hub-Signature-256 or X-Gitlab-Token header
+	w := httptest.NewRecorder()
+	s.handleWebhook(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when secret configured but no auth headers, got %d", w.Code)
+	}
+}
+
+func TestWebhook_GitLabInvalid(t *testing.T) {
+	s := newTestServerWithSecret("correct-token")
+	req := httptest.NewRequest("POST", "/api/v1/webhook/git", strings.NewReader("{}"))
+	req.Header.Set("X-Gitlab-Token", "wrong-token")
+	w := httptest.NewRecorder()
+	s.handleWebhook(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for wrong GitLab token, got %d", w.Code)
+	}
+}

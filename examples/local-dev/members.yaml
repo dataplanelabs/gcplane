@@ -1,0 +1,18 @@
+# Tenant user access management.
+# Members control who can access this GoClaw tenant and with what role.
+# Roles: owner, admin, operator, member, viewer
+resources:
+  - kind: Member
+    name: admin-user
+    spec:
+      role: admin
+
+  - kind: Member
+    name: dev-user
+    spec:
+      role: operator
+
+  - kind: Member
+    name: viewer-user
+    spec:
+      role: viewer

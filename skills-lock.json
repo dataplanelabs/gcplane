@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "ascii-visualizer": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "872d3359da61e84dffb6f89e48b582c4827b29d07c6b1c1c2df5c23f4ead7a27"
+    },
+    "helm-chart-scaffolding": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "9501756f3224c35d6d0150af6708eb0060e67d852e6dc3fd46a330c570982365"
+    }
+  }
+}

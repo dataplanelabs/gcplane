@@ -1,11 +1,24 @@
 package display
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 )
+
+// captureOutput redirects display output to a buffer and returns the captured string.
+func captureOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf bytes.Buffer
+	old := output
+	output = &buf
+	defer func() { output = old }()
+	fn()
+	return buf.String()
+}
 
 // TestPrintPlan_NoPanic verifies that PrintPlan does not panic for a mixed plan
 // containing create and noop actions, both in verbose and non-verbose modes.
@@ -114,4 +127,141 @@ func TestPrintApplyResult_NoPanic(t *testing.T) {
 		Failed:  2,
 		Errors:  []string{"failed to create agent", "network timeout"},
 	})
+}
+
+// --- Content validation tests ---
+
+func TestPrintCreate_Output(t *testing.T) {
+	t.Parallel()
+	out := captureOutput(t, func() {
+		printCreate(reconciler.Change{Kind: manifest.KindAgent, Name: "my-bot", Action: reconciler.ActionCreate})
+	})
+	if !strings.Contains(out, "+ Agent/my-bot") {
+		t.Errorf("expected '+ Agent/my-bot', got %q", out)
+	}
+}
+
+func TestPrintUpdate_Output(t *testing.T) {
+	t.Parallel()
+	out := captureOutput(t, func() {
+		printUpdate(reconciler.Change{
+			Kind: manifest.KindProvider, Name: "anthropic", Action: reconciler.ActionUpdate,
+			Diff: map[string]reconciler.FieldDiff{
+				"model": {Old: "gpt-3.5", New: "gpt-4"},
+			},
+		})
+	})
+	if !strings.Contains(out, "~ Provider/anthropic") {
+		t.Errorf("expected '~ Provider/anthropic', got %q", out)
+	}
+	if !strings.Contains(out, "model:") {
+		t.Errorf("expected diff key 'model:', got %q", out)
+	}
+}
+
+func TestPrintUpdate_Forced(t *testing.T) {
+	t.Parallel()
+	out := captureOutput(t, func() {
+		printUpdate(reconciler.Change{
+			Kind: manifest.KindAgent, Name: "bot", Action: reconciler.ActionUpdate, Forced: true,
+		})
+	})
+	if !strings.Contains(out, "(force)") {
+		t.Errorf("expected '(force)' in forced update, got %q", out)
+	}
+}
+
+func TestPrintDelete_Output(t *testing.T) {
+	t.Parallel()
+	out := captureOutput(t, func() {
+		printDelete(reconciler.Change{Kind: manifest.KindChannel, Name: "slack", Action: reconciler.ActionDelete})
+	})
+	if !strings.Contains(out, "- Channel/slack") {
+		t.Errorf("expected '- Channel/slack', got %q", out)
+	}
+}
+
+func TestPrintNoop_InSync(t *testing.T) {
+	t.Parallel()
+	out := captureOutput(t, func() {
+		printNoop(reconciler.Change{Kind: manifest.KindAgent, Name: "bot", Action: reconciler.ActionNoop})
+	})
+	if !strings.Contains(out, "= Agent/bot") {
+		t.Errorf("expected '= Agent/bot', got %q", out)
+	}
+	if !strings.Contains(out, "no changes") {
+		t.Errorf("expected 'no changes', got %q", out)
+	}
+}
+
+func TestPrintNoop_WithError(t *testing.T) {
+	t.Parallel()
+	out := captureOutput(t, func() {
+		printNoop(reconciler.Change{Kind: manifest.KindAgent, Name: "bot", Action: reconciler.ActionNoop, Error: "timeout"})
+	})
+	if !strings.Contains(out, "! Agent/bot") {
+		t.Errorf("expected '! Agent/bot', got %q", out)
+	}
+	if !strings.Contains(out, "skipped: timeout") {
+		t.Errorf("expected 'skipped: timeout', got %q", out)
+	}
+}
+
+func TestPrintPlan_SummaryLine(t *testing.T) {
+	t.Parallel()
+	plan := &reconciler.Plan{
+		Changes: []reconciler.Change{
+			{Kind: manifest.KindProvider, Name: "a", Action: reconciler.ActionCreate},
+			{Kind: manifest.KindAgent, Name: "b", Action: reconciler.ActionUpdate, Diff: map[string]reconciler.FieldDiff{"x": {}}},
+			{Kind: manifest.KindChannel, Name: "c", Action: reconciler.ActionDelete},
+		},
+		Creates: 1, Updates: 1, Deletes: 1,
+	}
+	out := captureOutput(t, func() { PrintPlan(plan, false) })
+	if !strings.Contains(out, "1 to create") || !strings.Contains(out, "1 to update") || !strings.Contains(out, "1 to delete") {
+		t.Errorf("summary line missing counts, got %q", out)
+	}
+}
+
+func TestPrintDiff_NoChange(t *testing.T) {
+	t.Parallel()
+	plan := &reconciler.Plan{
+		Changes: []reconciler.Change{
+			{Kind: manifest.KindProvider, Name: "ok", Action: reconciler.ActionNoop},
+		},
+		Noops: 1,
+	}
+	out := captureOutput(t, func() { PrintDiff(plan) })
+	if !strings.Contains(out, "No drift detected") {
+		t.Errorf("expected 'No drift detected', got %q", out)
+	}
+}
+
+func TestFormatVal(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		input any
+		want  string
+	}{
+		{nil, "(none)"},
+		{"hello", "hello"},
+		{strings.Repeat("x", 100), strings.Repeat("x", 77) + "..."},
+	}
+	for _, c := range cases {
+		got := formatVal(c.input)
+		if got != c.want {
+			t.Errorf("formatVal(%v) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}
+
+func TestSortedKeys(t *testing.T) {
+	t.Parallel()
+	m := map[string]reconciler.FieldDiff{
+		"z": {}, "a": {}, "m": {},
+	}
+	keys := sortedKeys(m)
+	if len(keys) != 3 || keys[0] != "a" || keys[1] != "m" || keys[2] != "z" {
+		t.Errorf("expected [a m z], got %v", keys)
+	}
 }

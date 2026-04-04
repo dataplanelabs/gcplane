@@ -286,3 +286,109 @@ func TestGitSource_Fetch_SubdirectoryPath(t *testing.T) {
 		t.Error("expected non-empty hash")
 	}
 }
+
+func TestGitSource_Fetch_BadBranch(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	repoURL := initBareRepo(t, validManifestYAML)
+	gs, err := NewGitSource(repoURL, "nonexistent-branch", "manifest.yaml", slog.Default())
+	if err != nil {
+		t.Fatalf("NewGitSource: %v", err)
+	}
+	defer gs.Cleanup()
+
+	_, _, err = gs.Fetch()
+	if err == nil {
+		t.Error("expected error for nonexistent branch")
+	}
+	if !strings.Contains(err.Error(), "git clone") {
+		t.Errorf("expected clone error, got: %v", err)
+	}
+}
+
+func TestGitSource_Fetch_InvalidManifestYAML(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	repoURL := initBareRepo(t, "not: [valid: yaml: {{")
+	gs, err := NewGitSource(repoURL, "main", "manifest.yaml", slog.Default())
+	if err != nil {
+		t.Fatalf("NewGitSource: %v", err)
+	}
+	defer gs.Cleanup()
+
+	_, _, err = gs.Fetch()
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+	if !strings.Contains(err.Error(), "load manifest") {
+		t.Errorf("expected load manifest error, got: %v", err)
+	}
+}
+
+func TestGitSource_Fetch_ValidationFailure(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	// Valid YAML but invalid manifest (bad apiVersion)
+	badManifest := `apiVersion: bad/v99
+kind: Manifest
+metadata:
+  name: test
+connection:
+  endpoint: http://localhost
+  token: tok
+resources: []
+`
+	repoURL := initBareRepo(t, badManifest)
+	gs, err := NewGitSource(repoURL, "main", "manifest.yaml", slog.Default())
+	if err != nil {
+		t.Fatalf("NewGitSource: %v", err)
+	}
+	defer gs.Cleanup()
+
+	_, _, err = gs.Fetch()
+	if err == nil {
+		t.Error("expected error for invalid manifest")
+	}
+	if !strings.Contains(err.Error(), "validate manifest") {
+		t.Errorf("expected validate manifest error, got: %v", err)
+	}
+}
+
+func TestGitSource_Fetch_FetchFailure(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+
+	repoURL := initBareRepo(t, validManifestYAML)
+	gs, err := NewGitSource(repoURL, "main", "manifest.yaml", slog.Default())
+	if err != nil {
+		t.Fatalf("NewGitSource: %v", err)
+	}
+	defer gs.Cleanup()
+
+	// First fetch succeeds (clone)
+	if _, _, err := gs.Fetch(); err != nil {
+		t.Fatalf("first Fetch: %v", err)
+	}
+
+	// Remove the bare repo to break fetch
+	bareDir := strings.TrimPrefix(repoURL, "file://")
+	if err := os.RemoveAll(bareDir); err != nil {
+		t.Fatalf("remove bare repo: %v", err)
+	}
+
+	// Second fetch should fail
+	_, _, err = gs.Fetch()
+	if err == nil {
+		t.Error("expected error when remote is gone")
+	}
+	if !strings.Contains(err.Error(), "git fetch") {
+		t.Errorf("expected git fetch error, got: %v", err)
+	}
+}

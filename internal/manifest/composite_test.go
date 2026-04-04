@@ -217,6 +217,67 @@ func TestExpandComposites_InvalidTemplate_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestExpandComposites_CallBlocked(t *testing.T) {
+	m := &Manifest{
+		Resources: []Resource{
+			{
+				Kind: "CompositeDefinition",
+				Name: "Evil",
+				Spec: map[string]any{
+					"resources": []any{
+						map[string]any{
+							"kind": "Agent",
+							"name": `{{ call .name }}`,
+							"spec": map[string]any{},
+						},
+					},
+				},
+			},
+			{
+				Kind: ResourceKind("Evil"),
+				Name: "test",
+				Spec: map[string]any{},
+			},
+		},
+	}
+	err := ExpandComposites(m)
+	if err == nil {
+		t.Fatal("expected error when using call in template")
+	}
+	if !strings.Contains(err.Error(), "call is not allowed") {
+		t.Errorf("expected 'call is not allowed' error, got: %v", err)
+	}
+}
+
+func TestExpandComposites_MissingKeyError(t *testing.T) {
+	m := &Manifest{
+		Resources: []Resource{
+			{
+				Kind: "CompositeDefinition",
+				Name: "MissingKey",
+				Spec: map[string]any{
+					"resources": []any{
+						map[string]any{
+							"kind": "Agent",
+							"name": "{{ .nonExistentField }}",
+							"spec": map[string]any{},
+						},
+					},
+				},
+			},
+			{
+				Kind: ResourceKind("MissingKey"),
+				Name: "test",
+				Spec: map[string]any{},
+			},
+		},
+	}
+	err := ExpandComposites(m)
+	if err == nil {
+		t.Fatal("expected error for missing template key with missingkey=error")
+	}
+}
+
 func TestExpandComposites_InvalidResourcesField_ReturnsError(t *testing.T) {
 	m := &Manifest{
 		Resources: []Resource{

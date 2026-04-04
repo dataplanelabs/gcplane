@@ -148,6 +148,115 @@ func TestBuildPayload_AllFormatsIncludeResourceNames(t *testing.T) {
 	}
 }
 
+// --- Structure validation tests ---
+
+func toMap(t *testing.T, v any) map[string]any {
+	t.Helper()
+	b, _ := json.Marshal(v)
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	return m
+}
+
+func TestSlackPayload_Structure(t *testing.T) {
+	t.Parallel()
+	m := toMap(t, buildSlackPayload(testChanges))
+	blocks, ok := m["blocks"].([]any)
+	if !ok || len(blocks) < 2 {
+		t.Fatalf("expected at least 2 blocks, got %v", m["blocks"])
+	}
+	header := blocks[0].(map[string]any)
+	if header["type"] != "header" {
+		t.Errorf("first block type = %v, want header", header["type"])
+	}
+	section := blocks[1].(map[string]any)
+	if section["type"] != "section" {
+		t.Errorf("second block type = %v, want section", section["type"])
+	}
+	text := section["text"].(map[string]any)
+	if text["type"] != "mrkdwn" {
+		t.Errorf("section text type = %v, want mrkdwn", text["type"])
+	}
+	// Slack uses *bold* not **bold**
+	body := text["text"].(string)
+	if strings.Contains(body, "**") {
+		t.Error("slack should use *bold* not **bold**")
+	}
+}
+
+func TestDiscordPayload_Structure(t *testing.T) {
+	t.Parallel()
+	m := toMap(t, buildDiscordPayload(testChanges))
+	embeds, ok := m["embeds"].([]any)
+	if !ok || len(embeds) < 1 {
+		t.Fatalf("expected embeds array, got %v", m["embeds"])
+	}
+	embed := embeds[0].(map[string]any)
+	if embed["title"] == nil || embed["title"] == "" {
+		t.Error("embed title should be present")
+	}
+	if embed["color"] != float64(16750848) {
+		t.Errorf("embed color = %v, want 16750848", embed["color"])
+	}
+	if embed["description"] == nil || embed["description"] == "" {
+		t.Error("embed description should be non-empty")
+	}
+}
+
+func TestGoogleChatPayload_Structure(t *testing.T) {
+	t.Parallel()
+	m := toMap(t, buildGoogleChatPayload(testChanges))
+	cards, ok := m["cardsV2"].([]any)
+	if !ok || len(cards) < 1 {
+		t.Fatalf("expected cardsV2 array, got %v", m["cardsV2"])
+	}
+	card := cards[0].(map[string]any)["card"].(map[string]any)
+	header := card["header"].(map[string]any)
+	if header["title"] == nil || header["title"] == "" {
+		t.Error("card header title should be present")
+	}
+	sections := card["sections"].([]any)
+	if len(sections) < 1 {
+		t.Fatal("expected at least 1 section")
+	}
+}
+
+func TestTeamsPayload_Structure(t *testing.T) {
+	t.Parallel()
+	m := toMap(t, buildTeamsPayload(testChanges))
+	if m["@type"] != "MessageCard" {
+		t.Errorf("@type = %v, want MessageCard", m["@type"])
+	}
+	if m["themeColor"] != "FF8C00" {
+		t.Errorf("themeColor = %v, want FF8C00", m["themeColor"])
+	}
+	sections, ok := m["sections"].([]any)
+	if !ok || len(sections) < 1 {
+		t.Fatalf("expected sections array, got %v", m["sections"])
+	}
+	sec := sections[0].(map[string]any)
+	if sec["text"] == nil || sec["text"] == "" {
+		t.Error("section text should be non-empty")
+	}
+}
+
+func TestTelegramPayload_Structure(t *testing.T) {
+	t.Parallel()
+	m := toMap(t, buildTelegramPayload(testChanges))
+	if m["parse_mode"] != "Markdown" {
+		t.Errorf("parse_mode = %v, want Markdown", m["parse_mode"])
+	}
+	text, ok := m["text"].(string)
+	if !ok || text == "" {
+		t.Fatal("text should be non-empty string")
+	}
+	if !strings.HasPrefix(text, "*") {
+		t.Errorf("telegram text should start with * (Markdown bold), got %q", text[:20])
+	}
+}
+
 func TestWebhookNotifier_SendsFormatPayload(t *testing.T) {
 	var received map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

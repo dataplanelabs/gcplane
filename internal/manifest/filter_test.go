@@ -47,6 +47,9 @@ func TestParseLabelSelector(t *testing.T) {
 		{"team=data", map[string]string{"team": "data"}},
 		{"team=data,role=engineer", map[string]string{"team": "data", "role": "engineer"}},
 		{"team = data", map[string]string{"team": "data"}},
+		{"key-without-equals", map[string]string{}},                    // no = → skipped
+		{"key=", map[string]string{"key": ""}},                         // empty value
+		{"a=1,no-equals,b=2", map[string]string{"a": "1", "b": "2"}},  // mixed
 	}
 
 	for _, c := range cases {

@@ -22,8 +22,19 @@ func Load(path string) (*Manifest, error) {
 	return loadFile(path)
 }
 
+// maxManifestFileSize is the maximum allowed manifest file size (10 MB).
+const maxManifestFileSize = 10 << 20
+
 // loadFile parses a single YAML manifest file.
 func loadFile(path string) (*Manifest, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", path, err)
+	}
+	if info.Size() > maxManifestFileSize {
+		return nil, fmt.Errorf("manifest file %s is %d bytes, exceeds %d byte limit", path, info.Size(), maxManifestFileSize)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)

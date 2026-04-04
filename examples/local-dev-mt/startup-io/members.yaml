@@ -1,0 +1,12 @@
+# Startup.io tenant members — small team, flat structure.
+# Roles: owner, admin, operator, member, viewer
+resources:
+  - kind: Member
+    name: founder
+    spec:
+      role: owner
+
+  - kind: Member
+    name: cto
+    spec:
+      role: admin

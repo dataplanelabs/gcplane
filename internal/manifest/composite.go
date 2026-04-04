@@ -150,9 +150,16 @@ func expandResource(tmpl Resource, ctx map[string]any) (Resource, error) {
 	return Resource{Kind: tmpl.Kind, Name: name, Spec: spec}, nil
 }
 
-// renderTemplate applies Go text/template substitution.
+// safeFuncs overrides the dangerous "call" builtin to prevent template injection.
+var safeFuncs = template.FuncMap{
+	"call": func(args ...any) (any, error) {
+		return nil, fmt.Errorf("call is not allowed in composite templates")
+	},
+}
+
+// renderTemplate applies Go text/template substitution with restricted functions.
 func renderTemplate(text string, ctx map[string]any) (string, error) {
-	t, err := template.New("").Parse(text)
+	t, err := template.New("").Option("missingkey=error").Funcs(safeFuncs).Parse(text)
 	if err != nil {
 		return "", err
 	}

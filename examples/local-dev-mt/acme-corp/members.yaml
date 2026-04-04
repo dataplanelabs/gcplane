@@ -1,0 +1,17 @@
+# Acme Corp tenant members — who has access and with what role.
+# Roles: owner, admin, operator, member, viewer
+resources:
+  - kind: Member
+    name: acme-admin
+    spec:
+      role: admin
+
+  - kind: Member
+    name: acme-dev
+    spec:
+      role: operator
+
+  - kind: Member
+    name: acme-viewer
+    spec:
+      role: viewer
