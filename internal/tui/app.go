@@ -227,13 +227,18 @@ func (a *App) Run() error {
 func (a *App) tabRefreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(150 * time.Millisecond)
 	defer ticker.Stop()
+	var tickCount int
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Traces: always refresh in background (data stays fresh across tabs)
+			tickCount++
+			// Traces: poll every ~3s (20 ticks) for live updates
+			if tickCount%20 == 0 {
+				a.traceStore.NotifyTraceUpdated()
+			}
 			a.refreshTraces()
 
 			if !a.liveStore.IsDirty() {
@@ -544,9 +549,11 @@ func (a *App) refreshTraces() {
 
 	fetcher, ok := a.Provider.(TraceFetcher)
 	if !ok {
-		a.tapp.QueueUpdateDraw(func() {
-			a.tracesPanel.RefreshUnavailable("Traces not available (provider does not support trace API)")
-		})
+		if a.registry.ActiveTab() == TabTraces {
+			a.tapp.QueueUpdateDraw(func() {
+				a.tracesPanel.RefreshUnavailable("Traces not available (provider does not support trace API)")
+			})
+		}
 		return
 	}
 
