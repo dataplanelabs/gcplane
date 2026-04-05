@@ -87,9 +87,9 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		}
 	}
 
-	// Ctrl+R: apply (reconcile)
+	// Ctrl+R: refresh
 	if event.Key() == tcell.KeyCtrlR {
-		h.app.applyAll()
+		h.app.triggerRefresh()
 		return nil
 	}
 
