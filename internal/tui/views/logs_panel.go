@@ -35,9 +35,10 @@ type LogsPanel struct {
 	flex      *tview.Flex
 	Table     *tview.Table
 	statusBar *tview.TextView
-	OnCopy    func(text string) // called when y is pressed on a row
+	OnCopy    func(text string)
 	paused    bool
 	levelMin  string     // minimum level to show
+	msgFilter string     // search filter on message text
 	entries   []LogEntry // current visible entries backing the table
 }
 
@@ -90,6 +91,10 @@ func (p *LogsPanel) Refresh(entries []LogEntry) {
 
 	for _, e := range entries {
 		if logLevelRank[e.Level] < minRank {
+			continue
+		}
+		if p.msgFilter != "" && !strings.Contains(
+			strings.ToLower(e.Message+" "+e.Source), p.msgFilter) {
 			continue
 		}
 		p.entries = append(p.entries, e)
@@ -204,34 +209,27 @@ func (p *LogsPanel) SelectedEntry() string {
 // SetLevelMin sets the minimum log level filter.
 func (p *LogsPanel) SetLevelMin(level string) { p.levelMin = level }
 
+// SetFilter sets a message search filter (case-insensitive).
+func (p *LogsPanel) SetFilter(f string) { p.msgFilter = strings.ToLower(f) }
+
 // TogglePause toggles the pause state.
 func (p *LogsPanel) TogglePause() {
 	p.paused = !p.paused
 }
 
-// handleInput processes vim keybindings on the logs table.
-func (p *LogsPanel) handleInput(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Rune() {
-	case 'j':
-		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
-	case 'k':
-		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
-	case 'g':
-		p.Table.Select(1, 0)
-		return nil
-	case 'G':
-		if rowCount := p.Table.GetRowCount(); rowCount > 1 {
-			p.Table.Select(rowCount-1, 0)
-		}
-		return nil
-	case 'y':
-		if text := p.SelectedEntry(); text != "" && p.OnCopy != nil {
-			p.OnCopy(text)
-		}
-		return nil
-	}
+// GoToTop selects the first log row.
+func (p *LogsPanel) GoToTop() { p.Table.Select(1, 0) }
 
-	// Ctrl+D: half-page down
+// GoToBottom selects the last log row.
+func (p *LogsPanel) GoToBottom() {
+	if rc := p.Table.GetRowCount(); rc > 1 {
+		p.Table.Select(rc-1, 0)
+	}
+}
+
+// handleInput processes Ctrl+D/Ctrl+U for half-page scroll.
+// j/k/gg/G/yy are handled by the global KeyHandler.
+func (p *LogsPanel) handleInput(event *tcell.EventKey) *tcell.EventKey {
 	if event.Key() == tcell.KeyCtrlD {
 		row, col := p.Table.GetSelection()
 		_, _, _, height := p.Table.GetInnerRect()
@@ -242,7 +240,6 @@ func (p *LogsPanel) handleInput(event *tcell.EventKey) *tcell.EventKey {
 		p.Table.Select(newRow, col)
 		return nil
 	}
-	// Ctrl+U: half-page up
 	if event.Key() == tcell.KeyCtrlU {
 		row, col := p.Table.GetSelection()
 		_, _, _, height := p.Table.GetInnerRect()
@@ -253,7 +250,6 @@ func (p *LogsPanel) handleInput(event *tcell.EventKey) *tcell.EventKey {
 		p.Table.Select(newRow, col)
 		return nil
 	}
-
 	return event
 }
 

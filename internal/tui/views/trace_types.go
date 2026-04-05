@@ -3,6 +3,8 @@ package views
 import (
 	"sort"
 	"time"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 // TraceData represents an LLM agent trace from GoClaw /v1/traces API.
@@ -114,5 +116,33 @@ func sortSpanNodes(nodes []*SpanNode) {
 		if len(n.Children) > 1 {
 			sortSpanNodes(n.Children)
 		}
+	}
+}
+
+// spanStatusIcon returns a Unicode icon for span status.
+func spanStatusIcon(status string) string {
+	switch status {
+	case "ok", "success", "completed":
+		return "\u25cf" // ●
+	case "error", "failed":
+		return "\u2717" // ✗
+	case "running", "pending":
+		return "\u25d0" // ◐
+	default:
+		return "\u25cb" // ○
+	}
+}
+
+// spanTypeColor returns the Catppuccin color for a span type.
+func spanTypeColor(spanType string) tcell.Color {
+	switch spanType {
+	case "agent":
+		return ColorMauve
+	case "llm_call":
+		return ColorBlue
+	case "tool_call":
+		return ColorTeal
+	default:
+		return ColorOverlay0
 	}
 }

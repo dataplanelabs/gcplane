@@ -1,33 +1,29 @@
 package views
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/rivo/tview"
 )
 
-// SpanDetail displays detailed information about a single span as an overlay.
+// SpanDetail displays detailed information about a single span.
 type SpanDetail struct {
 	TextView *tview.TextView
 	lastSpan *SpanData // for copy support
 }
 
-// NewSpanDetail creates a span detail overlay view.
+// NewSpanDetail creates a span detail view.
 func NewSpanDetail() *SpanDetail {
 	tv := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true).
 		SetWordWrap(true)
 	tv.SetBackgroundColor(ColorBase)
-	tv.SetBorder(true).
-		SetBorderColor(ColorOverlay0).
-		SetTitle(" Span Detail ").
-		SetTitleColor(ColorMauve)
-
-	sd := &SpanDetail{TextView: tv}
 	tv.SetInputCapture(VimScrollInput(tv))
-	return sd
+
+	return &SpanDetail{TextView: tv}
 }
 
 // Name implements View.
@@ -39,28 +35,28 @@ func (sd *SpanDetail) Primitive() tview.Primitive { return sd.TextView }
 // Activate implements View.
 func (sd *SpanDetail) Activate() {}
 
-// Show renders span detail content.
+// Show renders span detail content with JSON-formatted previews.
 func (sd *SpanDetail) Show(s SpanData) {
 	sd.lastSpan = &s
 	var b strings.Builder
 
 	// Header
+	typeHex := spanTypeHex(s.SpanType)
 	b.WriteString(fmt.Sprintf("\n %s %s",
 		BoldTag(HexMauve, "Span:"),
-		Tag(spanTypeHex(s.SpanType), s.SpanType)))
+		Tag(typeHex, s.SpanType)))
 	if s.Name != "" {
 		b.WriteString(" — " + Tag(HexText, s.Name))
 	}
 	b.WriteString("\n")
 
-	// Status line
+	// Status + Duration
 	icon := spanStatusIcon(s.Status)
-	b.WriteString(fmt.Sprintf(" %s %s %s  %s %s",
+	b.WriteString(fmt.Sprintf(" %s %s  %s %s",
 		Tag(HexOverlay0, "Status:"), icon+" "+s.Status,
-		Tag(HexOverlay0, "|"),
 		Tag(HexOverlay0, "Duration:"), formatTraceDuration(s.DurationMs)))
 	if s.Provider != "" {
-		b.WriteString(fmt.Sprintf("  %s %s", Tag(HexOverlay0, "| Provider:"), s.Provider))
+		b.WriteString(fmt.Sprintf("  %s %s", Tag(HexOverlay0, "Provider:"), s.Provider))
 	}
 	b.WriteString("\n")
 
@@ -69,47 +65,50 @@ func (sd *SpanDetail) Show(s SpanData) {
 		b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "Model:"), Tag(HexBlue, s.Model)))
 	}
 
+	// Tool
+	if s.ToolName != "" {
+		b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "Tool:"), Tag(HexTeal, s.ToolName)))
+	}
+
 	// Tokens
 	if s.InputTokens > 0 || s.OutputTokens > 0 {
 		b.WriteString(fmt.Sprintf(" %s %s in / %s out",
 			Tag(HexOverlay0, "Tokens:"),
-			Tag(HexText, formatNumber(s.InputTokens)),
-			Tag(HexText, formatNumber(s.OutputTokens))))
+			formatNumber(s.InputTokens),
+			formatNumber(s.OutputTokens)))
 		if s.Metadata != nil {
 			if s.Metadata.CacheReadTokens > 0 {
 				b.WriteString(fmt.Sprintf("  %s %s",
-					Tag(HexGreen, "cache read:"), formatNumber(s.Metadata.CacheReadTokens)))
+					Tag(HexGreen, "cache-r:"), formatNumber(s.Metadata.CacheReadTokens)))
 			}
 			if s.Metadata.CacheCreationTokens > 0 {
 				b.WriteString(fmt.Sprintf("  %s %s",
-					Tag(HexYellow, "cache write:"), formatNumber(s.Metadata.CacheCreationTokens)))
+					Tag(HexYellow, "cache-w:"), formatNumber(s.Metadata.CacheCreationTokens)))
 			}
 			if s.Metadata.ThinkingTokens > 0 {
 				b.WriteString(fmt.Sprintf("  %s %s",
-					Tag(HexPeach, "thinking:"), formatNumber(s.Metadata.ThinkingTokens)))
+					Tag(HexPeach, "think:"), formatNumber(s.Metadata.ThinkingTokens)))
 			}
 		}
 		b.WriteString("\n")
 	}
 
-	// Tool info
-	if s.ToolName != "" {
-		b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "Tool:"), Tag(HexTeal, s.ToolName)))
-	}
+	// ID
+	b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "ID:"), Tag(HexOverlay0, s.ID)))
 
 	b.WriteString("\n")
 
 	// Input preview
 	if s.InputPreview != "" {
-		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexOverlay0, "Input Preview:")))
-		b.WriteString(formatPreviewBlock(s.InputPreview))
+		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexOverlay0, "Input:")))
+		b.WriteString(formatPreview(s.InputPreview))
 		b.WriteString("\n")
 	}
 
 	// Output preview
 	if s.OutputPreview != "" {
-		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexOverlay0, "Output Preview:")))
-		b.WriteString(formatPreviewBlock(s.OutputPreview))
+		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexOverlay0, "Output:")))
+		b.WriteString(formatPreview(s.OutputPreview))
 		b.WriteString("\n")
 	}
 
@@ -123,7 +122,34 @@ func (sd *SpanDetail) Show(s SpanData) {
 	sd.TextView.ScrollToBeginning()
 }
 
-// spanTypeHex returns hex color for span type (for tview tags).
+// formatPreview tries to pretty-print JSON, falls back to indented text.
+func formatPreview(text string) string {
+	// Try JSON pretty-print
+	text = strings.TrimSpace(text)
+	if (strings.HasPrefix(text, "{") || strings.HasPrefix(text, "[")) {
+		var parsed any
+		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+			pretty, err := json.MarshalIndent(parsed, "   ", "  ")
+			if err == nil {
+				return indentBlock(string(pretty), HexSubtext0)
+			}
+		}
+	}
+	// Plain text fallback
+	return indentBlock(text, HexSubtext0)
+}
+
+// indentBlock wraps each line with indentation and color.
+func indentBlock(text string, hex string) string {
+	lines := strings.Split(text, "\n")
+	var b strings.Builder
+	for _, line := range lines {
+		b.WriteString("   " + Tag(hex, line) + "\n")
+	}
+	return b.String()
+}
+
+// spanTypeHex returns hex color for span type.
 func spanTypeHex(spanType string) string {
 	switch spanType {
 	case "agent":
@@ -135,16 +161,6 @@ func spanTypeHex(spanType string) string {
 	default:
 		return HexOverlay0
 	}
-}
-
-// formatPreviewBlock wraps preview text with indentation.
-func formatPreviewBlock(text string) string {
-	lines := strings.Split(text, "\n")
-	var b strings.Builder
-	for _, line := range lines {
-		b.WriteString("   " + Tag(HexSubtext0, line) + "\n")
-	}
-	return b.String()
 }
 
 // formatNumber formats an integer with comma separators.
@@ -161,4 +177,15 @@ func formatNumber(n int) string {
 		result = append(result, byte(c))
 	}
 	return string(result)
+}
+
+// formatSpanCopyText returns a clipboard-friendly text for a span.
+func formatSpanCopyText(s SpanData) string {
+	name := s.Name
+	if s.SpanType == "llm_call" && s.Model != "" {
+		name = s.Model
+	} else if s.SpanType == "tool_call" && s.ToolName != "" {
+		name = s.ToolName
+	}
+	return fmt.Sprintf("%s: %s (%s) %s", s.SpanType, name, formatTraceDuration(s.DurationMs), s.ID)
 }

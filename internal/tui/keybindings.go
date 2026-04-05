@@ -12,12 +12,10 @@ type InputMode int
 const (
 	ModeNormal  InputMode = iota // vim normal mode
 	ModeCommand                  // : command input mode
-	ModeSearch                   // / search filter mode (P1)
+	ModeSearch                   // / search filter mode
 )
 
 // kindByNumber maps number keys to resource kinds following ApplyOrder.
-// 0=All, 1=Provider, 2=Agent, 3=Channel, 4=MCPServer, 5=Skill,
-// 6=CronJob, 7=AgentTeam, 8=SystemConfig, 9=SecureCLI
 var kindByNumber = map[rune]manifest.ResourceKind{
 	'1': manifest.KindProvider,
 	'2': manifest.KindAgent,
@@ -32,8 +30,9 @@ var kindByNumber = map[rune]manifest.ResourceKind{
 
 // KeyHandler dispatches key events based on the current input mode.
 type KeyHandler struct {
-	app  *App
-	mode InputMode
+	app     *App
+	mode    InputMode
+	pending rune // for multi-key sequences: gg, yy
 }
 
 // NewKeyHandler creates a key handler bound to the given app.
@@ -48,13 +47,23 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
-	// Escape is the universal "get out" key
+	// Escape — universal "go back"
 	if event.Key() == tcell.KeyEscape {
+		h.pending = 0
 		if h.mode != ModeNormal {
 			h.mode = ModeNormal
-			h.app.model.SetFilter("")
+			h.app.clearSearch()
 			h.app.deactivateCommandBar()
-			h.app.refreshTable()
+			return nil
+		}
+		// On Traces tab: drill back to root
+		if h.app.registry.ActiveTab() == TabTraces && h.app.tracesPanel.Level > 0 {
+			h.app.tracesPanel.DrillRoot(h.app.tapp)
+			return nil
+		}
+		// Pop overlay or clear filter
+		if h.app.registry.HasOverlay() {
+			h.app.popView()
 			return nil
 		}
 		if h.app.model.GetFilter() != "" {
@@ -62,22 +71,15 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 			h.app.refreshTable()
 			return nil
 		}
-		h.app.popView()
 		return nil
 	}
 
-	// In command/search mode, let the InputField handle all other keys
+	// In command/search mode, let the InputField handle keys
 	if h.mode == ModeCommand || h.mode == ModeSearch {
 		return event
 	}
 
-	// Tab key on Traces tab toggles list/tree focus
-	if event.Key() == tcell.KeyTab && h.app.registry.ActiveTab() == TabTraces {
-		h.app.tracesPanel.ToggleFocus(h.app.tapp)
-		return nil
-	}
-
-	// Ctrl+E: edit selected resource — only on State tab, no overlay
+	// Ctrl+E: edit selected resource — State tab only
 	if event.Key() == tcell.KeyCtrlE {
 		if h.app.registry.ActiveTab() == TabState && !h.app.registry.HasOverlay() {
 			h.app.editResource()
@@ -91,12 +93,27 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
-	// Ctrl+D: delete selected resource — only on State tab, no overlay
+	// Ctrl+D: delete on State tab, half-page down elsewhere
 	if event.Key() == tcell.KeyCtrlD {
 		if h.app.registry.ActiveTab() == TabState && !h.app.registry.HasOverlay() {
 			h.app.deleteResource()
 			return nil
 		}
+		return event // pass to component for half-page scroll
+	}
+
+	// Ctrl+U: half-page up — pass to component
+	if event.Key() == tcell.KeyCtrlU {
+		return event
+	}
+
+	// Enter — drill in on Traces tab
+	if event.Key() == tcell.KeyEnter {
+		if h.app.registry.ActiveTab() == TabTraces && !h.app.registry.HasOverlay() {
+			h.handleDrillIn()
+			return nil
+		}
+		return event // let table/other handle Enter normally
 	}
 
 	return h.handleNormal(event)
@@ -104,16 +121,31 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 
 // handleNormal processes key events in normal (vim) mode.
 func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
-	// Tab switching — only when no overlay is active
+	// Multi-key sequences (gg, yy)
+	if h.pending != 0 {
+		prev := h.pending
+		h.pending = 0
+		if prev == 'g' && event.Rune() == 'g' {
+			h.goToTop()
+			return nil
+		}
+		if prev == 'y' && event.Rune() == 'y' {
+			h.copySelected()
+			return nil
+		}
+		// Not a valid sequence — process current key as new input
+	}
+
+	// Tab switching — uppercase S/T/L, only when no overlay
 	if !h.app.registry.HasOverlay() {
 		switch event.Rune() {
-		case 's':
+		case 'S':
 			h.app.switchTab(TabState)
 			return nil
-		case 't':
+		case 'T':
 			h.app.switchTab(TabTraces)
 			return nil
-		case 'l':
+		case 'L':
 			h.app.switchTab(TabLogs)
 			return nil
 		}
@@ -137,49 +169,117 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 	case 'r':
 		h.app.triggerRefresh()
 		return nil
-	case ' ':
-		// On Traces tab, pass Space to focused component (tree expand/collapse)
-		if h.app.registry.ActiveTab() == TabTraces {
-			return event
-		}
-		h.handlePauseResume()
+
+	// Vim motions — handled globally
+	case 'G':
+		h.goToBottom()
 		return nil
-	case 'c':
-		h.handleClearFilters()
+	case 'g':
+		h.pending = 'g'
 		return nil
 	case 'y':
-		// Pass y to focused component for copy (Traces + Logs tabs)
-		return event
-	case 'o', 'O':
-		// On Traces tab, pass o/O to focused component (expand/collapse)
+		h.pending = 'y'
+		return nil
+	case 'j':
+		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
+	case 'k':
+		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
+
+	// Drill navigation — Traces tab
+	case 'l':
 		if h.app.registry.ActiveTab() == TabTraces {
-			return event
+			h.handleDrillIn()
+			return nil
 		}
 		return event
+	case 'h':
+		if h.app.registry.ActiveTab() == TabTraces && h.app.tracesPanel.Level > 0 {
+			h.app.tracesPanel.DrillOut(h.app.tapp)
+			return nil
+		}
+		return event
+
+	// Pause/resume
+	case ' ':
+		h.handlePauseResume()
+		return nil
 	case 'p':
-		// Pause/resume on Traces tab (since Space is used for tree)
 		if h.app.registry.ActiveTab() == TabTraces {
 			h.app.tracesPanel.TogglePause()
 			return nil
 		}
 		return event
+
+	// Clear filters
+	case 'c':
+		h.handleClearFilters()
+		return nil
 	}
 
-	// Context-sensitive number keys
+	// Number keys
 	if event.Rune() >= '0' && event.Rune() <= '9' {
 		h.handleNumberKey(event.Rune())
 		return nil
 	}
 
-	// j/k vim navigation — translate to arrow keys for the table
-	switch event.Rune() {
-	case 'j':
-		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
-	case 'k':
-		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
-	}
-
 	return event
+}
+
+// goToTop navigates to the first item in the active view.
+func (h *KeyHandler) goToTop() {
+	switch h.app.registry.ActiveTab() {
+	case TabState:
+		h.app.table.Table.Select(1, 0)
+	case TabTraces:
+		h.app.tracesPanel.GoToTop()
+	case TabLogs:
+		h.app.logsPanel.GoToTop()
+	}
+}
+
+// goToBottom navigates to the last item in the active view.
+func (h *KeyHandler) goToBottom() {
+	switch h.app.registry.ActiveTab() {
+	case TabState:
+		if rc := h.app.table.Table.GetRowCount(); rc > 1 {
+			h.app.table.Table.Select(rc-1, 0)
+		}
+	case TabTraces:
+		h.app.tracesPanel.GoToBottom()
+	case TabLogs:
+		h.app.logsPanel.GoToBottom()
+	}
+}
+
+// copySelected copies the selected item to clipboard.
+func (h *KeyHandler) copySelected() {
+	var text string
+	switch h.app.registry.ActiveTab() {
+	case TabTraces:
+		text = h.app.tracesPanel.CopySelected()
+	case TabLogs:
+		text = h.app.logsPanel.SelectedEntry()
+	}
+	if text != "" {
+		_ = views.CopyToClipboard(text)
+		h.app.showStatus(views.Tag(views.HexGreen, "Copied"))
+	}
+}
+
+// handleDrillIn navigates one level deeper in the Traces tab.
+func (h *KeyHandler) handleDrillIn() {
+	if h.app.registry.ActiveTab() != TabTraces {
+		return
+	}
+	panel := h.app.tracesPanel
+	switch panel.Level {
+	case 0:
+		// Trace list → fetch spans and show span list
+		h.app.drillIntoTrace()
+	case 1:
+		// Span list → span detail
+		panel.DrillIn(h.app.tapp)
+	}
 }
 
 // handleNumberKey dispatches number keys based on active tab.
@@ -193,8 +293,6 @@ func (h *KeyHandler) handleNumberKey(r rune) {
 		}
 	case TabLogs:
 		h.handleLogLevelKey(r)
-	case TabTraces:
-		// Future: agent/channel filter by number key
 	}
 }
 
@@ -222,10 +320,12 @@ func (h *KeyHandler) handleClearFilters() {
 		h.app.refreshTable()
 	case TabLogs:
 		h.app.logsPanel.SetLevelMin("debug")
+		h.app.logsPanel.SetFilter("")
 	case TabTraces:
 		h.app.traceStore.SetFilters(views.TraceFilters{Limit: 50})
 		h.app.tracesPanel.SetAgentFilter("")
 		h.app.tracesPanel.SetChannelFilter("")
-		h.app.traceStore.NotifyTraceUpdated() // trigger re-fetch
+		h.app.tracesPanel.SetFilter("")
+		h.app.traceStore.NotifyTraceUpdated()
 	}
 }

@@ -105,10 +105,11 @@ func (r *ViewRegistry) HasOverlay() bool { return len(r.overlayStack) > 0 }
 func (r *ViewRegistry) TabBar() string {
 	var parts []string
 	for i, t := range tabMeta {
+		hint := views.Tag(views.HexOverlay0, "("+t.Key+")")
 		if PrimaryTab(i) == r.activeTab {
-			parts = append(parts, views.BoldTag(views.HexGreen, "\u25cf "+t.Label))
+			parts = append(parts, views.BoldTag(views.HexGreen, "\u25cf "+t.Label)+" "+hint)
 		} else {
-			parts = append(parts, views.Tag(views.HexOverlay0, "\u25cb "+t.Label))
+			parts = append(parts, views.Tag(views.HexOverlay0, "\u25cb "+t.Label)+" "+hint)
 		}
 	}
 	return " " + strings.Join(parts, "  ")

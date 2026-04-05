@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -11,15 +12,16 @@ import (
 type TraceList struct {
 	Table    *tview.Table
 	OnSelect func(traceID string) // called when user selects/navigates to a row
-	OnCopy   func(text string)    // called when user presses y to copy trace ID
+	OnCopy   func(text string)    // called on yy to copy trace ID
 	traces   []TraceData          // current data backing the table
+	filter   string               // search filter (case-insensitive)
 }
 
 // NewTraceList creates a trace list table component.
 func NewTraceList() *TraceList {
 	table := tview.NewTable().
 		SetSelectable(true, false).
-		SetFixed(1, 0). // fixed header row
+		SetFixed(1, 0).
 		SetSeparator(' ')
 	table.SetBackgroundColor(ColorBase)
 	table.SetSelectedStyle(tcell.StyleDefault.
@@ -28,46 +30,70 @@ func NewTraceList() *TraceList {
 
 	tl := &TraceList{Table: table}
 	table.SetSelectionChangedFunc(tl.onSelectionChanged)
-	table.SetInputCapture(tl.handleInput)
 	return tl
 }
 
 // Refresh rebuilds the table from trace data, preserving selection.
 func (tl *TraceList) Refresh(traces []TraceData, selectedID string) {
-	tl.traces = traces
+	tl.traces = tl.traces[:0]
 	tl.Table.Clear()
 	tl.renderHeader()
 
-	if len(traces) == 0 {
+	for _, tr := range traces {
+		if tl.filter != "" && !tl.matchesFilter(tr) {
+			continue
+		}
+		tl.traces = append(tl.traces, tr)
+	}
+
+	if len(tl.traces) == 0 {
 		tl.Table.SetCell(1, 0, tview.NewTableCell(
 			Tag(HexOverlay0, "  No traces")).
 			SetExpansion(1).SetSelectable(false))
 		return
 	}
 
-	selectedRow := 1 // default to first data row
-	for i, tr := range traces {
+	selectedRow := 1
+	for i, tr := range tl.traces {
 		row := i + 1
 		tl.renderRow(row, tr)
 		if tr.ID == selectedID {
 			selectedRow = row
 		}
 	}
-
 	tl.Table.Select(selectedRow, 0)
 }
 
 // SelectedTraceID returns the trace ID of the currently selected row.
 func (tl *TraceList) SelectedTraceID() string {
 	row, _ := tl.Table.GetSelection()
-	idx := row - 1 // header offset
+	idx := row - 1
 	if idx < 0 || idx >= len(tl.traces) {
 		return ""
 	}
 	return tl.traces[idx].ID
 }
 
-// renderHeader draws the fixed header row.
+// SelectedTrace returns the full TraceData of the selected row.
+func (tl *TraceList) SelectedTrace() *TraceData {
+	row, _ := tl.Table.GetSelection()
+	idx := row - 1
+	if idx < 0 || idx >= len(tl.traces) {
+		return nil
+	}
+	return &tl.traces[idx]
+}
+
+// SetFilter sets a search filter string (case-insensitive).
+func (tl *TraceList) SetFilter(f string) {
+	tl.filter = strings.ToLower(f)
+}
+
+func (tl *TraceList) matchesFilter(tr TraceData) bool {
+	text := strings.ToLower(tr.Name + " " + tr.AgentID + " " + tr.Channel + " " + tr.Status)
+	return strings.Contains(text, tl.filter)
+}
+
 func (tl *TraceList) renderHeader() {
 	headers := []struct {
 		text      string
@@ -75,7 +101,7 @@ func (tl *TraceList) renderHeader() {
 		width     int
 	}{
 		{"Name", 1, 0},
-		{"Status", 0, 10},
+		{"Status", 0, 12},
 		{"Duration", 0, 10},
 		{"Tokens", 0, 14},
 		{"Spans", 0, 7},
@@ -95,9 +121,7 @@ func (tl *TraceList) renderHeader() {
 	}
 }
 
-// renderRow draws a single trace row.
 func (tl *TraceList) renderRow(row int, tr TraceData) {
-	// Name — agent name or trace name
 	name := tr.Name
 	if name == "" {
 		name = tr.AgentID
@@ -108,81 +132,27 @@ func (tl *TraceList) renderRow(row int, tr TraceData) {
 	tl.Table.SetCell(row, 0, tview.NewTableCell(" "+name).
 		SetTextColor(ColorText).SetExpansion(1))
 
-	// Status
 	sym, color := traceStatusCell(tr.Status)
 	tl.Table.SetCell(row, 1, tview.NewTableCell(sym+" "+tr.Status).
-		SetTextColor(color).SetMaxWidth(10))
+		SetTextColor(color).SetMaxWidth(12))
 
-	// Duration
 	dur := formatTraceDuration(tr.DurationMs)
 	tl.Table.SetCell(row, 2, tview.NewTableCell(dur).
 		SetTextColor(ColorSubtext0).SetMaxWidth(10))
 
-	// Tokens
 	tok := formatTokens(tr.TotalInputTokens, tr.TotalOutputTokens, tr.Metadata)
 	tl.Table.SetCell(row, 3, tview.NewTableCell(tok).
 		SetTextColor(ColorText).SetMaxWidth(14))
 
-	// Spans
 	spans := fmt.Sprintf("%d", tr.SpanCount)
 	tl.Table.SetCell(row, 4, tview.NewTableCell(spans).
 		SetTextColor(ColorSubtext0).SetMaxWidth(7))
 
-	// Time
 	ts := tr.StartTime.Format("15:04:05")
 	tl.Table.SetCell(row, 5, tview.NewTableCell(ts).
 		SetTextColor(ColorOverlay0).SetMaxWidth(10))
 }
 
-// handleInput processes vim keybindings on the trace list.
-func (tl *TraceList) handleInput(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Rune() {
-	case 'j':
-		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
-	case 'k':
-		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
-	case 'g':
-		tl.Table.Select(1, 0)
-		return nil
-	case 'G':
-		if rowCount := tl.Table.GetRowCount(); rowCount > 1 {
-			tl.Table.Select(rowCount-1, 0)
-		}
-		return nil
-	case 'y':
-		if id := tl.SelectedTraceID(); id != "" && tl.OnCopy != nil {
-			tl.OnCopy(id)
-		}
-		return nil
-	}
-
-	// Ctrl+D: half-page down
-	if event.Key() == tcell.KeyCtrlD {
-		row, col := tl.Table.GetSelection()
-		_, _, _, height := tl.Table.GetInnerRect()
-		newRow := row + height/2
-		if max := tl.Table.GetRowCount() - 1; newRow > max {
-			newRow = max
-		}
-		tl.Table.Select(newRow, col)
-		return nil
-	}
-	// Ctrl+U: half-page up
-	if event.Key() == tcell.KeyCtrlU {
-		row, col := tl.Table.GetSelection()
-		_, _, _, height := tl.Table.GetInnerRect()
-		newRow := row - height/2
-		if newRow < 1 {
-			newRow = 1 // skip header
-		}
-		tl.Table.Select(newRow, col)
-		return nil
-	}
-
-	return event
-}
-
-// onSelectionChanged fires OnSelect callback with the selected trace ID.
 func (tl *TraceList) onSelectionChanged(row, _ int) {
 	idx := row - 1
 	if idx < 0 || idx >= len(tl.traces) || tl.OnSelect == nil {
@@ -228,7 +198,7 @@ func formatTokens(input, output int, meta *TraceMetadata) string {
 	out := compactNumber(output)
 	s := fmt.Sprintf("%s/%s", in, out)
 	if meta != nil && meta.TotalCacheReadTokens > 0 {
-		s += fmt.Sprintf(" [%s]+%s[-]", HexGreen, compactNumber(meta.TotalCacheReadTokens))
+		s += " +" + compactNumber(meta.TotalCacheReadTokens) + "c"
 	}
 	return s
 }

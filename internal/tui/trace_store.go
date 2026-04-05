@@ -16,6 +16,7 @@ type TraceStore struct {
 	total        int
 	filters      views.TraceFilters
 	selectedID   string            // currently selected trace ID
+	spans        []views.SpanData  // raw spans for selected trace
 	spanTree     []*views.SpanNode // built tree for selected trace
 	selectedData *views.TraceData  // trace header for selected trace
 	listDirty    bool
@@ -75,6 +76,7 @@ func (s *TraceStore) SelectTrace(id string) {
 	s.mu.Lock()
 	if s.selectedID != id {
 		s.selectedID = id
+		s.spans = nil
 		s.spanTree = nil
 		s.selectedData = nil
 		s.detailDirty = true
@@ -137,6 +139,7 @@ func (s *TraceStore) RefreshDetail(ctx context.Context, fetcher TraceFetcher) er
 	// Only update if selection hasn't changed during fetch
 	if s.selectedID == id {
 		s.selectedData = trace
+		s.spans = spans
 		s.spanTree = tree
 		s.detailDirty = false
 	}
@@ -161,6 +164,18 @@ func (s *TraceStore) Total() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.total
+}
+
+// SelectedSpans returns the raw spans for the selected trace.
+func (s *TraceStore) SelectedSpans() []views.SpanData {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.spans) == 0 {
+		return nil
+	}
+	out := make([]views.SpanData, len(s.spans))
+	copy(out, s.spans)
+	return out
 }
 
 // SelectedSpanTree returns the built span tree for the selected trace.

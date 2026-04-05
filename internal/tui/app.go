@@ -59,7 +59,6 @@ type App struct {
 	logsPanel   *views.LogsPanel
 	tracesPanel *views.TracesPanel
 	traceStore  *TraceStore
-	spanDetail  *views.SpanDetail
 
 	// Refresh infrastructure
 	refreshMu sync.Mutex
@@ -181,32 +180,6 @@ func (a *App) buildLayout() {
 
 	a.tracesPanel = views.NewTracesPanel()
 	a.registry.Register(a.tracesPanel)
-
-	a.spanDetail = views.NewSpanDetail()
-	a.registry.Register(a.spanDetail)
-
-	// Wire TraceList selection → TraceStore
-	a.tracesPanel.List().OnSelect = func(traceID string) {
-		a.traceStore.SelectTrace(traceID)
-		a.triggerTraceDetailRefresh()
-	}
-
-	// Wire copy support — always show feedback
-	a.tracesPanel.List().OnCopy = func(text string) {
-		_ = views.CopyToClipboard(text)
-		a.showStatus(views.Tag(views.HexGreen, "Copied: "+text))
-	}
-	a.tracesPanel.Tree().OnCopy = func(text string) {
-		_ = views.CopyToClipboard(text)
-		a.showStatus(views.Tag(views.HexGreen, "Copied to clipboard"))
-	}
-
-	// Wire SpanTree detail → overlay
-	a.tracesPanel.Tree().OnDetail = func(span views.SpanData) {
-		a.spanDetail.Show(span)
-		a.pushView("span-detail")
-		a.tapp.SetFocus(a.spanDetail.TextView)
-	}
 
 	// Register overlay views
 	a.registry.Register(a.detail)
@@ -574,24 +547,73 @@ func (a *App) refreshTraces() {
 		}()
 	}
 
-	if a.traceStore.NeedsDetailRefresh() {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := a.traceStore.RefreshDetail(ctx, fetcher); err != nil {
-				return
-			}
+}
+
+// drillIntoTrace fetches trace detail and navigates to the span list.
+func (a *App) drillIntoTrace() {
+	id := a.tracesPanel.List().SelectedTraceID()
+	if id == "" {
+		return
+	}
+
+	fetcher, ok := a.Provider.(TraceFetcher)
+	if !ok {
+		a.showStatus(views.Tag(views.HexRed, "Trace API not available"))
+		return
+	}
+
+	// Select and fetch
+	a.traceStore.SelectTrace(id)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := a.traceStore.RefreshDetail(ctx, fetcher); err != nil {
 			a.tapp.QueueUpdateDraw(func() {
-				a.tracesPanel.RefreshDetail(a.traceStore.SelectedSpanTree())
+				a.showStatus(views.Tag(views.HexRed, "Failed to fetch trace: "+err.Error()))
 			})
-		}()
+			return
+		}
+		a.tapp.QueueUpdateDraw(func() {
+			trace := a.traceStore.SelectedTrace()
+			spans := a.traceStore.SelectedSpans()
+			if trace != nil {
+				a.tracesPanel.ShowSpans(trace, spans, a.tapp)
+			}
+		})
+	}()
+}
+
+// applySearch applies a search filter to the active tab.
+func (a *App) applySearch(filter string) {
+	switch a.registry.ActiveTab() {
+	case TabState:
+		a.model.SetFilter(filter)
+		a.refreshTable()
+	case TabTraces:
+		a.tracesPanel.SetFilter(filter)
+		// Re-render the current level with filter
+		if a.tracesPanel.Level == 0 {
+			a.tracesPanel.Refresh(
+				a.traceStore.Traces(),
+				a.traceStore.Total(),
+				a.traceStore.SelectedID(),
+			)
+		}
+	case TabLogs:
+		a.logsPanel.SetFilter(filter)
 	}
 }
 
-// triggerTraceDetailRefresh kicks an immediate trace detail refresh if on Traces tab.
-func (a *App) triggerTraceDetailRefresh() {
-	if a.registry.ActiveTab() == TabTraces {
-		go a.refreshTraces()
+// clearSearch clears the active search filter for the current tab.
+func (a *App) clearSearch() {
+	switch a.registry.ActiveTab() {
+	case TabState:
+		a.model.SetFilter("")
+		a.refreshTable()
+	case TabTraces:
+		a.tracesPanel.SetFilter("")
+	case TabLogs:
+		a.logsPanel.SetFilter("")
 	}
 }
 
@@ -752,25 +774,23 @@ func (a *App) activateSearch() {
 	a.tapp.SetFocus(a.cmdBar)
 }
 
-// onSearchDone handles search input completion.
+// onSearchDone handles search input completion, dispatching to the active tab.
 func (a *App) onSearchDone(key tcell.Key) {
 	if key == tcell.KeyEscape {
-		a.model.SetFilter("")
+		a.clearSearch()
 		a.keys.mode = ModeNormal
 		a.cmdBar.SetLabel("")
 		a.cmdBar.SetDoneFunc(a.onCommandDone)
 		a.deactivateCommandBar()
-		a.refreshTable()
 		return
 	}
 	if key == tcell.KeyEnter {
 		filter := a.cmdBar.GetText()
-		a.model.SetFilter(filter)
+		a.applySearch(filter)
 		a.keys.mode = ModeNormal
 		a.cmdBar.SetLabel("")
 		a.cmdBar.SetDoneFunc(a.onCommandDone)
 		a.deactivateCommandBar()
-		a.refreshTable()
 	}
 }
 
@@ -793,15 +813,19 @@ func helpText() string {
 	return fmt.Sprintf(`
  %s
    %s State    %s Traces    %s Logs
-   %s %s %s  via command
 
  %s
    %s         Move down/up
-   %s         Jump to top/bottom
-   %s       View resource detail (State)
-   %s           Show drift diff (State)
+   %s        Go to top/bottom
+   %s        Copy selected item
+   %s/%s     Half-page scroll
    %s         Back / Close overlay
    %s           Quit
+
+ %s (Traces — drill-down)
+   %s/%s  Drill in / Drill out
+   %s         Back to trace list (root)
+   %s       Pause/resume   %s Clear filters
 
  %s (State tab)
    %s Provider   %s Agent      %s Channel
@@ -812,24 +836,14 @@ func helpText() string {
  %s (Logs tab)
    %s DEBUG+   %s INFO+   %s WARN+   %s ERROR
 
- %s (Traces tab)
-   %s       Toggle list / tree focus
-   %s     Select trace / expand-collapse span
-   %s/%s     Half-page scroll
-   %s/%s   Expand-collapse / Expand all (tree)
-   %s         Copy trace ID / span info
-   %s         Pause/resume auto-refresh
-   %s         Clear filters
-
  %s
-   %s      Apply (reconcile all pending changes)
+   %s      Apply (reconcile)
    %s      Delete selected resource
    %s      Edit selected resource ($EDITOR)
-   %s      Apply all       %s Delete
    %s       Sync (attach)   %s  Tenant switch
 
  %s
-   %s           Filter by name
+   %s           Search / filter
    %s       Apply       %s Cancel/clear
 
  %s
@@ -837,10 +851,15 @@ func helpText() string {
    %s           Refresh now
 `,
 		h("Tabs"),
-		k("s"), k("t"), k("l"),
-		k(":state"), k(":traces"), k(":logs"),
-		h("Navigation"),
-		k("j/k"), k("g/G"), k("Enter"), k("d"), k("Esc"), k("q"),
+		k("S"), k("T"), k("L"),
+		h("Navigation (global)"),
+		k("j/k"), k("gg/G"), k("yy"),
+		k("Ctrl+D"), k("Ctrl+U"),
+		k("Esc"), k("q"),
+		h("Traces"),
+		k("l/Enter"), k("h"),
+		k("Esc"),
+		k("Space/p"), k("c"),
 		h("Number Keys"),
 		k("1"), k("2"), k("3"),
 		k("4"), k("5"), k("6"),
@@ -848,15 +867,8 @@ func helpText() string {
 		k("0"),
 		h("Number Keys"),
 		k("1"), k("2"), k("3"), k("4"),
-		h("Traces"),
-		k("Tab"), k("Enter"),
-		k("Ctrl+D"), k("Ctrl+U"),
-		k("Space/o"), k("O"),
-		k("y"),
-		k("p"), k("c"),
 		h("Actions"),
 		k("Ctrl+R"), k("Ctrl+D"), k("Ctrl+E"),
-		k(":apply"), k(":delete"),
 		k(":sync"), k(":tenant X"),
 		h("Search"),
 		k("/"), k("Enter"), k("Esc"),
