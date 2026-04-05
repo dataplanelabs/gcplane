@@ -83,6 +83,22 @@ After creating a tenant, use a tenant-bound API key to configure:
     userId: "user@example.com"
     credentials:
       apiKey: ${GITHUB_API_KEY}
+
+# Secure CLI binaries (v1.1.0+)
+- kind: SecureCLI
+  name: kubectl
+  spec:
+    binaryName: kubectl
+    isGlobal: true
+    denyArgs: ["delete", "exec"]
+
+# Per-agent CLI overrides (v1.1.0+, non-enumerable)
+- kind: SecureCLIGrant
+  name: kubectl--dev-assistant
+  spec:
+    binaryName: kubectl
+    agentKey: dev-assistant
+    timeoutSeconds: 60
 ```
 
 ## Tenant Isolation Policy

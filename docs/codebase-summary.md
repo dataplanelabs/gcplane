@@ -15,7 +15,7 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 | **Test Coverage** | 81.3% (161+ tests) |
 | **Codebase Lines** | ~14,778 LOC |
 | **Binary Size** | Single statically-linked executable |
-| **Resource Kinds** | 12 (Tenant + 8 core + 3 config) |
+| **Resource Kinds** | 14 (Tenant + 8 core + 5 config) |
 | **Transport Protocols** | HTTP REST + WebSocket RPC v3 |
 
 ## Technology Stack
@@ -82,7 +82,9 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 - `builtin_tool_configs.go` — Per-tenant builtin tool config
 - `skill_configs.go` — Per-tenant skill enable/disable
 - `mcp_credentials.go` — Per-user MCP server credentials
-- `system_configs.go` — Per-tenant system settings (NEW in v1.0.0)
+- `system_configs.go` — Per-tenant system settings (v1.0.0+)
+- `secure_cli.go` — SecureCLI CRUD (HTTP, deletable, binary_name key) (NEW in v1.1.0)
+- `secure_cli_grants.go` — SecureCLIGrant CRUD (HTTP, deletable, composite key) (NEW in v1.1.0)
 - `cron_jobs.go` — CronJob CRUD (WebSocket, deletable, agent_key resolution)
 - `teams.go` — AgentTeam CRUD (WebSocket, deletable)
 
@@ -175,7 +177,7 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 - **release.yml** — Build + publish multi-platform releases (GitHub, Docker Hub, ghcr.io)
 - **upstream-check.yml** — Weekly check for GoClaw updates
 
-## Resource Kinds (12 total)
+## Resource Kinds (14 total)
 
 ### System Scope (1)
 | Kind | Create | Update | Delete | Transport | Notes |
@@ -193,18 +195,24 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 | `CronJob` | ✓ | ✓ | ✓ | WebSocket | agent_key → agent_id resolved |
 | `AgentTeam` | ✓ | ✓ | ✓ | WebSocket | v2 settings (notifications, delivery mode) |
 
-### Config Resources (3)
+### Config Resources (5)
 | Kind | Create | Update | Delete | Transport | Notes |
 |------|--------|--------|--------|-----------|-------|
 | `BuiltinToolConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant, v0.8.0+ |
 | `SkillConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant, v0.8.0+ |
 | `MCPCredentials` | ✓ | ✓ | ✓ | HTTP | Per-user, v0.8.0+ |
 | `SystemConfig` | ✓ | ✓ | ✓ | HTTP | Per-tenant system settings, v1.0.0+ |
+| `SecureCLI` | ✓ | ✓ | ✓ | HTTP | Secure CLI binary configs, v1.1.0+ |
+
+### Child Resources (1)
+| Kind | Create | Update | Delete | Transport | Notes |
+|------|--------|--------|--------|-----------|-------|
+| `SecureCLIGrant` | ✓ | ✓ | ✓ | HTTP | Per-agent CLI overrides, v1.1.0+, non-enumerable |
 
 ### Dependency Order
 ```
 Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig
-  → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → AgentTeam
+  → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → SecureCLI → SecureCLIGrant → AgentTeam
 ```
 
 Prune deletes in reverse order.
@@ -307,6 +315,8 @@ Excluded from comparison to prevent false diffs:
 - Agent: systemPrompt
 - Provider: (varies by provider type)
 - Channel: credentials object contents
+- SecureCLI: env (encrypted environment variables)
+- SecureCLIGrant: agentKey, binaryName (manifest references resolved to UUIDs)
 
 ## Development Workflow
 

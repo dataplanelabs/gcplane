@@ -40,6 +40,8 @@ const (
 	KindSkillConfig       ResourceKind = "SkillConfig"
 	KindMCPCredentials    ResourceKind = "MCPCredentials"
 	KindSystemConfig      ResourceKind = "SystemConfig"
+	KindSecureCLI         ResourceKind = "SecureCLI"
+	KindSecureCLIGrant    ResourceKind = "SecureCLIGrant"
 )
 
 // Resource is a generic managed resource with kind + name + arbitrary spec.
@@ -66,6 +68,8 @@ func ApplyOrder() []ResourceKind {
 		KindMCPCredentials,    // per-user MCP creds, after MCPServer
 		KindChannel,           // depends on Agent
 		KindCronJob,           // depends on Agent
+		KindSecureCLI,         // depends on Tenant
+		KindSecureCLIGrant,    // depends on SecureCLI + Agent
 		KindAgentTeam,         // no strict deps
 	}
 }

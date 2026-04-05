@@ -161,6 +161,8 @@ gcplane apply -f gcplane.yaml --auto-approve
 | `SkillConfig` | HTTP | create, update, delete, list (per-tenant) |
 | `MCPCredentials` | HTTP | create, update, delete, list (per-user) |
 | `SystemConfig` | HTTP | create, update, delete, list (per-tenant, v1.0.0+) |
+| `SecureCLI` | HTTP | create, update, delete, list (v1.1.0+) |
+| `SecureCLIGrant` | HTTP | create, update, delete (per-agent overrides, v1.1.0+) |
 | `CronJob` | WebSocket | create, update, delete, list |
 | `AgentTeam` | WebSocket | create, update, delete, list |
 
@@ -267,7 +269,7 @@ gcplane top -f manifest.yaml --endpoint http://localhost:8080
 
 ### Features
 
-- **Resource Browser**: Browse all 12 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, CronJob, AgentTeam)
+- **Resource Browser**: Browse all 14 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, SecureCLI, SecureCLIGrant, CronJob, AgentTeam)
 - **Status Coloring**: InSync (green), Drifted (yellow), Missing/Error (red), Extra (blue)
 - **YAML View**: Press Enter to view full resource YAML with syntax highlighting
 - **Drift Details**: Press `d` to see field-level drift comparison
@@ -286,8 +288,8 @@ gcplane top -f manifest.yaml --endpoint http://localhost:8080
 | `Enter` | View resource YAML details |
 | `d` | Show drift diff |
 | `r` | Refresh resources |
-| `0-9` | Filter by kind (0=all, 1=provider, 2=agent, etc.) |
-| `:` | Command mode |
+| `0-9` | Filter by kind (0=all, 1=provider, 2=agent, etc., 9=securecli) |
+| `:` | Command mode (`:cli`, `:securecli`, `:agent`, `:cron`, `:team`, etc.) |
 | `/` | Search by name |
 | `?` | Show help |
 | `q` | Quit |

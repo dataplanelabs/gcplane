@@ -43,7 +43,7 @@ Examples:
 ## File Organization
 - `cmd/` — CLI commands, one file per command
 - `internal/` — private packages, organized by domain
-- Each resource type gets its own file in `provider/goclaw/`
+- Each resource type gets its own file in `provider/goclaw/` (e.g., `secure_cli.go`, `secure_cli_grants.go`)
 - Keep files under 200 lines where practical
 
 ## Naming Conventions
@@ -66,6 +66,8 @@ func (p *Provider) updateX(key string, spec map[string]any) error
 ```
 
 Routing in `provider.go` dispatches by `ResourceKind`.
+
+**Composite Keys**: Some resources use composite natural keys (e.g., SecureCLIGrant uses `binaryName--agentKey`). The observe method parses the composite key and validates both parts resolve to valid resource UUIDs before comparison.
 
 ## Provider Options
 Use the Option pattern for Provider configuration:

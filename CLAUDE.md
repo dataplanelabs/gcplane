@@ -1,4 +1,4 @@
-# GCPlane (v1.0.0 — stable since 2026-04-02)
+# GCPlane (v1.1.2 — stable since 2026-04-05)
 
 Declarative GitOps control plane for GoClaw. Manages AI agents, providers, channels, MCP servers, cron jobs, and teams through YAML manifests.
 
@@ -17,7 +17,7 @@ cmd/              — CLI commands (validate, plan, apply, diff, export, serve, 
 internal/
   manifest/       — YAML loader, validator, composites, labels, field config
   reconciler/     — Observe→Compare→Act engine with ReconcileOpts (DryRun, Prune)
-  provider/goclaw — GoClaw API client (HTTP + WS) for 12 resource types
+  provider/goclaw — GoClaw API client (HTTP + WS) for 14 resource types
   keyconv/        — camelCase↔snake_case key translation
   controller/     — Reconcile loop, status tracker, tenant manager
   server/         — HTTP endpoints (health, metrics, status, sync, webhook)
@@ -36,6 +36,8 @@ internal/
 - Composites: `CompositeDefinition` expanded during load via Go `text/template`
 - Agent `contextWindow` and `maxToolIterations` are observable (manageable from manifests)
 - Provider `apiKey` is write-only (masked as "***" in API responses)
+- SecureCLI `env` is write-only (encrypted env vars for CLI credential injection)
+- SecureCLIGrant uses composite name `binaryName--agentKey` (e.g., `kubectl--assistant`)
 
 ## Testing
 ```bash

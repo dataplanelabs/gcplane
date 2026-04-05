@@ -40,12 +40,14 @@ resources:
 | `SkillConfig` | HTTP | Yes | Per-tenant skill enable/disable |
 | `SystemConfig` | HTTP | Yes | Per-tenant key-value system settings |
 | `MCPCredentials` | HTTP | Yes | Per-user MCP server credentials |
+| `SecureCLI` | HTTP | Yes | Secure CLI binary configs (v1.1.0+) |
+| `SecureCLIGrant` | HTTP | Yes | Per-agent CLI overrides, child resource (v1.1.0+) |
 | `CronJob` | WebSocket | Yes | Scheduled task |
 | `AgentTeam` | WebSocket | Yes | Agent team |
 
-Resources are applied in dependency order: Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → AgentTeam. Prune deletes in reverse order.
+Resources are applied in dependency order: Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → SecureCLI → SecureCLIGrant → AgentTeam. Prune deletes in reverse order.
 
-**Note:** Skill is managed by GoClaw and cannot be deleted by gcplane. BuiltinToolConfig, SkillConfig, SystemConfig, and MCPCredentials are not enumerable for prune.
+**Note:** Skill is managed by GoClaw and cannot be deleted by gcplane. BuiltinToolConfig, SkillConfig, SystemConfig, MCPCredentials, and SecureCLIGrant are not enumerable for prune.
 
 ## Channel Configuration
 
@@ -190,6 +192,37 @@ Create tenants declaratively (requires system-level API key):
     credentials:
       apiKey: ${GITHUB_API_KEY}
 ```
+
+## Secure CLI Configuration
+
+Manage secure CLI binary access and per-agent overrides:
+
+```yaml
+# Define a secure CLI binary
+- kind: SecureCLI
+  name: kubectl
+  spec:
+    binaryName: kubectl
+    isGlobal: true
+    denyArgs: ["delete", "exec"]
+    timeoutSeconds: 30
+    tips: "Use --dry-run for safety"
+    enabled: true
+    env:
+      KUBECONFIG: /etc/kubernetes/config
+
+# Per-agent CLI grant (overrides parent SecureCLI settings)
+- kind: SecureCLIGrant
+  name: kubectl--assistant
+  spec:
+    binaryName: kubectl
+    agentKey: assistant
+    timeoutSeconds: 60
+    enabled: true
+    # other fields inherit from SecureCLI if not specified
+```
+
+**Reference Validation**: SecureCLIGrant specs validate that `agentKey` references an Agent and `binaryName` references a SecureCLI resource. Missing references fail validation with clear errors.
 
 ## Config Auto-Discovery
 

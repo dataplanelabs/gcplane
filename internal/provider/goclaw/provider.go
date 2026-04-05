@@ -121,6 +121,10 @@ func (p *Provider) Observe(ctx context.Context, kind manifest.ResourceKind, key 
 		return p.observeMCPCredentials(ctx, key)
 	case manifest.KindSystemConfig:
 		return p.observeSystemConfig(ctx, key)
+	case manifest.KindSecureCLI:
+		return p.observeSecureCLI(ctx, key)
+	case manifest.KindSecureCLIGrant:
+		return p.observeSecureCLIGrant(ctx, key)
 	default:
 		return nil, fmt.Errorf("observe not implemented for kind %s", kind)
 	}
@@ -186,6 +190,10 @@ func (p *Provider) Create(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.createMCPCredentials(ctx, key, spec)
 	case manifest.KindSystemConfig:
 		return p.createSystemConfig(ctx, key, spec)
+	case manifest.KindSecureCLI:
+		return p.createSecureCLI(ctx, key, spec)
+	case manifest.KindSecureCLIGrant:
+		return p.createSecureCLIGrant(ctx, key, spec)
 	default:
 		return fmt.Errorf("create not implemented for kind %s", kind)
 	}
@@ -218,6 +226,10 @@ func (p *Provider) Update(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.updateMCPCredentials(ctx, key, spec)
 	case manifest.KindSystemConfig:
 		return p.updateSystemConfig(ctx, key, spec)
+	case manifest.KindSecureCLI:
+		return p.updateSecureCLI(ctx, key, spec)
+	case manifest.KindSecureCLIGrant:
+		return p.updateSecureCLIGrant(ctx, key, spec)
 	default:
 		return fmt.Errorf("update not implemented for kind %s", kind)
 	}
@@ -248,6 +260,10 @@ func (p *Provider) Delete(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.deleteMCPCredentials(ctx, key)
 	case manifest.KindSystemConfig:
 		return p.deleteSystemConfig(ctx, key)
+	case manifest.KindSecureCLI:
+		return p.deleteSecureCLI(ctx, key)
+	case manifest.KindSecureCLIGrant:
+		return p.deleteSecureCLIGrant(ctx, key)
 	case manifest.KindSkill:
 		return nil // not deletable
 	default:
@@ -274,8 +290,10 @@ func (p *Provider) ListAll(ctx context.Context, kind manifest.ResourceKind) ([]r
 		return p.listAllCronJobs(ctx)
 	case manifest.KindAgentTeam:
 		return p.listAllTeams(ctx)
-	case manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindSystemConfig, manifest.KindMCPCredentials:
-		return nil, nil // per-tenant configs not enumerable for prune
+	case manifest.KindSecureCLI:
+		return p.listAllSecureCLIs(ctx)
+	case manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindSystemConfig, manifest.KindMCPCredentials, manifest.KindSecureCLIGrant:
+		return nil, nil // per-tenant configs and child resources not enumerable for prune
 	default:
 		return nil, fmt.Errorf("list not implemented for kind %s", kind)
 	}

@@ -104,6 +104,17 @@
 - Updated model references in examples to latest (claude-sonnet-4-20250514)
 - Stable API — backward compatible, production-ready
 
+### v1.1.0 (2026-04-05) — Secure CLI & Grants
+- New SecureCLI resource: manage secure CLI binary configurations with encrypted env vars
+- New SecureCLIGrant resource: per-agent CLI overrides with composite key pattern (binaryName--agentKey)
+- Write-only field handling for env (SecureCLI) and agentKey/binaryName (SecureCLIGrant)
+- Reference validation: SecureCLIGrant refs Agent + SecureCLI (cross-validated)
+- Non-enumerable SecureCLIGrant for prune (child resource)
+- TUI support: key `9` filter + `:cli`/`:securecli` aliases
+- 13 new tests (7 for SecureCLI, 6 for SecureCLIGrant)
+- Updated dependency order: Channel → CronJob → SecureCLI → SecureCLIGrant → AgentTeam
+- Resource kinds expanded from 12 to 14
+
 ## Release Timeline
 
 | Version | Status | Release Date | Focus |
@@ -111,4 +122,5 @@
 | v0.1–v0.7.0 | Released | 2026-03-17 to 2026-03-18 | Foundation → Interactive UI |
 | v0.7.2 | Released | 2026-03-25 | Credentials, Tenant Isolation |
 | v0.8.0 | Released | 2026-03-24 | First-class Multi-tenant |
-| **v1.0.0** | **Latest** | **2026-04-02** | **Production Release (Stable)** |
+| v1.0.0 | Released | 2026-04-02 | Production Release (Stable) |
+| **v1.1.0** | **Latest** | **2026-04-05** | **Secure CLI & Grants** |

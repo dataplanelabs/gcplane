@@ -197,6 +197,32 @@ func (p *Provider) listAllTeams(ctx context.Context) ([]reconciler.ResourceInfo,
 	return infos, nil
 }
 
+// listAllSecureCLIs returns ResourceInfo for every secure CLI binary in GoClaw.
+func (p *Provider) listAllSecureCLIs(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	data, err := p.http.Get(ctx, "/v1/cli-credentials")
+	if err != nil {
+		return nil, fmt.Errorf("list cli-credentials: %w", err)
+	}
+	var resp struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("parse cli-credentials response: %w", err)
+	}
+	infos := make([]reconciler.ResourceInfo, 0, len(resp.Items))
+	for _, item := range resp.Items {
+		if !p.matchesTenant(ctx, item) {
+			continue
+		}
+		infos = append(infos, reconciler.ResourceInfo{
+			Kind:      manifest.KindSecureCLI,
+			Name:      strVal(item, "binary_name"),
+			CreatedBy: strVal(item, "created_by"),
+		})
+	}
+	return infos, nil
+}
+
 // listAllTenants returns ResourceInfo for every tenant in GoClaw.
 func (p *Provider) listAllTenants(ctx context.Context) ([]reconciler.ResourceInfo, error) {
 	data, err := p.http.Get(ctx, "/v1/tenants")

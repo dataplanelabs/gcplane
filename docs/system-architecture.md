@@ -90,7 +90,9 @@ gcplane/
 │   │   ├── skill_configs.go         # Per-tenant skill enable/disable
 │   │   ├── mcp_credentials.go       # Per-user MCP server credentials
 │   │   ├── system_configs.go        # Per-tenant system settings
-│   │   └── tenant_test.go           # Tenant resource tests (12 tests)
+│   │   ├── secure_cli.go            # SecureCLI CRUD (HTTP, deletable)
+│   │   ├── secure_cli_grants.go     # SecureCLIGrant CRUD (HTTP, deletable)
+│   │   └── secure_cli_test.go       # SecureCLI + Grant tests (13 tests)
 │   ├── controller/                  # Reconciliation loop + status tracking
 │   │   ├── controller.go            # Main loop with interval + graceful shutdown
 │   │   └── status.go                # k8s-style status conditions
@@ -135,7 +137,7 @@ gcplane/
 
 | GCPlane | Tested GoClaw | RPC Protocol | Key Features |
 |---------|---------------|--------------|--------------|
-| v1.0.0+ | 2.x | v3 | 12 kinds (Tenant + config), full multi-tenant, stable API |
+| v1.1.0+ | 2.x | v3 | 14 kinds (+ SecureCLI/Grant), full multi-tenant, stable API |
 
 **Tested Image**: `ghcr.io/nextlevelbuilder/goclaw:full` (v2.x)
 
@@ -157,7 +159,7 @@ gcplane/
 ## Key Design Decisions
 
 ### Dual Transport
-- **HTTP REST**: Primary for Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig (support Create/Update/Delete/List)
+- **HTTP REST**: Primary for Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, SecureCLI, SecureCLIGrant (support Create/Update/Delete/List)
 - **WebSocket RPC v3**: CronJob, AgentTeam (no HTTP endpoints in GoClaw; support Create/Update/Delete/List)
 - WS connection is lazy-initialized on first WS resource access
 
@@ -177,7 +179,7 @@ GoClaw uses UUIDs internally. GCPlane uses human-readable natural keys (`name` f
 
 ### Dependency Ordering
 Resources processed in dependency order:
-Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → AgentTeam
+Tenant → Provider → Agent → Skill → BuiltinToolConfig → SkillConfig → SystemConfig → MCPServer → MCPCredentials → Channel → CronJob → SecureCLI → SecureCLIGrant → AgentTeam
 
 Prune deletes in reverse order (safe cascading).
 
@@ -185,7 +187,7 @@ Prune deletes in reverse order (safe cascading).
 - Prune is opt-in (requires `--prune` flag or manifest `prune: true`)
 - Only deletes resources marked with `gcplane.io/managed: true` (GCPlane-owned)
 - Skill is excluded (GoClaw manages this; not deletable)
-- SystemConfig, SkillConfig, BuiltinToolConfig, MCPCredentials not enumerable for prune (GoClaw design)
+- SystemConfig, SkillConfig, BuiltinToolConfig, MCPCredentials, SecureCLIGrant not enumerable for prune (child resource or GoClaw design)
 - Deletes happen in reverse dependency order to prevent cascade failures
 - Continue-on-error per-resource; one failure doesn't block others
 

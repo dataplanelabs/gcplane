@@ -191,7 +191,8 @@ func (e *Engine) detectAndExecutePrunes(ctx context.Context, m *manifest.Manifes
 		// Skip non-deletable and non-enumerable kinds
 		if kind == manifest.KindSkill ||
 			kind == manifest.KindBuiltinToolConfig || kind == manifest.KindSkillConfig ||
-			kind == manifest.KindSystemConfig || kind == manifest.KindMCPCredentials {
+			kind == manifest.KindSystemConfig || kind == manifest.KindMCPCredentials ||
+			kind == manifest.KindSecureCLIGrant {
 			continue
 		}
 

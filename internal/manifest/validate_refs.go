@@ -48,6 +48,19 @@ func validateReferences(m *Manifest) []error {
 					}
 				}
 			}
+		case KindSecureCLIGrant:
+			// spec.agentKey must reference an Agent
+			if ref := specStr(r.Spec, "agentKey"); ref != "" {
+				if !index[KindAgent][ref] {
+					errs = append(errs, fmt.Errorf("%s: references Agent %q which is not declared", prefix, ref))
+				}
+			}
+			// spec.binaryName must reference a SecureCLI
+			if ref := specStr(r.Spec, "binaryName"); ref != "" {
+				if !index[KindSecureCLI][ref] {
+					errs = append(errs, fmt.Errorf("%s: references SecureCLI %q which is not declared", prefix, ref))
+				}
+			}
 		case KindAgentTeam:
 			// spec.lead must reference an Agent
 			if ref := specStr(r.Spec, "lead"); ref != "" {
