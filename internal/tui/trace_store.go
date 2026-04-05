@@ -64,6 +64,13 @@ func (s *TraceStore) NeedsListRefresh() bool {
 	return s.listDirty
 }
 
+// NotifyDetailDirty marks the detail as needing refresh.
+func (s *TraceStore) NotifyDetailDirty() {
+	s.mu.Lock()
+	s.detailDirty = true
+	s.mu.Unlock()
+}
+
 // NeedsDetailRefresh returns true if span detail should be re-fetched.
 func (s *TraceStore) NeedsDetailRefresh() bool {
 	s.mu.RLock()

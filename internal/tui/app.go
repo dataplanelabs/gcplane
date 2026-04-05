@@ -130,6 +130,10 @@ func NewApp(cfg Config) (*App, error) {
 			app.liveStore.HandleEvent(frame)
 			if frame.Event == "trace.updated" {
 				app.traceStore.NotifyTraceUpdated()
+				// Also refresh spans if viewing a trace at level 1
+				if app.tracesPanel != nil && app.tracesPanel.Level >= 1 {
+					app.traceStore.NotifyDetailDirty()
+				}
 			}
 		})
 	}
@@ -229,10 +233,8 @@ func (a *App) tabRefreshLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// TraceStore refresh for Traces tab
-			if a.registry.ActiveTab() == TabTraces {
-				a.refreshTraces()
-			}
+			// Traces: always refresh in background (data stays fresh across tabs)
+			a.refreshTraces()
 
 			if !a.liveStore.IsDirty() {
 				continue
@@ -538,15 +540,43 @@ func (a *App) refreshTraces() {
 				return // silently skip; will retry next tick
 			}
 			a.tapp.QueueUpdateDraw(func() {
-				a.tracesPanel.Refresh(
-					a.traceStore.Traces(),
-					a.traceStore.Total(),
-					a.traceStore.SelectedID(),
-				)
+				if a.registry.ActiveTab() == TabTraces && a.tracesPanel.Level == 0 {
+					a.tracesPanel.Refresh(
+						a.traceStore.Traces(),
+						a.traceStore.Total(),
+						a.traceStore.SelectedID(),
+					)
+				}
 			})
 		}()
 	}
 
+	// Live span refresh: when viewing a running trace at level 1,
+	// periodically re-fetch its spans so new steps appear in real time.
+	if a.tracesPanel.Level == 1 && a.registry.ActiveTab() == TabTraces {
+		trace := a.traceStore.SelectedTrace()
+		if trace != nil && (trace.Status == "running" || trace.Status == "pending") {
+			a.traceStore.NotifyDetailDirty()
+		}
+	}
+
+	if a.traceStore.NeedsDetailRefresh() {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := a.traceStore.RefreshDetail(ctx, fetcher); err != nil {
+				return
+			}
+			a.tapp.QueueUpdateDraw(func() {
+				if a.registry.ActiveTab() == TabTraces && a.tracesPanel.Level == 1 {
+					spans := a.traceStore.SelectedSpans()
+					if spans != nil {
+						a.tracesPanel.SpanListView().Refresh(spans)
+					}
+				}
+			})
+		}()
+	}
 }
 
 // drillIntoTrace fetches trace detail and navigates to the span list.
