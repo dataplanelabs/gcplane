@@ -41,7 +41,7 @@ func (a *App) applyAll() {
 		go a.doApply()
 	})
 	a.pushView("confirm")
-	a.tapp.SetFocus(a.confirm.Modal)
+	a.tapp.SetFocus(a.confirm.Focusable())
 }
 
 // doApply runs the actual reconciliation in a goroutine.
@@ -87,7 +87,7 @@ func (a *App) deleteResource() {
 		go a.doDelete(c.Kind, c.Name)
 	})
 	a.pushView("confirm")
-	a.tapp.SetFocus(a.confirm.Modal)
+	a.tapp.SetFocus(a.confirm.Focusable())
 }
 
 // doDelete runs the delete operation in a goroutine.
