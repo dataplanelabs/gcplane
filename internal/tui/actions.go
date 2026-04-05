@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
@@ -190,8 +191,17 @@ func (a *App) editResource() {
 	}()
 }
 
-// showStatus displays a temporary message in the command bar.
+// showStatus displays a temporary message in the command bar, auto-clearing after 5 seconds.
 func (a *App) showStatus(msg string) {
 	a.cmdBar.SetLabel(msg)
 	a.cmdBar.SetText("")
+	go func() {
+		time.Sleep(5 * time.Second)
+		a.tapp.QueueUpdateDraw(func() {
+			// Only clear if the label still matches (hasn't been replaced by a newer message)
+			if a.cmdBar.GetLabel() == msg {
+				a.cmdBar.SetLabel(":")
+			}
+		})
+	}()
 }
