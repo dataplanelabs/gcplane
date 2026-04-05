@@ -109,22 +109,29 @@ gcplane/
 │   │   └── resolver.go              # ${ENV}, file://, SOPS support
 │   ├── display/                     # Terminal output formatting
 │   │   └── plan.go                  # Terraform-style colored diff + prune warnings
-│   ├── tui/                         # Interactive terminal UI (k9s-style, v1.2+)
-│   │   ├── app.go                   # Main app, wiring, refresh loop
-│   │   ├── model.go                 # Thread-safe shared state
-│   │   ├── keybindings.go           # Vim-style mode dispatch
-│   │   ├── registry.go              # ViewRegistry for modular view registration
-│   │   ├── event_bus.go             # Typed pub/sub with QueueUpdateDraw safety
+│   ├── tui/                         # Interactive terminal UI (k9s-style, v1.2.0+, 5,754 LOC)
+│   │   ├── app.go                   # Main orchestrator, wires layout/views, refresh loops
+│   │   ├── model.go                 # Thread-safe shared state (RWMutex)
+│   │   ├── keybindings.go           # Vim-style input dispatch with two-key sequences
+│   │   ├── registry.go              # ViewRegistry for tab page + overlay management
+│   │   ├── event_bus.go             # Typed pub/sub with QueueUpdateDraw thread safety
+│   │   ├── actions.go               # Resource operations (apply, delete, edit)
+│   │   ├── attach.go                # HTTP polling for remote instances
+│   │   ├── trace_store.go           # Thread-safe LLM trace cache with fetch gating
+│   │   ├── live_store.go            # Ring-buffered WS event stream (500 entries)
 │   │   └── views/
 │   │       ├── view.go              # View interface (Name, Primitive, Activate)
-│   │       ├── resource_table.go    # Resource list with status coloring
+│   │       ├── resource_table.go    # State tab: resource list with status coloring
 │   │       ├── resource_detail.go   # YAML view with syntax highlighting
 │   │       ├── drift_view.go        # Field-level drift diff
-│   │       ├── trace_view.go        # Real-time trace/log view
-│   │       ├── confirm_modal.go     # Confirmation dialog
-│   │       └── help_view.go         # Help overlay
-│   └── tui/trace/                   # Trace capture (v1.2+)
-│       ├── ring_handler.go          # slog.Handler with 1000-entry ring buffer
+│   │       ├── trace_list.go        # Traces tab: list of traces (left panel, 2:3)
+│   │       ├── span_tree.go         # Traces tab: span tree (right panel, 1:3)
+│   │       ├── span_detail.go       # Overlay: detailed span information
+│   │       ├── logs_panel.go        # Logs tab: live log table with level filtering
+│   │       ├── confirm_modal.go     # Confirmation dialog for destructive ops
+│   │       └── help_view.go         # Help overlay with keybinding reference
+│   └── tui/trace/                   # Trace capture (v1.2.0+)
+│       ├── ring_handler.go          # Custom slog.Handler with 1000-entry ring buffer
 │       ├── entry.go                 # TraceEntry structure
 │       └── types.go                 # Event types (EventTraceEntry, etc.)
 └── examples/
@@ -139,9 +146,11 @@ gcplane/
 | Version | Release | Focus |
 |---------|---------|-------|
 | v0.1–v0.7.0 | 2026-03-17–18 | Foundation → Interactive TUI |
-| **v0.7.2** | **2026-03-25** | **Credentials, Tenant Isolation** |
+| v0.7.2 | 2026-03-25 | Credentials, Tenant Isolation |
 | v0.8.0 | 2026-03-24 | First-class Multi-tenant (13 kinds) |
-| v0.9.0 | Planned | Advanced filtering & export |
+| v1.0.0 | 2026-04-02 | Production Release (14 kinds, removed TTSConfig/Tool) |
+| v1.1.0 | 2026-04-05 | Secure CLI & Grants (SecureCLI/SecureCLIGrant) |
+| **v1.2.0** | **2026-04-05** | **TUI Redesign: 3-tab layout, LLM trace capture, ViewRegistry architecture** |
 
 ### GoClaw Compatibility Matrix
 
@@ -252,27 +261,30 @@ Manifest values support `${ENV_VAR}` substitution and `file://path` references. 
 4. Expose status endpoints (/healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git)
 5. Graceful shutdown on SIGINT/SIGTERM
 
-### Top (interactive dashboard) — v1.2+
+### Top (Interactive Dashboard) — v1.2.0+
 1. Load + validate manifest
 2. Resolve connection config (flags > env > manifest)
-3. Create TUI app with extensible ViewRegistry:
-   a. Register 6 views: ResourceTable, ResourceDetail, DriftView, TraceView, ConfirmModal, HelpView
-   b. Create EventBus for publish/subscribe
-   c. Create RingHandler (1000 entries) for slog capture
-   d. Wire provider/engine logger → RingHandler → EventBus
-4. Start refresh goroutine on `--interval` (default 10s):
-   a. List all resources from GoClaw
-   b. Compute status (InSync, Drifted, Missing, Error, Extra)
-   c. Update shared model (atomic write)
-   d. Publish plan.updated event (views subscribe)
-5. Handle vim-style keybindings with tab-based navigation:
-   - Tab switching (s/l/e/t): Switch between State/Logs/Events/Trace tabs
-   - Ctrl+E: edit resource, Ctrl+D: delete resource, Ctrl+R: reconcile
-   - j/k: navigate, g/G: jump, Enter: show detail, d: show drift, r: refresh
-   - Number keys: context-sensitive per tab (kinds on State, levels on Logs/Trace, event types on Events)
-   - /: search, ?: help, Esc: dismiss dialog/return to table, q: quit
-   - Space: pause/resume stream (Logs/Events/Trace), c: clear filters, :: commands
+3. Create TUI app with ViewRegistry:
+   a. Register State (ResourceTable, ResourceDetail, DriftView)
+   b. Register Traces (TraceList, SpanTree, SpanDetail overlay)
+   c. Register Logs (LogsPanel)
+   d. Register overlays: ConfirmModal, HelpView
+   e. Create EventBus for typed pub/sub with QueueUpdateDraw
+   f. Create TraceStore (LLM trace cache) + LiveStore (event ring buffer, 500 entries)
+   g. Create RingHandler (1000 entries) for slog API call tracing
+   h. Wire reconciler/engine logger → RingHandler → EventBus
+4. Refresh loops:
+   - **State tab** (10s): List resources → compute status → update model → publish plan.updated
+   - **Traces tab** (3s polling on dirty flag): HTTP ListTraces → BuildSpanTree → update TraceStore → QueueUpdateDraw
+   - **Logs tab** (real-time): WS event stream → LiveStore ring buffer → dirty flag → 150ms refresh loop → QueueUpdateDraw
+5. Handle vim-style keybindings with global + tab-specific actions:
+   - **Global** (all tabs): S/T/L (uppercase tab switch), Ctrl+C/Q (quit), Esc (back), Ctrl+R/r (refresh), ? (help), : (command), / (search)
+   - **State**: j/k navigate, gg/G jump, Enter (detail), d (drift), 0-9 (kind filter), yy (copy ID), c (clear)
+   - **Traces**: Tab (focus toggle), l/h (drill), Enter (expand), Space/p (pause), yy (copy), c (clear)
+   - **Logs**: j/k navigate, 1-4 (level filter), Space/p (pause), yy (copy), c (clear)
 6. Views receive events:
-   - ResourceTable subscribes to plan.updated, refreshes on event
-   - TraceView subscribes to trace.*, displays real-time logs and API calls
-7. Graceful shutdown on Ctrl+C (close WS, cleanup tview)
+   - ResourceTable subscribes to plan.updated, refreshes on state change
+   - TraceList subscribes to trace.updated, polls API every 3s
+   - LogsPanel subscribes to WS event stream, displays real-time logs
+7. Overlay navigation: ViewRegistry stack with push/pop, Esc dismisses any overlay
+8. Graceful shutdown on Ctrl+C (close WS, cleanup tview)

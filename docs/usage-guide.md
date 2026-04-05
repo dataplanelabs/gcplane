@@ -267,82 +267,75 @@ gcplane top -f manifest.yaml --interval 5s
 gcplane top -f manifest.yaml --endpoint http://localhost:8080
 ```
 
-### Features
+### Features (v1.2.0+)
 
-- **Tabbed Interface**: State (S), Logs (L), Events (E), Trace (T) tabs — full-screen peer views
-- **Resource Browser** (State tab): Browse all 14 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, SecureCLI, SecureCLIGrant, CronJob, AgentTeam)
-- **Status Coloring**: InSync (green), Drifted (yellow), Missing/Error (red), Extra (blue)
-- **YAML View**: Press Enter to view full resource YAML with syntax highlighting
+- **3-Tab Layout**: State, Traces, Logs — full-screen peer views with live updates
+- **State Tab**: Browse all 14 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, SecureCLI, SecureCLIGrant, CronJob, AgentTeam)
+- **Traces Tab**: LLM agent traces with 2-panel split (TraceList on left 2:3, SpanTree on right 1:3), drill-down from span list to span detail, live polling every 3s
+- **Logs Tab**: Real-time log streaming with level filtering (1=debug, 2=info, 3=warn, 4=error)
+- **Status Coloring**: InSync (green), Drifted (yellow), Missing/Error (red), Extra (blue) — Catppuccin Mocha palette
+- **YAML Viewer**: Press Enter on resource to view full YAML with syntax highlighting (State tab)
 - **Drift Details**: Press `d` to see field-level drift comparison (State tab)
-- **Live Logs**: Real-time log streaming with level filtering (Logs tab)
-- **Live Events**: Real-time event feed with type filtering (Events tab)
-- **Live Trace**: Reconciliation events and API calls with level filtering (Trace tab)
-- **Vim Keybindings**: j/k navigate, g/G jump to start/end, q quit, ? help, : commands, / search
-- **Context-Sensitive Filtering**: Number keys do different things per tab (kinds on State, levels on Logs/Trace, type filters on Events)
-- **Auto-Refresh**: Configurable interval (default 10s), press `r` for manual refresh
-- **Search**: Press `/` to filter by resource name (case-insensitive, State tab)
+- **Span Details**: Press Enter on span row to see detailed trace information in overlay (Traces tab)
+- **Vim Keybindings**: j/k navigate, gg/G jump to start/end, yy copy ID, Tab toggle focus (Traces), : commands, / search
+- **Overlay Navigation**: Esc dismisses any overlay and returns to root view
+- **Auto-Refresh**: State 10s, Traces 3s polling, Logs real-time WS — manual refresh with Ctrl+R/r
+- **Search**: Press `/` to filter (resource name on State, trace name on Traces, log message on Logs)
 
 ### Keybindings
 
-#### Tab Navigation
+#### Tab Navigation (Global, disabled when overlay active)
 | Key | Action |
 |-----|--------|
-| `s` | Switch to State tab |
-| `l` | Switch to Logs tab |
-| `e` | Switch to Events tab |
-| `t` | Switch to Trace tab |
+| `S` (uppercase) | Switch to State tab |
+| `T` (uppercase) | Switch to Traces tab |
+| `L` (uppercase) | Switch to Logs tab |
 
 #### Global Controls
 | Key | Action |
 |-----|--------|
+| `Ctrl+C` / `Q` | Quit |
+| `Ctrl+R` / `r` | Refresh active tab |
 | `Ctrl+E` | Edit selected resource (State tab only) |
-| `Ctrl+D` | Delete selected resource (State tab only) |
-| `Ctrl+R` | Apply/reconcile all resources |
-| `q` | Quit |
-| `?` | Show help |
-| `Esc` | Dismiss dialog or return to table |
+| `Ctrl+D` | Delete selected resource (State tab) or page down (Traces/Logs) |
+| `Esc` | Dismiss overlay, drill up, clear active filter |
+| `?` | Show help overlay |
+| `:` | Enter command mode |
+| `/` | Enter search mode |
 
 #### State Tab (Resource Browser)
 | Key | Action |
 |-----|--------|
 | `j`/`k` | Navigate up/down |
-| `g` | Jump to start |
+| `gg` | Jump to start (two-key sequence) |
 | `G` | Jump to end |
 | `Enter` | View resource YAML details |
 | `d` | Show drift diff |
 | `0-9` | Filter by kind (0=all, 1=provider, 2=agent, 3=channel, 4=mcp, 5=skill, 6=cron, 7=team, 8=systemconfig, 9=securecli) |
-| `/` | Search by name |
+| `yy` | Copy selected resource ID (two-key sequence) |
+| `c` | Clear all filters |
+
+#### Traces Tab (LLM Agent Traces)
+| Key | Action |
+|-----|--------|
+| `j`/`k` | Navigate up/down |
+| `gg` / `G` | Jump to start/end |
+| `Tab` | Toggle focus between TraceList (left) and SpanTree (right) |
+| `l` / `h` | Drill in/out (navigate tree) |
+| `Enter` | View full span details in overlay |
+| `Space` / `p` | Pause/resume trace polling |
+| `yy` | Copy span ID |
 | `c` | Clear filters |
-| `r` | Manual refresh |
 
 #### Logs Tab (Log Streaming)
 | Key | Action |
 |-----|--------|
-| `1-4` | Filter by log level (1=debug, 2=info, 3=warn, 4=error) |
-| `Space` | Pause/resume log capture |
+| `j`/`k` | Navigate up/down |
+| `1-4` | Set minimum log level (1=debug, 2=info, 3=warn, 4=error) |
+| `Space` / `p` | Pause/resume log capture |
+| `Ctrl+D` | Page down |
+| `yy` | Copy log entry |
 | `c` | Clear level filter |
-| `r` | Manual refresh |
-
-#### Events Tab (Event Feed)
-| Key | Action |
-|-----|--------|
-| `1-6` | Filter by event type (1=all, 2=agent, 3=chat, 4=health, 5=cron, 6=team) |
-| `Space` | Pause/resume event capture |
-| `c` | Clear event filter |
-| `r` | Manual refresh |
-
-#### Trace Tab (Reconciliation Log)
-| Key | Action |
-|-----|--------|
-| `1-4` | Filter by trace level (1=debug, 2=info, 3=warn, 4=error) |
-| `Space` | Pause/resume trace capture |
-| `c` | Clear level filter |
-| `r` | Manual refresh |
-
-#### Command Mode
-| Key | Action |
-|-----|--------|
-| `:` | Enter command mode (`:agent`, `:provider`, `:cron`, `:team`, etc.) |
 
 ### Top Flags
 

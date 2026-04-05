@@ -1,10 +1,10 @@
 # GCPlane Codebase Summary
 
-Generated: 2026-04-03 | Based on repomix analysis and v1.0.0 release
+Generated: 2026-04-06 | Based on repomix analysis and v1.2.0 release
 
 ## Overview
 
-GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deployments. Single binary, under 10 deps, pure Go 1.25. Total codebase: ~14,778 LOC across cmd/ and internal/ packages with 161+ tests (81.3% coverage).
+GCPlane v1.2.0 is a declarative GitOps control plane for managing GoClaw deployments. Single binary, under 10 deps, pure Go 1.25. Total codebase: ~20,600 LOC across cmd/ and internal/ packages with 183+ tests (81.3%+ coverage).
 
 ## Quick Stats
 
@@ -13,7 +13,7 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 | **Language** | Go 1.25+ |
 | **Total Dependencies** | 5 direct |
 | **Test Coverage** | 81.3%+ (172+ tests, +11 TUI in v1.2) |
-| **Codebase Lines** | ~15,500 LOC (v1.2) |
+| **Codebase Lines** | ~20,600 LOC (v1.2.0) |
 | **Binary Size** | Single statically-linked executable |
 | **Resource Kinds** | 14 (Tenant + 8 core + 5 config) |
 | **Transport Protocols** | HTTP REST + WebSocket RPC v3 |
@@ -124,24 +124,36 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 | `server.go` | Server startup, graceful shutdown, middleware |
 | `handlers.go` | /healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git |
 
-### internal/tui/ — Interactive Terminal UI (v1.2+, ~3300 LOC)
-**Purpose**: k9s-style resource browser with extensible view architecture and real-time tracing
+### internal/tui/ — Interactive Terminal UI (v1.2.0+, ~5,754 LOC)
+**Purpose**: k9s-style resource browser with 3-tab layout, extensible view architecture, and real-time LLM trace capture
 
+**Core Components** (3,467 LOC):
 | File | Responsibility |
 |------|-----------------|
-| `app.go` | Main app, ViewRegistry wiring, refresh loop, layout |
-| `registry.go` | ViewRegistry: register/switch/stack views dynamically |
-| `event_bus.go` | Typed pub/sub with QueueUpdateDraw safety |
-| `model.go` | Thread-safe shared state, resource cache |
-| `keybindings.go` | Vim-style mode dispatch (browse, search, detail, drift, trace, help) |
+| `app.go` | Main orchestrator, wires layout/views/keybindings, manages refresh loops (State 10s, Traces 3s, Logs RT) |
+| `registry.go` | ViewRegistry: manage tab pages with overlay support (confirm modal, help, span detail) |
+| `event_bus.go` | Typed pub/sub with QueueUpdateDraw thread safety |
+| `model.go` | Thread-safe shared state with RWMutex for resource filtering |
+| `keybindings.go` | Vim-style input dispatcher with modal support, two-key sequences (gg, yy) |
+| `actions.go` | Resource operations (apply, delete, edit with $EDITOR) |
+| `attach.go` | HTTP polling client for remote gcplane serve instances |
+| `trace_store.go` | LLM trace data cache with atomic.Bool fetch gating |
+| `live_store.go` | Ring-buffered WS event stream (500-entry capacity) |
+
+**Views Layer** (2,287 LOC):
+| File | Responsibility |
+|------|-----------------|
 | `views/view.go` | View interface (Name, Primitive, Activate) |
-| `views/resource_table.go` | Resource list with status coloring |
+| `views/resource_table.go` | State tab: resource list with status coloring (InSync/Drifted/Missing/Error/Extra) |
 | `views/resource_detail.go` | YAML view with syntax highlighting |
 | `views/drift_view.go` | Field-level drift comparison (red/green diff) |
-| `views/trace_view.go` | Real-time reconciliation events, API calls, logs |
+| `views/trace_list.go` | Traces tab: list of traces (left panel, 2:3 ratio) |
+| `views/span_tree.go` | Traces tab: hierarchical span tree (right panel, 1:3 ratio) |
+| `views/span_detail.go` | Overlay: detailed trace span information |
+| `views/logs_panel.go` | Logs tab: live log table with level filtering |
 | `views/confirm_modal.go` | Confirmation dialog for destructive ops |
 | `views/help_view.go` | Help overlay with keybinding reference |
-| `trace/ring_handler.go` | slog.Handler with 1000-entry ring buffer |
+| `trace/ring_handler.go` | Custom slog.Handler with 1000-entry ring buffer for API call tracing |
 | `trace/entry.go` | TraceEntry structure |
 | `trace/types.go` | Event types (EventTraceEntry, etc.) |
 
@@ -163,8 +175,8 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 #### internal/update/ (~318 LOC)
 - `update.go` — Self-update checker via GitHub Releases
 
-#### internal/tui/ (~2191 LOC)
-- 12 files for k9s-style interactive TUI dashboard
+#### internal/tui/ (~5,754 LOC)
+- 21 files for k9s-style TUI with 3-tab layout (State/Traces/Logs), LLM trace capture, and remote attach mode
 
 ### examples/ — Reference Manifests
 - **minimal.yaml** — Bare minimum (1 provider, 1 agent)
@@ -272,12 +284,12 @@ GoClaw uses UUIDs internally. GCPlane manifests use human-readable names. Resolu
 ## Testing
 
 ### Test Coverage
-- **Overall**: 81.3%+ (172+ tests, +11 TUI tests in v1.2)
+- **Overall**: 81.3%+ (183+ tests)
 - **Provider**: 81.9% (HTTP + WS mock tests)
 - **Source**: 86.0% (FileSource dirs + GitSource)
 - **Controller**: 91.4% (reconcile loop + metrics)
 - **Reconciler**: High coverage via table-driven tests
-- **TUI**: 27 tests (ResourceTable, Registry, RingHandler, smoke test)
+- **TUI**: 27 tests (ResourceTable, TraceStore, Registry, RingHandler, LiveStore, smoke test)
 
 ### Test Organization
 - Unit tests alongside source files (`*_test.go`)

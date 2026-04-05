@@ -115,14 +115,18 @@
 - Updated dependency order: Channel → CronJob → SecureCLI → SecureCLIGrant → AgentTeam
 - Resource kinds expanded from 12 to 14
 
-### v1.2.0 (2026-04-05) — TUI Extensibility + Trace
-- TUI extensibility: View interface + ViewRegistry pattern for modular view registration
-- EventBus: Typed publish/subscribe with QueueUpdateDraw safety for thread-safe UI updates
-- Trace view (`t` key): Real-time reconciliation events, API calls, error context
-- Ring handler: slog.Handler capture with 1000-entry ring buffer for trace data
-- API request logging: HTTP client method, path, status, duration in trace
-- 11 new tests (27 total TUI tests), race-detector clean
-- 6 registered views: ResourceTable, ResourceDetail, DriftView, TraceView, ConfirmModal, HelpView
+### v1.2.0 (2026-04-05) — TUI Redesign: 3-Tab Layout + LLM Trace Monitoring
+- **Tab Layout Redesign**: Replaced 4-tab (State/Logs/Events/Trace) with 3-tab (State/Traces/Logs)
+- **LLM Agent Traces**: New Traces tab with 2-panel split (TraceList left 2:3, SpanTree right 1:3), live polling every 3s
+- **TraceStore**: Thread-safe LLM trace cache with WS event forwarding, atomic fetch gating, dirty flag pattern
+- **LiveStore**: Ring-buffered WS event stream (500 entries) with wraparound semantics
+- **ViewRegistry**: Tab page + overlay management with push/pop stack navigation (Esc-driven back)
+- **EventBus**: Typed publish/subscribe with QueueUpdateDraw thread safety for concurrent updates
+- **RingHandler**: Custom slog.Handler with 1000-entry ring buffer for API call tracing
+- **Keybindings v1.2**: Vim-style with two-key sequences (gg, yy), Tab focus toggle (Traces), uppercase S/T/L for tab switch
+- **SpanDetail Overlay**: Drill-down to individual span with tokens, cache metrics, thinking tokens, input/output previews
+- **27 Tests Total**: TraceStore, LiveStore, Registry, RingHandler, ResourceTable, smoke test (race-clean)
+- **5,754 LOC TUI**: 3,467 core components + 2,287 views + 1,000 entry ring buffer storage
 - No new external dependencies
 
 ## Release Timeline

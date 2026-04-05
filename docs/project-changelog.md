@@ -55,10 +55,3 @@ All notable changes to GCPlane are documented here.
 
 ### Added
 - SHA-256 hash tracking for write-only fields to detect meaningful changes despite API masking.
-
----
-
-## [v1.2.0] — 2026-04-05 (Earlier Releases)
-
-### Previous Versions
-- v1.1.5, v1.1.4, v1.1.3, ... (see git log for pre-v1.2.0 history)
