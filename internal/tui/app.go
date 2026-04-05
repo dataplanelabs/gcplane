@@ -173,6 +173,10 @@ func (a *App) buildLayout() {
 	a.registry.Register(a.table)
 
 	a.logsPanel = views.NewLogsPanel()
+	a.logsPanel.OnCopy = func(text string) {
+		_ = views.CopyToClipboard(text)
+		a.showStatus(views.Tag(views.HexGreen, "Copied log entry"))
+	}
 	a.registry.Register(a.logsPanel)
 
 	a.tracesPanel = views.NewTracesPanel()
@@ -470,7 +474,7 @@ func (a *App) focusActiveTab() {
 	case TabTraces:
 		a.tapp.SetFocus(a.tracesPanel.FocusPrimitive())
 	case TabLogs:
-		a.tapp.SetFocus(a.logsPanel.TextView)
+		a.tapp.SetFocus(a.logsPanel.Table)
 	}
 }
 

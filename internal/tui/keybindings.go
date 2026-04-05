@@ -148,10 +148,7 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 		h.handleClearFilters()
 		return nil
 	case 'y':
-		// On Traces tab, pass y to focused component (copy)
-		if h.app.registry.ActiveTab() == TabTraces {
-			return event
-		}
+		// Pass y to focused component for copy (Traces + Logs tabs)
 		return event
 	case 'o', 'O':
 		// On Traces tab, pass o/O to focused component (expand/collapse)

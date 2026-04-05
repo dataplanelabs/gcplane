@@ -30,26 +30,44 @@ var logLevelRank = map[string]int{
 	"debug": 0, "info": 1, "warn": 2, "error": 3,
 }
 
-// LogsPanel displays live GoClaw server logs in the bottom panel.
+// LogsPanel displays live GoClaw server logs with selectable rows.
 type LogsPanel struct {
-	TextView *tview.TextView
-	paused   bool
-	levelMin string // minimum level to show: "debug", "info", "warn", "error"
+	flex      *tview.Flex
+	Table     *tview.Table
+	statusBar *tview.TextView
+	OnCopy    func(text string) // called when y is pressed on a row
+	paused    bool
+	levelMin  string     // minimum level to show
+	entries   []LogEntry // current visible entries backing the table
 }
 
-// NewLogsPanel creates a logs panel view.
+// NewLogsPanel creates a logs panel view with a selectable table.
 func NewLogsPanel() *LogsPanel {
-	tv := tview.NewTextView().
+	table := tview.NewTable().
+		SetSelectable(true, false).
+		SetFixed(1, 0).
+		SetSeparator(' ')
+	table.SetBackgroundColor(ColorBase)
+	table.SetSelectedStyle(tcell.StyleDefault.
+		Background(ColorSurface0).
+		Foreground(ColorText))
+
+	statusBar := tview.NewTextView().
 		SetDynamicColors(true).
-		SetScrollable(true).
-		SetWordWrap(false)
-	tv.SetBackgroundColor(ColorBase)
+		SetTextAlign(tview.AlignLeft)
+	statusBar.SetBackgroundColor(ColorBase)
+
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(table, 0, 1, true).
+		AddItem(statusBar, 1, 0, false)
 
 	p := &LogsPanel{
-		TextView: tv,
-		levelMin: "info",
+		flex:      flex,
+		Table:     table,
+		statusBar: statusBar,
+		levelMin:  "info",
 	}
-	tv.SetInputCapture(p.handleInput)
+	table.SetInputCapture(p.handleInput)
 	return p
 }
 
@@ -57,50 +75,86 @@ func NewLogsPanel() *LogsPanel {
 func (p *LogsPanel) Name() string { return "logs" }
 
 // Primitive implements View.
-func (p *LogsPanel) Primitive() tview.Primitive { return p.TextView }
+func (p *LogsPanel) Primitive() tview.Primitive { return p.flex }
 
 // Activate implements View.
 func (p *LogsPanel) Activate() {}
 
-// Refresh renders log entries from LiveStore snapshot (called from tick-based redraw).
+// Refresh renders log entries from LiveStore snapshot.
 func (p *LogsPanel) Refresh(entries []LogEntry) {
-	var b strings.Builder
-	shown := 0
+	p.Table.Clear()
+	p.renderHeader()
+
 	minRank := logLevelRank[p.levelMin]
+	p.entries = p.entries[:0]
 
 	for _, e := range entries {
 		if logLevelRank[e.Level] < minRank {
 			continue
 		}
-		b.WriteString(p.formatEntry(e))
-		b.WriteByte('\n')
-		shown++
+		p.entries = append(p.entries, e)
 	}
 
-	// Status line
-	pauseTag := ""
-	if p.paused {
-		pauseTag = Tag(HexYellow, "[PAUSED] ")
+	if len(p.entries) == 0 {
+		p.Table.SetCell(1, 0, tview.NewTableCell(
+			Tag(HexOverlay0, "  No log entries")).
+			SetExpansion(1).SetSelectable(false))
+	} else {
+		for i, e := range p.entries {
+			p.renderRow(i+1, e)
+		}
 	}
-	status := fmt.Sprintf("\n%s%s %d/%d entries | Level: %s+",
-		pauseTag, Tag(HexOverlay0, "---"), shown, len(entries), logLevelLabel[p.levelMin])
-	b.WriteString(status)
 
-	p.TextView.SetText(b.String())
-	if !p.paused {
-		p.TextView.ScrollToEnd()
+	// Auto-scroll to bottom if not paused
+	if !p.paused && len(p.entries) > 0 {
+		p.Table.Select(len(p.entries), 0)
 	}
+
+	p.updateStatusBar(len(p.entries), len(entries))
 }
 
 // RefreshUnavailable shows a fallback message when logs.tail is not available.
 func (p *LogsPanel) RefreshUnavailable(reason string) {
-	p.TextView.SetText(Tag(HexOverlay0, "\n  "+reason))
+	p.Table.Clear()
+	p.renderHeader()
+	p.Table.SetCell(1, 0, tview.NewTableCell(
+		Tag(HexOverlay0, "  "+reason)).
+		SetExpansion(1).SetSelectable(false))
 }
 
-// formatEntry renders a single log entry with Catppuccin colors.
-func (p *LogsPanel) formatEntry(e LogEntry) string {
-	ts := Tag(HexOverlay0, e.Time.Format("15:04:05.000"))
+// renderHeader draws the fixed header row.
+func (p *LogsPanel) renderHeader() {
+	headers := []struct {
+		text      string
+		expansion int
+		width     int
+	}{
+		{"Time", 0, 14},
+		{"Level", 0, 6},
+		{"Source", 0, 16},
+		{"Message", 1, 0},
+	}
+	for col, h := range headers {
+		cell := tview.NewTableCell(" " + h.text).
+			SetTextColor(ColorSubtext0).
+			SetSelectable(false).
+			SetBackgroundColor(ColorMantle)
+		if h.expansion > 0 {
+			cell.SetExpansion(h.expansion)
+		} else {
+			cell.SetMaxWidth(h.width)
+		}
+		p.Table.SetCell(0, col, cell)
+	}
+}
 
+// renderRow draws a single log entry row.
+func (p *LogsPanel) renderRow(row int, e LogEntry) {
+	// Time
+	p.Table.SetCell(row, 0, tview.NewTableCell(" "+e.Time.Format("15:04:05.000")).
+		SetTextColor(ColorOverlay0).SetMaxWidth(14))
+
+	// Level
 	hex := logLevelHex[e.Level]
 	if hex == "" {
 		hex = HexText
@@ -109,20 +163,113 @@ func (p *LogsPanel) formatEntry(e LogEntry) string {
 	if label == "" {
 		label = e.Level
 	}
-	lvl := Tag(hex, label)
+	color, _ := colorFromHex(hex)
+	p.Table.SetCell(row, 1, tview.NewTableCell(label).
+		SetTextColor(color).SetMaxWidth(6))
 
-	src := ""
-	if e.Source != "" {
-		src = Tag(HexSky, e.Source) + " "
+	// Source
+	src := e.Source
+	if len(src) > 14 {
+		src = src[:11] + "..."
 	}
+	p.Table.SetCell(row, 2, tview.NewTableCell(src).
+		SetTextColor(ColorSky).SetMaxWidth(16))
 
-	attrs := p.formatAttrs(e.Attrs)
-
-	return fmt.Sprintf(" %s %s %s%s %s", ts, lvl, src, Tag(HexText, e.Message), attrs)
+	// Message + attrs
+	msg := e.Message
+	attrs := formatLogAttrs(e.Attrs)
+	if attrs != "" {
+		msg += " " + attrs
+	}
+	p.Table.SetCell(row, 3, tview.NewTableCell(msg).
+		SetTextColor(ColorText).SetExpansion(1))
 }
 
-// formatAttrs renders key=value pairs in muted color, sorted by key.
-func (p *LogsPanel) formatAttrs(attrs map[string]string) string {
+// SelectedEntry returns the text of the currently selected log row.
+func (p *LogsPanel) SelectedEntry() string {
+	row, _ := p.Table.GetSelection()
+	idx := row - 1 // header offset
+	if idx < 0 || idx >= len(p.entries) {
+		return ""
+	}
+	e := p.entries[idx]
+	attrs := formatLogAttrs(e.Attrs)
+	s := fmt.Sprintf("%s %s %s %s", e.Time.Format("15:04:05.000"), e.Level, e.Source, e.Message)
+	if attrs != "" {
+		s += " " + attrs
+	}
+	return s
+}
+
+// SetLevelMin sets the minimum log level filter.
+func (p *LogsPanel) SetLevelMin(level string) { p.levelMin = level }
+
+// TogglePause toggles the pause state.
+func (p *LogsPanel) TogglePause() {
+	p.paused = !p.paused
+}
+
+// handleInput processes vim keybindings on the logs table.
+func (p *LogsPanel) handleInput(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Rune() {
+	case 'j':
+		return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone)
+	case 'k':
+		return tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone)
+	case 'g':
+		p.Table.Select(1, 0)
+		return nil
+	case 'G':
+		if rowCount := p.Table.GetRowCount(); rowCount > 1 {
+			p.Table.Select(rowCount-1, 0)
+		}
+		return nil
+	case 'y':
+		if text := p.SelectedEntry(); text != "" && p.OnCopy != nil {
+			p.OnCopy(text)
+		}
+		return nil
+	}
+
+	// Ctrl+D: half-page down
+	if event.Key() == tcell.KeyCtrlD {
+		row, col := p.Table.GetSelection()
+		_, _, _, height := p.Table.GetInnerRect()
+		newRow := row + height/2
+		if max := p.Table.GetRowCount() - 1; newRow > max {
+			newRow = max
+		}
+		p.Table.Select(newRow, col)
+		return nil
+	}
+	// Ctrl+U: half-page up
+	if event.Key() == tcell.KeyCtrlU {
+		row, col := p.Table.GetSelection()
+		_, _, _, height := p.Table.GetInnerRect()
+		newRow := row - height/2
+		if newRow < 1 {
+			newRow = 1
+		}
+		p.Table.Select(newRow, col)
+		return nil
+	}
+
+	return event
+}
+
+// updateStatusBar renders the status bar with current state.
+func (p *LogsPanel) updateStatusBar(shown, total int) {
+	pauseTag := ""
+	if p.paused {
+		pauseTag = Tag(HexYellow, "[PAUSED] ")
+	}
+	status := fmt.Sprintf(" %s%s %d/%d entries | Level: %s+",
+		pauseTag, Tag(HexOverlay0, "---"), shown, total, logLevelLabel[p.levelMin])
+	p.statusBar.SetText(status)
+}
+
+// formatLogAttrs renders key=value pairs sorted by key.
+func formatLogAttrs(attrs map[string]string) string {
 	if len(attrs) == 0 {
 		return ""
 	}
@@ -133,18 +280,27 @@ func (p *LogsPanel) formatAttrs(attrs map[string]string) string {
 	sort.Strings(keys)
 	var parts []string
 	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%s", k, attrs[k]))
+		parts = append(parts, k+"="+attrs[k])
 	}
-	return Tag(HexOverlay0, strings.Join(parts, " "))
+	return strings.Join(parts, " ")
 }
 
-// SetLevelMin sets the minimum log level filter.
-func (p *LogsPanel) SetLevelMin(level string) { p.levelMin = level }
-
-// TogglePause toggles the pause state.
-func (p *LogsPanel) TogglePause() { p.paused = !p.paused }
-
-// handleInput processes scroll-only keybindings (j/k/g/G).
-func (p *LogsPanel) handleInput(event *tcell.EventKey) *tcell.EventKey {
-	return VimScrollInput(p.TextView)(event)
+// colorFromHex converts a hex color string to tcell.Color.
+func colorFromHex(hex string) (tcell.Color, bool) {
+	switch hex {
+	case HexOverlay0:
+		return ColorOverlay0, true
+	case HexGreen:
+		return ColorGreen, true
+	case HexYellow:
+		return ColorYellow, true
+	case HexRed:
+		return ColorRed, true
+	case HexBlue:
+		return ColorBlue, true
+	case HexText:
+		return ColorText, true
+	default:
+		return ColorText, false
+	}
 }
