@@ -1,6 +1,7 @@
 # Per-tenant config overrides for Acme Corp.
-# BuiltinToolConfig: enable/disable builtin tools for this tenant.
+# BuiltinToolConfig: enable/disable builtin tools and configure provider chains.
 # Tool names use kebab-case (converted to snake_case for GoClaw API).
+# Provider chain settings are write-only (sent on apply, not compared on plan).
 resources:
   - kind: BuiltinToolConfig
     name: exec
@@ -16,3 +17,22 @@ resources:
     name: read-file
     spec:
       enabled: true
+
+  # Provider chain: ordered fallback list — first enabled provider is tried first.
+  # If it fails, the next provider in the chain is used.
+  - kind: BuiltinToolConfig
+    name: create-image
+    spec:
+      enabled: true
+      settings:
+        providers:
+          - provider: openrouter
+            model: google/gemini-2.5-flash-image
+            timeout: 120
+            retries: 2
+            enabled: true
+          - provider: openrouter
+            model: google/gemini-3.1-flash-image-preview
+            timeout: 120
+            retries: 2
+            enabled: true
