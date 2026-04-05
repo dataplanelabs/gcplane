@@ -329,7 +329,7 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 	// avoiding a second secret resolution that could produce a different value.
 	desiredHash := rc.change.WriteOnlyHash
 	observedHash, _ := rc.current[WriteOnlyHashField].(string)
-	if desiredHash != "" && desiredHash != observedHash {
+	if desiredHash != "" && observedHash != "" && desiredHash != observedHash {
 		e.logger.Info("write-only hash mismatch",
 			slog.String("kind", string(rc.resource.Kind)),
 			slog.String("name", rc.resource.Name),

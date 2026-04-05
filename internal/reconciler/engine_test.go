@@ -250,8 +250,8 @@ func TestReconcile_ExecuteInjectsWriteOnlyHash(t *testing.T) {
 
 func TestReconcile_WriteOnlyHashDriftDetected(t *testing.T) {
 	provider := newMockProvider()
-	// Agent exists in GoClaw with no hash (simulating first reconcile on existing cluster)
-	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4"}
+	// Agent exists in GoClaw with a stale hash (simulating write-only field change)
+	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4", "writeOnlyHash": "stale-hash"}
 
 	engine := NewEngine(provider, nil)
 	m := &manifest.Manifest{
@@ -278,6 +278,32 @@ func TestReconcile_WriteOnlyHashDriftDetected(t *testing.T) {
 				t.Error("expected writeOnlyHash in diff")
 			}
 		}
+	}
+}
+
+func TestReconcile_WriteOnlyHashMissingIsNoop(t *testing.T) {
+	// Resource exists but GoClaw doesn't store/return writeOnlyHash.
+	// Without an observed hash, comparison is skipped to avoid permanent update drift.
+	provider := newMockProvider()
+	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4"} // no writeOnlyHash
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindAgent,
+				Name: "bot",
+				Spec: map[string]any{
+					"model":        "gpt-4",
+					"contextFiles": []any{map[string]any{"IDENTITY.md": "I am a bot"}},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected noop (no observed hash to compare), got noops=%d updates=%d", plan.Noops, plan.Updates)
 	}
 }
 
@@ -311,8 +337,8 @@ func TestReconcile_WriteOnlyHashMatchesNoop(t *testing.T) {
 
 func TestReconcile_WriteOnlyHashIgnoreAnnotation(t *testing.T) {
 	provider := newMockProvider()
-	// Agent exists with no hash — normally would trigger update
-	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4"}
+	// Agent exists with stale hash — normally would trigger update, but annotation disables it
+	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4", "writeOnlyHash": "stale-hash"}
 
 	engine := NewEngine(provider, nil)
 	m := &manifest.Manifest{
