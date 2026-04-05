@@ -41,16 +41,21 @@ func (a *App) applyAll() {
 
 // doApply runs the actual reconciliation in a goroutine.
 func (a *App) doApply() {
-	_, result := a.Engine.Reconcile(context.Background(), a.Manifest, reconciler.ReconcileOpts{DryRun: false})
+	plan, result := a.Engine.Reconcile(context.Background(), a.Manifest, reconciler.ReconcileOpts{DryRun: false})
 
 	// Refresh to show updated state
 	a.refresh()
 
 	a.tapp.QueueUpdateDraw(func() {
-		if result.Failed > 0 {
-			a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Applied: %d, Failed: %d", result.Applied, result.Failed)))
+		summary := fmt.Sprintf("Applied: %d, Failed: %d, Creates: %d, Updates: %d",
+			result.Applied, result.Failed, plan.Creates, plan.Updates)
+		if len(result.Errors) > 0 {
+			summary += " | Errors: " + result.Errors[0]
+		}
+		if result.Failed > 0 || result.Applied == 0 {
+			a.showStatus(views.Tag(views.HexRed, summary))
 		} else {
-			a.showStatus(views.Tag(views.HexGreen, fmt.Sprintf("Applied %d change(s) successfully", result.Applied)))
+			a.showStatus(views.Tag(views.HexGreen, summary))
 		}
 	})
 }
