@@ -164,7 +164,7 @@ func (a *App) buildLayout() {
 
 	// Command bar — 1 row input
 	a.cmdBar = tview.NewInputField().
-		SetLabel(":").
+		SetLabel("").
 		SetFieldWidth(0).
 		SetDoneFunc(a.onCommandDone)
 	a.cmdBar.SetFieldBackgroundColor(views.ColorMantle)
@@ -389,12 +389,14 @@ func (a *App) toggleHelp() {
 
 // activateCommandBar focuses the command bar input.
 func (a *App) activateCommandBar() {
+	a.cmdBar.SetLabel(":")
 	a.cmdBar.SetText("")
 	a.tapp.SetFocus(a.cmdBar)
 }
 
 // deactivateCommandBar returns focus to the main content.
 func (a *App) deactivateCommandBar() {
+	a.cmdBar.SetLabel("")
 	a.cmdBar.SetText("")
 	a.tapp.SetFocus(a.table.Table)
 }
@@ -538,7 +540,7 @@ func (a *App) onSearchDone(key tcell.Key) {
 	if key == tcell.KeyEscape {
 		a.model.SetFilter("")
 		a.keys.mode = ModeNormal
-		a.cmdBar.SetLabel(":")
+		a.cmdBar.SetLabel("")
 		a.cmdBar.SetDoneFunc(a.onCommandDone)
 		a.deactivateCommandBar()
 		a.refreshTable()
@@ -548,7 +550,7 @@ func (a *App) onSearchDone(key tcell.Key) {
 		filter := a.cmdBar.GetText()
 		a.model.SetFilter(filter)
 		a.keys.mode = ModeNormal
-		a.cmdBar.SetLabel(":")
+		a.cmdBar.SetLabel("")
 		a.cmdBar.SetDoneFunc(a.onCommandDone)
 		a.deactivateCommandBar()
 		a.refreshTable()

@@ -200,7 +200,7 @@ func (a *App) showStatus(msg string) {
 		a.tapp.QueueUpdateDraw(func() {
 			// Only clear if the label still matches (hasn't been replaced by a newer message)
 			if a.cmdBar.GetLabel() == msg {
-				a.cmdBar.SetLabel(":")
+				a.cmdBar.SetLabel("")
 			}
 		})
 	}()
