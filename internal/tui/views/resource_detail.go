@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"gopkg.in/yaml.v3"
 )
@@ -31,27 +30,7 @@ func NewResourceDetail() *ResourceDetail {
 	tv.SetTitleColor(ColorMauve)
 
 	// Vim-style scrolling
-	tv.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'j':
-			row, col := tv.GetScrollOffset()
-			tv.ScrollTo(row+1, col)
-			return nil
-		case 'k':
-			row, col := tv.GetScrollOffset()
-			if row > 0 {
-				tv.ScrollTo(row-1, col)
-			}
-			return nil
-		case 'g':
-			tv.ScrollToBeginning()
-			return nil
-		case 'G':
-			tv.ScrollToEnd()
-			return nil
-		}
-		return event
-	})
+	tv.SetInputCapture(VimScrollInput(tv))
 
 	return &ResourceDetail{TextView: tv}
 }
@@ -147,11 +126,12 @@ func colorizeValue(val string) string {
 	}
 }
 
-// isNumeric checks if a string looks like a number.
+// isNumeric checks if a string looks like a number (integer or float, optionally negative).
 func isNumeric(s string) bool {
 	if len(s) == 0 {
 		return false
 	}
+	hasDigit := false
 	for i, c := range s {
 		if c == '-' && i == 0 {
 			continue
@@ -159,9 +139,11 @@ func isNumeric(s string) bool {
 		if c == '.' {
 			continue
 		}
-		if c < '0' || c > '9' {
-			return false
+		if c >= '0' && c <= '9' {
+			hasDigit = true
+			continue
 		}
+		return false
 	}
-	return true
+	return hasDigit
 }

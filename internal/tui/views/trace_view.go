@@ -168,22 +168,6 @@ func (tv *TraceView) formatAttrs(attrs map[string]any) string {
 // handleInput processes trace-specific keybindings.
 func (tv *TraceView) handleInput(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Rune() {
-	case 'j':
-		row, col := tv.TextView.GetScrollOffset()
-		tv.TextView.ScrollTo(row+1, col)
-		return nil
-	case 'k':
-		row, col := tv.TextView.GetScrollOffset()
-		if row > 0 {
-			tv.TextView.ScrollTo(row-1, col)
-		}
-		return nil
-	case 'g':
-		tv.TextView.ScrollToBeginning()
-		return nil
-	case 'G':
-		tv.TextView.ScrollToEnd()
-		return nil
 	case ' ':
 		tv.paused = !tv.paused
 		tv.Refresh()
@@ -211,5 +195,6 @@ func (tv *TraceView) handleInput(event *tcell.EventKey) *tcell.EventKey {
 		tv.Refresh()
 		return nil
 	}
-	return event
+	// Delegate vim scroll keys (j/k/g/G)
+	return VimScrollInput(tv.TextView)(event)
 }

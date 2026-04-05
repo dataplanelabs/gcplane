@@ -125,6 +125,13 @@ func (m *Model) GetManifestName() string {
 	return m.manifestName
 }
 
+// SetManifestName sets the manifest name under the write lock.
+func (m *Model) SetManifestName(name string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.manifestName = name
+}
+
 // GetEndpoint returns the GoClaw endpoint.
 func (m *Model) GetEndpoint() string {
 	m.mu.RLock()

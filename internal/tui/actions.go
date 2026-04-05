@@ -15,6 +15,10 @@ import (
 
 // applyAll triggers a real reconciliation (non-dry-run) with confirmation.
 func (a *App) applyAll() {
+	if a.Engine == nil {
+		a.showStatus(views.Tag(views.HexYellow, "Apply not available in attach mode"))
+		return
+	}
 	plan := a.model.GetPlan()
 	if plan == nil {
 		return
@@ -63,6 +67,10 @@ func (a *App) doApply() {
 
 // deleteResource deletes the selected resource with confirmation.
 func (a *App) deleteResource() {
+	if a.Provider == nil {
+		a.showStatus(views.Tag(views.HexYellow, "Delete not available in attach mode"))
+		return
+	}
 	c := a.table.GetSelectedChange()
 	if c == nil {
 		return
@@ -192,16 +200,18 @@ func (a *App) editResource() {
 }
 
 // showStatus displays a temporary message in the command bar, auto-clearing after 5 seconds.
+// Uses a timer instead of a goroutine to avoid goroutine leaks on rapid calls.
 func (a *App) showStatus(msg string) {
 	a.cmdBar.SetLabel(msg)
 	a.cmdBar.SetText("")
-	go func() {
-		time.Sleep(5 * time.Second)
+	if a.statusTimer != nil {
+		a.statusTimer.Stop()
+	}
+	a.statusTimer = time.AfterFunc(5*time.Second, func() {
 		a.tapp.QueueUpdateDraw(func() {
-			// Only clear if the label still matches (hasn't been replaced by a newer message)
 			if a.cmdBar.GetLabel() == msg {
 				a.cmdBar.SetLabel("")
 			}
 		})
-	}()
+	})
 }

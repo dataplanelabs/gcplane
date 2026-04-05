@@ -54,6 +54,8 @@ type App struct {
 	// Attach mode — poll a running gcplane serve instance
 	attachClient *AttachClient
 	tenant       string // current tenant in multi-tenant attach mode
+
+	statusTimer *time.Timer // guards against goroutine leak in showStatus
 }
 
 // Config holds the parameters for creating a new TUI App.
@@ -91,7 +93,7 @@ func NewApp(cfg Config) (*App, error) {
 		app.attachClient = client
 		app.Provider = &stubProvider{baseURL: cfg.Attach}
 		app.model = NewModel(nil, cfg.Attach, interval)
-		app.model.manifestName = "attached: " + cfg.Attach
+		app.model.SetManifestName("attached: " + cfg.Attach)
 	} else {
 		app.model = NewModel(cfg.Manifest, cfg.Endpoint, interval)
 	}
@@ -231,6 +233,9 @@ func (a *App) refreshDirect() {
 	a.tapp.QueueUpdateDraw(func() {
 		a.table.Refresh(a.model.GetChanges())
 		a.updateHeader()
+		if len(plan.Errors) > 0 {
+			a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("%d observe error(s): %s", len(plan.Errors), plan.Errors[0])))
+		}
 	})
 	a.bus.Publish(Event{Type: EventPlanUpdated})
 }
@@ -490,11 +495,11 @@ func (a *App) handleTenantCommand(cmd string) {
 	if len(parts) == 1 {
 		// Clear tenant filter
 		a.tenant = ""
-		a.model.manifestName = "attached: " + a.attachClient.baseURL
+		a.model.SetManifestName("attached: " + a.attachClient.baseURL)
 		a.showStatus(views.Tag(views.HexGreen, "Showing all tenants"))
 	} else {
 		a.tenant = parts[1]
-		a.model.manifestName = "tenant: " + a.tenant
+		a.model.SetManifestName("tenant: " + a.tenant)
 		a.showStatus(views.Tag(views.HexGreen, fmt.Sprintf("Switched to tenant: %s", a.tenant)))
 	}
 	a.triggerRefresh()

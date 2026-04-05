@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/controller"
@@ -37,7 +38,7 @@ func (c *AttachClient) FetchStatus() (*controller.SyncStatus, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -55,13 +56,13 @@ func (c *AttachClient) FetchStatus() (*controller.SyncStatus, error) {
 
 // FetchTenantStatus fetches status for a specific tenant.
 func (c *AttachClient) FetchTenantStatus(tenant string) (*controller.SyncStatus, error) {
-	resp, err := c.httpClient.Get(c.baseURL + "/api/v1/status/" + tenant)
+	resp, err := c.httpClient.Get(c.baseURL + "/api/v1/status/" + url.PathEscape(tenant))
 	if err != nil {
 		return nil, fmt.Errorf("connect to serve: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -85,7 +86,7 @@ func (c *AttachClient) FetchTenantsStatus() (map[string]controller.SyncStatus, e
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -122,7 +123,7 @@ func (c *AttachClient) TriggerSync() error {
 
 // TriggerTenantSync triggers sync for a specific tenant.
 func (c *AttachClient) TriggerTenantSync(tenant string) error {
-	resp, err := c.httpClient.Post(c.baseURL+"/api/v1/sync/"+tenant, "application/json", nil)
+	resp, err := c.httpClient.Post(c.baseURL+"/api/v1/sync/"+url.PathEscape(tenant), "application/json", nil)
 	if err != nil {
 		return fmt.Errorf("trigger sync: %w", err)
 	}

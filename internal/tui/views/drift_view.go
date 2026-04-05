@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -26,27 +25,7 @@ func NewDriftView() *DriftView {
 	tv.SetTitleColor(ColorYellow)
 
 	// Vim-style scrolling
-	tv.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'j':
-			row, col := tv.GetScrollOffset()
-			tv.ScrollTo(row+1, col)
-			return nil
-		case 'k':
-			row, col := tv.GetScrollOffset()
-			if row > 0 {
-				tv.ScrollTo(row-1, col)
-			}
-			return nil
-		case 'g':
-			tv.ScrollToBeginning()
-			return nil
-		case 'G':
-			tv.ScrollToEnd()
-			return nil
-		}
-		return event
-	})
+	tv.SetInputCapture(VimScrollInput(tv))
 
 	return &DriftView{TextView: tv}
 }
@@ -115,15 +94,15 @@ func renderDiff(diffs map[string]reconciler.FieldDiff) string {
 }
 
 // formatDiffVal formats a diff value for display, truncating long values.
+// Truncation happens before escaping to avoid cutting inside a tview tag sequence.
 func formatDiffVal(v any) string {
 	if v == nil {
 		return "(none)"
 	}
 	s := fmt.Sprintf("%v", v)
-	// Escape tview color tags
-	s = strings.ReplaceAll(s, "[", "[[]")
 	if len(s) > 80 {
-		return s[:77] + "..."
+		s = s[:77] + "..."
 	}
+	s = strings.ReplaceAll(s, "[", "[[]")
 	return strings.TrimSpace(s)
 }

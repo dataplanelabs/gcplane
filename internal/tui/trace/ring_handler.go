@@ -81,10 +81,11 @@ func (h *RingHandler) Handle(_ context.Context, r slog.Record) error {
 	c.mu.Lock()
 	c.entries[c.pos%c.size] = entry
 	c.pos++
+	onEntry := c.onEntry // capture under lock
 	c.mu.Unlock()
 
-	if c.onEntry != nil {
-		c.onEntry(entry)
+	if onEntry != nil {
+		onEntry(entry)
 	}
 	return nil
 }

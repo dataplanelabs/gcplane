@@ -123,9 +123,8 @@ func TestResourceTableGetSelectedChange(t *testing.T) {
 	}
 }
 
-func TestKindOrderMap(t *testing.T) {
-	m := kindOrderMap()
-	if m[manifest.KindProvider] >= m[manifest.KindAgent] {
+func TestKindOrder(t *testing.T) {
+	if kindOrder[manifest.KindProvider] >= kindOrder[manifest.KindAgent] {
 		t.Error("Provider should come before Agent in order")
 	}
 }

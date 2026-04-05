@@ -73,7 +73,6 @@ func (rt *ResourceTable) Refresh(changes []reconciler.Change) {
 	// Sort changes: by kind order, then name alphabetically
 	sorted := make([]reconciler.Change, len(changes))
 	copy(sorted, changes)
-	kindOrder := kindOrderMap()
 	sort.Slice(sorted, func(i, j int) bool {
 		oi, oj := kindOrder[sorted[i].Kind], kindOrder[sorted[j].Kind]
 		if oi != oj {
@@ -227,11 +226,12 @@ func actionToStatus(c reconciler.Change) string {
 	}
 }
 
-// kindOrderMap returns a map of ResourceKind to its position in ApplyOrder.
-func kindOrderMap() map[manifest.ResourceKind]int {
+// kindOrder maps each ResourceKind to its position in ApplyOrder.
+// Initialized once at package load to avoid per-refresh allocation.
+var kindOrder = func() map[manifest.ResourceKind]int {
 	m := make(map[manifest.ResourceKind]int)
 	for i, k := range manifest.ApplyOrder() {
 		m[k] = i
 	}
 	return m
-}
+}()

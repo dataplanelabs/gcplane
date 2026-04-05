@@ -1,7 +1,6 @@
 package views
 
 import (
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -41,16 +40,3 @@ func (cm *ConfirmModal) Show(message string, onConfirm func(confirmed bool)) {
 	cm.Modal.SetFocus(1)
 }
 
-// HandleInput provides extra keybindings for the modal (y/n shortcuts).
-func (cm *ConfirmModal) HandleInput(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Rune() {
-	case 'y', 'Y':
-		cm.Modal.SetFocus(0) // select Yes
-		// Simulate Enter to trigger DoneFunc
-		return tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone)
-	case 'n', 'N':
-		cm.Modal.SetFocus(1) // select No
-		return tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone)
-	}
-	return event
-}
