@@ -867,67 +867,72 @@ func helpText() string {
 
 	return fmt.Sprintf(`
  %s
-   %s State    %s Traces    %s Logs
+   %s State(S)   %s Traces(T)   %s Logs(L)
 
  %s
-   %s         Move down/up
-   %s        Go to top/bottom
-   %s        Copy selected item
-   %s/%s     Half-page scroll
-   %s         Back / Close overlay
-   %s           Quit
+   %s           Move down / up
+   %s          Go to top / bottom
+   %s          Copy selected to clipboard
+   %s %s   Half-page down / up
+   %s %s     Refresh active tab / quit
 
- %s (Traces — drill-down)
-   %s/%s  Drill in / Drill out
+ %s
+   %s           Search / filter current view
+   %s         Apply filter
+   %s         Clear filter / cancel
+
+ %s (drill-down: Traces > Spans > Detail)
+   %s %s   Drill in / drill out
    %s         Back to trace list (root)
-   %s       Pause/resume   %s Clear filters
+   %s %s     Pause / resume auto-refresh
+   %s           Clear filters
+   Live: auto-polls every 3s + WS events
 
- %s (State tab)
+ %s (resource filter)
    %s Provider   %s Agent      %s Channel
    %s MCPServer  %s Skill      %s CronJob
    %s AgentTeam  %s SysConfig  %s SecureCLI
-   %s All
+   %s All kinds
 
- %s (Logs tab)
+ %s (level filter)
    %s DEBUG+   %s INFO+   %s WARN+   %s ERROR
 
- %s
-   %s      Apply (reconcile)
-   %s      Delete selected resource
-   %s      Edit selected resource ($EDITOR)
-   %s       Sync (attach)   %s  Tenant switch
+ %s (State tab only)
+   %s     Edit resource ($EDITOR)
+   %s     Delete selected resource
+   %s     Show drift diff
+   %s      Apply all   %s Sync (attach)
+   %s       Tenant switch
 
  %s
-   %s           Search / filter
-   %s       Apply       %s Cancel/clear
-
- %s
-   %s           Toggle this help
-   %s           Refresh now
+   %s           Command mode
+   %s           This help
 `,
 		h("Tabs"),
-		k("S"), k("T"), k("L"),
-		h("Navigation (global)"),
+		k("●"), k("○"), k("○"),
+		h("Navigation (all tabs)"),
 		k("j/k"), k("gg/G"), k("yy"),
 		k("Ctrl+D"), k("Ctrl+U"),
-		k("Esc"), k("q"),
+		k("Ctrl+R/r"), k("q"),
+		h("Search"),
+		k("/"), k("Enter"), k("Esc"),
 		h("Traces"),
 		k("l/Enter"), k("h"),
 		k("Esc"),
-		k("Space/p"), k("c"),
-		h("Number Keys"),
+		k("Space"), k("p"),
+		k("c"),
+		h("State"),
 		k("1"), k("2"), k("3"),
 		k("4"), k("5"), k("6"),
 		k("7"), k("8"), k("9"),
 		k("0"),
-		h("Number Keys"),
+		h("Logs"),
 		k("1"), k("2"), k("3"), k("4"),
 		h("Actions"),
-		k("Ctrl+R"), k("Ctrl+D"), k("Ctrl+E"),
-		k(":sync"), k(":tenant X"),
-		h("Search"),
-		k("/"), k("Enter"), k("Esc"),
+		k("Ctrl+E"), k("Ctrl+D"), k("d"),
+		k(":apply"), k(":sync"),
+		k(":tenant X"),
 		h("Other"),
-		k("?"), k("r"),
+		k(":"), k("?"),
 	)
 }
