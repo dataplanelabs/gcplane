@@ -656,6 +656,7 @@ func (a *App) applySearch(filter string) {
 		}
 	case TabLogs:
 		a.logsPanel.SetFilter(filter)
+		a.logsPanel.Refresh(a.liveStore.Logs()) // force redraw with filter
 	}
 }
 
@@ -669,6 +670,7 @@ func (a *App) clearSearch() {
 		a.tracesPanel.SetFilter("")
 	case TabLogs:
 		a.logsPanel.SetFilter("")
+		a.logsPanel.Refresh(a.liveStore.Logs()) // force redraw
 	}
 }
 

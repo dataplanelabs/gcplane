@@ -321,6 +321,7 @@ func (h *KeyHandler) handleClearFilters() {
 	case TabLogs:
 		h.app.logsPanel.SetLevelMin("debug")
 		h.app.logsPanel.SetFilter("")
+		h.app.logsPanel.Refresh(h.app.liveStore.Logs())
 	case TabTraces:
 		h.app.traceStore.SetFilters(views.TraceFilters{Limit: 50})
 		h.app.tracesPanel.SetAgentFilter("")
