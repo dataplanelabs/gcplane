@@ -95,6 +95,37 @@ func (p *Provider) ensureWS(ctx context.Context) error {
 	return nil
 }
 
+// SetEventHandler registers a callback for WS push events on the underlying WSClient.
+// Must be called before ensureWS/Connect.
+func (p *Provider) SetEventHandler(h WSEventHandler) {
+	p.ws.SetEventHandler(h)
+}
+
+// StartLogTail subscribes to GoClaw server log stream via logs.tail RPC.
+// Logs arrive as "log" events on the WS event handler. Gracefully returns
+// an error if the RPC is not available on this GoClaw version.
+func (p *Provider) StartLogTail(ctx context.Context, level string) error {
+	if err := p.ensureWS(ctx); err != nil {
+		return err
+	}
+	_, err := p.ws.Call(ctx, "logs.tail", map[string]any{
+		"action": "start",
+		"level":  level,
+	})
+	return err
+}
+
+// StopLogTail unsubscribes from GoClaw server log stream.
+func (p *Provider) StopLogTail(ctx context.Context) error {
+	if err := p.ensureWS(ctx); err != nil {
+		return err
+	}
+	_, err := p.ws.Call(ctx, "logs.tail", map[string]any{
+		"action": "stop",
+	})
+	return err
+}
+
 // Close releases provider resources (WS connection).
 func (p *Provider) Close() error {
 	p.wsMu.Lock()

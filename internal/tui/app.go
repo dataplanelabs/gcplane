@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
+	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 	"github.com/dataplanelabs/gcplane/internal/tui/trace"
 	"github.com/dataplanelabs/gcplane/internal/tui/views"
@@ -22,6 +23,17 @@ type ProviderAPI interface {
 	Update(ctx context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error
 	Delete(ctx context.Context, kind manifest.ResourceKind, key string) error
 	Close() error
+}
+
+// LogTailer is optionally implemented by providers that support log streaming.
+type LogTailer interface {
+	StartLogTail(ctx context.Context, level string) error
+	StopLogTail(ctx context.Context) error
+}
+
+// EventListenerSetup is optionally implemented by providers that support WS event streaming.
+type EventListenerSetup interface {
+	SetEventHandler(h goclaw.WSEventHandler)
 }
 
 // App is the top-level TUI application, wiring layout, views, and keybindings.
@@ -40,6 +52,9 @@ type App struct {
 	confirm      *views.ConfirmModal
 	traceView    *views.TraceView
 	traceHandler *trace.RingHandler
+	liveStore    *LiveStore
+	logsPanel    *views.LogsPanel
+	eventsPanel  *views.EventsPanel
 
 	// Refresh infrastructure
 	refreshMu sync.Mutex
@@ -105,6 +120,17 @@ func NewApp(cfg Config) (*App, error) {
 			app.bus.Publish(Event{Type: EventTraceEntry, Payload: e})
 		})
 	}
+
+	// LiveStore — ring-buffered state from WS events
+	app.liveStore = NewLiveStore(500, 500)
+
+	// Wire WS event handler → LiveStore (if provider supports it)
+	if setup, ok := app.Provider.(EventListenerSetup); ok {
+		setup.SetEventHandler(func(frame goclaw.WSEventFrame) {
+			app.liveStore.HandleEvent(frame)
+		})
+	}
+
 	app.keys = NewKeyHandler(app)
 	app.buildLayout()
 	app.tapp.SetInputCapture(app.keys.Handle)
@@ -112,16 +138,16 @@ func NewApp(cfg Config) (*App, error) {
 	return app, nil
 }
 
-// buildLayout creates the 3-row layout: header, pages, command bar.
+// buildLayout creates the static 3-row layout: header(2), pages(flex), command bar(1).
 func (a *App) buildLayout() {
-	// Header bar — 1 row
+	// Header bar — 2 rows (metadata + tab bar)
 	a.header = tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignLeft)
 	a.header.SetBackgroundColor(views.ColorMantle)
 	a.updateHeader()
 
-	// Resource table — main view
+	// Resource table — State tab primary view
 	a.table = views.NewResourceTable()
 	a.table.OnSelect = func(c reconciler.Change) {
 		a.showDetail(c)
@@ -130,41 +156,36 @@ func (a *App) buildLayout() {
 		a.showDrift(c)
 	}
 
-	// Detail view — shows full YAML of observed resource
+	// Overlay views
 	a.detail = views.NewResourceDetail()
-
-	// Drift view — shows field-level diff
 	a.drift = views.NewDriftView()
-
-	// Confirmation modal
 	a.confirm = views.NewConfirmModal()
 
-	// View registry — manages all pages and navigation stack
+	// View registry
 	pages := tview.NewPages()
 	a.registry = NewViewRegistry(pages, a.tapp)
+
+	// Register primary tab views
 	a.registry.Register(a.table)
+
+	a.logsPanel = views.NewLogsPanel()
+	a.registry.Register(a.logsPanel)
+
+	a.eventsPanel = views.NewEventsPanel()
+	a.registry.Register(a.eventsPanel)
+
+	if a.traceHandler != nil {
+		a.traceView = views.NewTraceView(a.traceHandler)
+		a.registry.Register(a.traceView)
+	}
+
+	// Register overlay views
 	a.registry.Register(a.detail)
 	a.registry.Register(a.drift)
 	a.registry.Register(a.confirm)
 	a.registry.Register(views.NewHelpView(helpText()))
 
-	// Trace view — register if handler is available
-	if a.traceHandler != nil {
-		a.traceView = views.NewTraceView(a.traceHandler)
-		a.registry.Register(a.traceView)
-
-		// Auto-refresh trace view when new entries arrive
-		a.bus.Subscribe(EventTraceEntry, func(_ Event) {
-			if a.registry.Current() == "trace" {
-				a.traceView.Refresh()
-			}
-		})
-	}
-
-	// Show main view by default
-	pages.SwitchToPage("main")
-
-	// Command bar — 1 row input
+	// Command bar
 	a.cmdBar = tview.NewInputField().
 		SetLabel("").
 		SetFieldWidth(0).
@@ -172,16 +193,16 @@ func (a *App) buildLayout() {
 	a.cmdBar.SetFieldBackgroundColor(views.ColorMantle)
 	a.cmdBar.SetLabelColor(views.ColorMauve)
 
-	// Root layout: header(1) + pages(flex) + cmdbar(1)
+	// Static layout: header(2) + pages(flex) + cmdbar(1)
 	a.layout = tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(a.header, 1, 0, false).
+		AddItem(a.header, 2, 0, false).
 		AddItem(a.registry.Pages(), 0, 1, true).
 		AddItem(a.cmdBar, 1, 0, false)
 }
 
 // Run starts the TUI event loop. Blocks until the app exits.
 func (a *App) Run() error {
-	a.registry.Push("main")
+	a.registry.SwitchTab(TabState)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
@@ -189,10 +210,42 @@ func (a *App) Run() error {
 	// Initial data load + start refresh loop
 	go a.refresh()
 	go a.refreshLoop(ctx)
+	go a.tabRefreshLoop(ctx)
 
 	err := a.tapp.SetRoot(a.layout, true).EnableMouse(false).Run()
 	cancel() // stop refresh loop on exit
 	return err
+}
+
+// tabRefreshLoop redraws the active tab content on a 150ms tick.
+func (a *App) tabRefreshLoop(ctx context.Context) {
+	ticker := time.NewTicker(150 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !a.liveStore.IsDirty() {
+				continue
+			}
+			a.tapp.QueueUpdateDraw(func() {
+				tab := a.registry.ActiveTab()
+				switch tab {
+				case TabLogs:
+					a.logsPanel.Refresh(a.liveStore.Logs())
+				case TabEvents:
+					a.eventsPanel.Refresh(a.liveStore.Events())
+				case TabTrace:
+					if a.traceView != nil {
+						a.traceView.Refresh()
+					}
+				}
+				a.liveStore.MarkClean()
+			})
+		}
+	}
 }
 
 // Stop gracefully shuts down the TUI.
@@ -345,9 +398,14 @@ func (a *App) updateHeader() {
 		}
 	}
 
-	text := fmt.Sprintf(" %s%s%s%s%s%s%s%s",
+	metadataLine := fmt.Sprintf(" %s%s%s%s%s%s%s%s",
 		views.BoldTag(views.HexMauve, "gcplane"), sep, name, sep, ep, sep, kindLabel, mode) + summary + age
-	a.header.SetText(text)
+
+	tabBar := ""
+	if a.registry != nil {
+		tabBar = a.registry.TabBar()
+	}
+	a.header.SetText(metadataLine + "\n" + tabBar)
 }
 
 // switchKind changes the kind filter and refreshes the table.
@@ -361,12 +419,46 @@ func (a *App) pushView(name string) {
 	a.registry.Push(name)
 }
 
+// switchTab switches to a primary tab, managing log tail lifecycle.
+func (a *App) switchTab(tab PrimaryTab) {
+	if tab == TabTrace && a.traceView == nil {
+		return
+	}
+	prev := a.registry.ActiveTab()
+	a.registry.SwitchTab(tab)
+	a.updateHeader()
+
+	// Log tail lifecycle
+	if tab == TabLogs && prev != TabLogs {
+		go a.startLogTail()
+	} else if tab != TabLogs && prev == TabLogs {
+		go a.stopLogTail()
+	}
+
+	// Set focus to the active tab's primary widget
+	a.focusActiveTab()
+}
+
+// focusActiveTab sets focus to the current tab's primary widget.
+func (a *App) focusActiveTab() {
+	switch a.registry.ActiveTab() {
+	case TabState:
+		a.tapp.SetFocus(a.table.Table)
+	case TabLogs:
+		a.tapp.SetFocus(a.logsPanel.TextView)
+	case TabEvents:
+		a.tapp.SetFocus(a.eventsPanel.TextView)
+	case TabTrace:
+		if a.traceView != nil {
+			a.tapp.SetFocus(a.traceView.TextView)
+		}
+	}
+}
+
 // popView returns to the previous page in the view stack.
 func (a *App) popView() {
-	page := a.registry.Pop()
-	if page == "main" {
-		a.tapp.SetFocus(a.table.Table)
-	}
+	a.registry.Pop()
+	a.focusActiveTab()
 }
 
 // showDetail navigates to the resource detail YAML view.
@@ -392,6 +484,42 @@ func (a *App) toggleHelp() {
 	}
 }
 
+// startLogTail subscribes to GoClaw logs if provider supports it.
+func (a *App) startLogTail() {
+	tailer, ok := a.Provider.(LogTailer)
+	if !ok {
+		a.tapp.QueueUpdateDraw(func() {
+			a.logsPanel.RefreshUnavailable("logs.tail not available (provider does not support log streaming)")
+		})
+		return
+	}
+	if a.liveStore.IsTailing() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := tailer.StartLogTail(ctx, "info"); err != nil {
+		a.tapp.QueueUpdateDraw(func() {
+			a.logsPanel.RefreshUnavailable("logs.tail: " + err.Error())
+		})
+		return
+	}
+	a.liveStore.SetTailing(true)
+}
+
+// stopLogTail unsubscribes from GoClaw log stream.
+func (a *App) stopLogTail() {
+	if !a.liveStore.IsTailing() {
+		return
+	}
+	a.liveStore.SetTailing(false)
+	if tailer, ok := a.Provider.(LogTailer); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = tailer.StopLogTail(ctx)
+	}
+}
+
 // activateCommandBar focuses the command bar input.
 func (a *App) activateCommandBar() {
 	a.cmdBar.SetLabel(":")
@@ -399,11 +527,11 @@ func (a *App) activateCommandBar() {
 	a.tapp.SetFocus(a.cmdBar)
 }
 
-// deactivateCommandBar returns focus to the main content.
+// deactivateCommandBar returns focus to the active tab's content.
 func (a *App) deactivateCommandBar() {
 	a.cmdBar.SetLabel("")
 	a.cmdBar.SetText("")
-	a.tapp.SetFocus(a.table.Table)
+	a.focusActiveTab()
 }
 
 // onCommandDone handles command bar submission or cancellation.
@@ -461,6 +589,18 @@ func (a *App) executeCommand(cmd string) {
 		return
 	case "sync":
 		a.triggerRemoteSync()
+		return
+	case "state":
+		a.switchTab(TabState)
+		return
+	case "logs":
+		a.switchTab(TabLogs)
+		return
+	case "events":
+		a.switchTab(TabEvents)
+		return
+	case "trace":
+		a.switchTab(TabTrace)
 		return
 	}
 
@@ -580,70 +720,70 @@ func helpText() string {
 
 	return fmt.Sprintf(`
  %s
+   %s State    %s Logs    %s Events    %s Trace
+   %s %s %s %s  via command
+
+ %s
    %s         Move down/up
    %s         Jump to top/bottom
-   %s       View resource detail
-   %s           Show drift diff
+   %s       View resource detail (State)
+   %s           Show drift diff (State)
    %s         Back / Close overlay
    %s           Quit
 
- %s
+ %s (State tab)
    %s Provider   %s Agent      %s Channel
    %s MCPServer  %s Skill      %s CronJob
    %s AgentTeam  %s SysConfig  %s SecureCLI
    %s All
 
- %s
-   %s   %s    %s   %s
-   %s      %s     %s      %s
-   %s        Show all resources
-   %s       Show this help
-   %s          Quit
+ %s (Logs/Trace tabs)
+   %s DEBUG+   %s INFO+   %s WARN+   %s ERROR
 
- %s
-   %s           Filter by name (case-insensitive)
-   %s       Apply filter
-   %s         Cancel / clear filter
+ %s (Events tab)
+   %s All   %s Agent   %s Chat   %s Health   %s Cron   %s Team
 
  %s
    %s      Apply (reconcile all pending changes)
    %s      Delete selected resource
-   %s           Edit selected resource ($EDITOR)
-   %s      Apply all changes
-   %s     Delete selected resource
-   %s       Trigger sync (attach mode)
-   %s   Switch to tenant X (attach mode)
-   %s     Clear tenant filter
+   %s      Edit selected resource ($EDITOR)
+   %s      Apply all       %s Delete
+   %s       Sync (attach)   %s  Tenant switch
+
+ %s (Logs/Events/Trace)
+   %s       Pause/resume auto-scroll
+   %s         Clear filters
 
  %s
-   %s           Toggle trace log
-   %s       Pause/resume auto-scroll
-   %s         Filter level (DEBUG/INFO/WARN/ERROR)
-   %s           Reset filters
+   %s           Filter by name
+   %s       Apply       %s Cancel/clear
 
  %s
    %s           Toggle this help
    %s           Refresh now
 `,
+		h("Tabs"),
+		k("s"), k("l"), k("e"), k("t"),
+		k(":state"), k(":logs"), k(":events"), k(":trace"),
 		h("Navigation"),
 		k("j/k"), k("g/G"), k("Enter"), k("d"), k("Esc"), k("q"),
-		h("Kind Filter"),
+		h("Number Keys"),
 		k("1"), k("2"), k("3"),
 		k("4"), k("5"), k("6"),
 		k("7"), k("8"), k("9"),
 		k("0"),
-		h("Commands"),
-		k(":provider"), k(":agent"), k(":channel"), k(":mcp"),
-		k(":skill"), k(":cron"), k(":team"), k(":cli"),
-		k(":all"), k(":help"), k(":q"),
+		h("Number Keys"),
+		k("1"), k("2"), k("3"), k("4"),
+		h("Number Keys"),
+		k("1"), k("2"), k("3"), k("4"), k("5"), k("6"),
+		h("Actions"),
+		k("Ctrl+R"), k("Ctrl+D"), k("Ctrl+E"),
+		k(":apply"), k(":delete"),
+		k(":sync"), k(":tenant X"),
+		h("Streaming"),
+		k("Space"), k("c"),
 		h("Search"),
 		k("/"), k("Enter"), k("Esc"),
-		h("Actions"),
-		k("Ctrl+R"), k("Ctrl+D"), k("e"),
-		k(":apply"), k(":delete"), k(":sync"),
-		k(":tenant X"), k(":tenant"),
-		h("Trace View"),
-		k("t"), k("Space"), k("1-4"), k("c"),
 		h("Other"),
 		k("?"), k("r"),
 	)

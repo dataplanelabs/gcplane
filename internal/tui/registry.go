@@ -1,16 +1,41 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/dataplanelabs/gcplane/internal/tui/views"
 	"github.com/rivo/tview"
 )
 
+// PrimaryTab identifies a primary full-screen tab.
+type PrimaryTab int
+
+const (
+	TabState  PrimaryTab = iota
+	TabLogs
+	TabEvents
+	TabTrace
+)
+
+// tabMeta maps tabs to page names and display labels.
+var tabMeta = []struct {
+	PageName string
+	Label    string
+	Key      string
+}{
+	{"main", "State", "S"},
+	{"logs", "Logs", "L"},
+	{"events", "Events", "E"},
+	{"trace", "Trace", "T"},
+}
+
 // ViewRegistry manages named views backed by tview.Pages.
 type ViewRegistry struct {
-	pages     *tview.Pages
-	views     map[string]views.View
-	viewStack []string
-	tapp      *tview.Application
+	pages        *tview.Pages
+	views        map[string]views.View
+	activeTab    PrimaryTab
+	overlayStack []string
+	tapp         *tview.Application
 }
 
 // NewViewRegistry creates a registry backed by the given Pages widget.
@@ -28,36 +53,67 @@ func (r *ViewRegistry) Register(v views.View) {
 	r.pages.AddPage(v.Name(), v.Primitive(), true, false)
 }
 
-// Push navigates to a named view, preserving the stack for Esc.
+// SwitchTab switches to a primary tab, clearing any overlay stack.
+func (r *ViewRegistry) SwitchTab(tab PrimaryTab) {
+	r.activeTab = tab
+	r.overlayStack = r.overlayStack[:0]
+	pageName := tabMeta[tab].PageName
+	r.pages.SwitchToPage(pageName)
+	if v, ok := r.views[pageName]; ok {
+		v.Activate()
+	}
+}
+
+// Push navigates to an overlay view on top of the current tab.
 func (r *ViewRegistry) Push(name string) {
-	r.viewStack = append(r.viewStack, name)
+	r.overlayStack = append(r.overlayStack, name)
 	r.pages.SwitchToPage(name)
 	if v, ok := r.views[name]; ok {
 		v.Activate()
 	}
 }
 
-// Pop returns to the previous view in the stack.
+// Pop returns to the previous overlay, or the active tab if stack is empty.
 // Returns the name of the view now showing.
 func (r *ViewRegistry) Pop() string {
-	if len(r.viewStack) > 0 {
-		r.viewStack = r.viewStack[:len(r.viewStack)-1]
+	if len(r.overlayStack) > 0 {
+		r.overlayStack = r.overlayStack[:len(r.overlayStack)-1]
 	}
-	if len(r.viewStack) > 0 {
-		name := r.viewStack[len(r.viewStack)-1]
+	if len(r.overlayStack) > 0 {
+		name := r.overlayStack[len(r.overlayStack)-1]
 		r.pages.SwitchToPage(name)
 		return name
 	}
-	r.pages.SwitchToPage("main")
-	return "main"
+	pageName := tabMeta[r.activeTab].PageName
+	r.pages.SwitchToPage(pageName)
+	return pageName
 }
 
 // Current returns the name of the current front page.
 func (r *ViewRegistry) Current() string {
-	if len(r.viewStack) > 0 {
-		return r.viewStack[len(r.viewStack)-1]
+	if len(r.overlayStack) > 0 {
+		return r.overlayStack[len(r.overlayStack)-1]
 	}
-	return "main"
+	return tabMeta[r.activeTab].PageName
+}
+
+// ActiveTab returns the current primary tab.
+func (r *ViewRegistry) ActiveTab() PrimaryTab { return r.activeTab }
+
+// HasOverlay returns true when an overlay view is on the stack.
+func (r *ViewRegistry) HasOverlay() bool { return len(r.overlayStack) > 0 }
+
+// TabBar returns a colored tab bar string for the header.
+func (r *ViewRegistry) TabBar() string {
+	var parts []string
+	for i, t := range tabMeta {
+		if PrimaryTab(i) == r.activeTab {
+			parts = append(parts, views.BoldTag(views.HexGreen, "\u25cf "+t.Label))
+		} else {
+			parts = append(parts, views.Tag(views.HexOverlay0, "\u25cb "+t.Label))
+		}
+	}
+	return " " + strings.Join(parts, "  ")
 }
 
 // Get returns a registered view by name.

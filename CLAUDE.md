@@ -42,12 +42,19 @@ internal/
 - SecureCLIGrant uses composite name `binaryName--agentKey` (e.g., `kubectl--assistant`)
 
 ## TUI Architecture
+- **Tabbed Layout** (v1.2+): 4 full-screen peer tabs (State, Logs, Events, Trace) switched via s/l/e/t keys
 - `View` interface: `Name()`, `Primitive()`, `Activate()` — all views implement this
-- `ViewRegistry`: wraps `tview.Pages` with push/pop navigation stack
+- `ViewRegistry`: manages tab pages with overlay support (confirm modal, help)
 - `EventBus`: typed pub/sub with `QueueUpdateDraw` thread safety
+- `LiveStore`: thread-safe shared state with atomic updates for real-time data
 - `RingHandler` (`trace/`): custom `slog.Handler` → 1000-entry ring buffer → trace view
-- Trace view (`t` key): shows reconciliation events, API calls, errors with Catppuccin colors
+- **Tab Components**:
+  - State tab: ResourceTable (kind filtering via 0-9), ResourceDetail (Enter), DriftView (d key)
+  - Logs tab: LogsPanel (level filtering 1-4, live streaming)
+  - Events tab: EventsPanel (type filtering 1-6, live streaming)
+  - Trace tab: TraceView (level filtering 1-4, shows API calls and reconciliation events)
 - API logging: HTTPClient logs request/response (method, path, status, duration) via slog
+- Keybindings: Tab switch (s/l/e/t), edit (Ctrl+E), delete (Ctrl+D), reconcile (Ctrl+R), pause/resume (Space), clear filters (c)
 
 ## Testing
 ```bash

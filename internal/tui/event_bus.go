@@ -10,8 +10,8 @@ import (
 type EventType string
 
 const (
-	EventPlanUpdated EventType = "plan.updated"  // new plan from refresh
-	EventTraceEntry  EventType = "trace.entry"   // new trace log entry
+	EventPlanUpdated EventType = "plan.updated"   // new plan from refresh
+	EventTraceEntry  EventType = "trace.entry"    // new trace log entry
 	EventStatusMsg   EventType = "status.message" // status bar message
 )
 

@@ -7,21 +7,22 @@ import (
 
 // ConfirmModal is a centered confirmation dialog with Yes/No buttons.
 type ConfirmModal struct {
-	layout *tview.Flex // outer centering wrapper
-	form   *tview.Form
-	text   *tview.TextView
+	grid *tview.Grid // outer centering wrapper
+	form *tview.Form
+	text *tview.TextView
 }
 
 // NewConfirmModal creates a modal dialog for destructive action confirmation.
 func NewConfirmModal() *ConfirmModal {
 	cm := &ConfirmModal{}
+	cardBg := ColorSurface0
 
 	// Message text
 	cm.text = tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
 		SetTextColor(ColorText).
 		SetDynamicColors(true)
-	cm.text.SetBackgroundColor(ColorMantle)
+	cm.text.SetBackgroundColor(cardBg)
 
 	// Button form
 	cm.form = tview.NewForm().
@@ -31,29 +32,37 @@ func NewConfirmModal() *ConfirmModal {
 		SetButtonActivatedStyle(tcell.StyleDefault.
 			Foreground(tcell.GetColor("#1e1e2e")).
 			Background(tcell.GetColor("#cba6f7")))
-	cm.form.SetBackgroundColor(ColorMantle)
+	cm.form.SetBackgroundColor(cardBg)
 	cm.form.AddButton("Yes", nil).AddButton("No", nil)
 
-	// Inner card: text + buttons, single border
+	// Arrow keys navigate between buttons
+	cm.form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyLeft, tcell.KeyUp:
+			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
+		case tcell.KeyRight, tcell.KeyDown:
+			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
+		}
+		return event
+	})
+
+	// Card: single border, uniform background
 	card := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(cm.text, 0, 1, false).
-		AddItem(cm.form, 1, 0, true)
-	card.SetBackgroundColor(ColorMantle).
+		AddItem(cm.form, 3, 0, true)
+	card.SetBackgroundColor(cardBg).
 		SetBorder(true).
-		SetBorderColor(ColorSurface1).
+		SetBorderColor(ColorOverlay0).
 		SetTitle(" Confirm ").
 		SetTitleColor(ColorMauve).
-		SetBorderPadding(1, 1, 2, 2)
+		SetBorderPadding(1, 0, 2, 2)
 
-	// Center the card on screen
-	cm.layout = tview.NewFlex().
-		AddItem(nil, 0, 1, false).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-			AddItem(nil, 0, 1, false).
-			AddItem(card, 9, 0, true).
-			AddItem(nil, 0, 1, false), 50, 0, true).
-		AddItem(nil, 0, 1, false)
-	cm.layout.SetBackgroundColor(tcell.ColorDefault)
+	// Center with grid
+	cm.grid = tview.NewGrid().
+		SetColumns(0, 42, 0).
+		SetRows(0, 10, 0)
+	cm.grid.SetBackgroundColor(ColorBase)
+	cm.grid.AddItem(card, 1, 1, 1, 1, 0, 0, true)
 
 	return cm
 }
@@ -62,7 +71,7 @@ func NewConfirmModal() *ConfirmModal {
 func (cm *ConfirmModal) Name() string { return "confirm" }
 
 // Primitive implements View.
-func (cm *ConfirmModal) Primitive() tview.Primitive { return cm.layout }
+func (cm *ConfirmModal) Primitive() tview.Primitive { return cm.grid }
 
 // Activate implements View.
 func (cm *ConfirmModal) Activate() {}

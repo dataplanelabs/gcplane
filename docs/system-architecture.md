@@ -265,10 +265,13 @@ Manifest values support `${ENV_VAR}` substitution and `file://path` references. 
    b. Compute status (InSync, Drifted, Missing, Error, Extra)
    c. Update shared model (atomic write)
    d. Publish plan.updated event (views subscribe)
-5. Handle vim-style keybindings with multi-view support:
-   - j/k: navigate, g/G: jump, Enter: show detail, d: show drift, t: toggle trace
-   - /: search, ?: help, Esc: return to table, q: quit
-   - 0-9: filter by kind, r: refresh, :: commands
+5. Handle vim-style keybindings with tab-based navigation:
+   - Tab switching (s/l/e/t): Switch between State/Logs/Events/Trace tabs
+   - Ctrl+E: edit resource, Ctrl+D: delete resource, Ctrl+R: reconcile
+   - j/k: navigate, g/G: jump, Enter: show detail, d: show drift, r: refresh
+   - Number keys: context-sensitive per tab (kinds on State, levels on Logs/Trace, event types on Events)
+   - /: search, ?: help, Esc: dismiss dialog/return to table, q: quit
+   - Space: pause/resume stream (Logs/Events/Trace), c: clear filters, :: commands
 6. Views receive events:
    - ResourceTable subscribes to plan.updated, refreshes on event
    - TraceView subscribes to trace.*, displays real-time logs and API calls

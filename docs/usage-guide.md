@@ -269,17 +269,40 @@ gcplane top -f manifest.yaml --endpoint http://localhost:8080
 
 ### Features
 
-- **Resource Browser**: Browse all 14 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, SecureCLI, SecureCLIGrant, CronJob, AgentTeam)
+- **Tabbed Interface**: State (S), Logs (L), Events (E), Trace (T) tabs — full-screen peer views
+- **Resource Browser** (State tab): Browse all 14 resource kinds (Tenant, Provider, Agent, Channel, MCPServer, Skill, BuiltinToolConfig, SkillConfig, MCPCredentials, SystemConfig, SecureCLI, SecureCLIGrant, CronJob, AgentTeam)
 - **Status Coloring**: InSync (green), Drifted (yellow), Missing/Error (red), Extra (blue)
 - **YAML View**: Press Enter to view full resource YAML with syntax highlighting
-- **Drift Details**: Press `d` to see field-level drift comparison
+- **Drift Details**: Press `d` to see field-level drift comparison (State tab)
+- **Live Logs**: Real-time log streaming with level filtering (Logs tab)
+- **Live Events**: Real-time event feed with type filtering (Events tab)
+- **Live Trace**: Reconciliation events and API calls with level filtering (Trace tab)
 - **Vim Keybindings**: j/k navigate, g/G jump to start/end, q quit, ? help, : commands, / search
-- **Kind Filtering**: Number keys or type `:agent`, `:provider`, `:mcp`, `:cron`, `:team`, etc.
+- **Context-Sensitive Filtering**: Number keys do different things per tab (kinds on State, levels on Logs/Trace, type filters on Events)
 - **Auto-Refresh**: Configurable interval (default 10s), press `r` for manual refresh
-- **Search**: Press `/` to filter by resource name (case-insensitive)
+- **Search**: Press `/` to filter by resource name (case-insensitive, State tab)
 
 ### Keybindings
 
+#### Tab Navigation
+| Key | Action |
+|-----|--------|
+| `s` | Switch to State tab |
+| `l` | Switch to Logs tab |
+| `e` | Switch to Events tab |
+| `t` | Switch to Trace tab |
+
+#### Global Controls
+| Key | Action |
+|-----|--------|
+| `Ctrl+E` | Edit selected resource (State tab only) |
+| `Ctrl+D` | Delete selected resource (State tab only) |
+| `Ctrl+R` | Apply/reconcile all resources |
+| `q` | Quit |
+| `?` | Show help |
+| `Esc` | Dismiss dialog or return to table |
+
+#### State Tab (Resource Browser)
 | Key | Action |
 |-----|--------|
 | `j`/`k` | Navigate up/down |
@@ -287,12 +310,39 @@ gcplane top -f manifest.yaml --endpoint http://localhost:8080
 | `G` | Jump to end |
 | `Enter` | View resource YAML details |
 | `d` | Show drift diff |
-| `r` | Refresh resources |
-| `0-9` | Filter by kind (0=all, 1=provider, 2=agent, etc., 9=securecli) |
-| `:` | Command mode (`:cli`, `:securecli`, `:agent`, `:cron`, `:team`, etc.) |
+| `0-9` | Filter by kind (0=all, 1=provider, 2=agent, 3=channel, 4=mcp, 5=skill, 6=cron, 7=team, 8=systemconfig, 9=securecli) |
 | `/` | Search by name |
-| `?` | Show help |
-| `q` | Quit |
+| `c` | Clear filters |
+| `r` | Manual refresh |
+
+#### Logs Tab (Log Streaming)
+| Key | Action |
+|-----|--------|
+| `1-4` | Filter by log level (1=debug, 2=info, 3=warn, 4=error) |
+| `Space` | Pause/resume log capture |
+| `c` | Clear level filter |
+| `r` | Manual refresh |
+
+#### Events Tab (Event Feed)
+| Key | Action |
+|-----|--------|
+| `1-6` | Filter by event type (1=all, 2=agent, 3=chat, 4=health, 5=cron, 6=team) |
+| `Space` | Pause/resume event capture |
+| `c` | Clear event filter |
+| `r` | Manual refresh |
+
+#### Trace Tab (Reconciliation Log)
+| Key | Action |
+|-----|--------|
+| `1-4` | Filter by trace level (1=debug, 2=info, 3=warn, 4=error) |
+| `Space` | Pause/resume trace capture |
+| `c` | Clear level filter |
+| `r` | Manual refresh |
+
+#### Command Mode
+| Key | Action |
+|-----|--------|
+| `:` | Enter command mode (`:agent`, `:provider`, `:cron`, `:team`, etc.) |
 
 ### Top Flags
 

@@ -42,9 +42,7 @@ func NewTraceView(handler *trace.RingHandler) *TraceView {
 		SetDynamicColors(true).
 		SetScrollable(true).
 		SetWordWrap(false)
-	tv.SetBorder(true).SetTitle(" Trace (t to close) ")
-	tv.SetBorderColor(ColorSurface1)
-	tv.SetTitleColor(ColorMauve)
+	tv.SetBackgroundColor(ColorBase)
 
 	traceView := &TraceView{
 		TextView: tv,
@@ -165,36 +163,19 @@ func (tv *TraceView) formatAttrs(attrs map[string]any) string {
 	return Tag(HexOverlay0, strings.Join(parts, " "))
 }
 
-// handleInput processes trace-specific keybindings.
+// SetLevelMin sets the minimum trace level filter.
+func (tv *TraceView) SetLevelMin(level slog.Level) { tv.levelMin = level }
+
+// SetPaused sets the pause state.
+func (tv *TraceView) SetPaused(paused bool) { tv.paused = paused }
+
+// TogglePause toggles pause and refreshes.
+func (tv *TraceView) TogglePause() {
+	tv.paused = !tv.paused
+	tv.Refresh()
+}
+
+// handleInput processes scroll-only keybindings (j/k/g/G).
 func (tv *TraceView) handleInput(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Rune() {
-	case ' ':
-		tv.paused = !tv.paused
-		tv.Refresh()
-		return nil
-	case '1':
-		tv.levelMin = slog.LevelDebug
-		tv.Refresh()
-		return nil
-	case '2':
-		tv.levelMin = slog.LevelInfo
-		tv.Refresh()
-		return nil
-	case '3':
-		tv.levelMin = slog.LevelWarn
-		tv.Refresh()
-		return nil
-	case '4':
-		tv.levelMin = slog.LevelError
-		tv.Refresh()
-		return nil
-	case 'c':
-		// Clear is visual only — buffer still holds entries, but we reset the view
-		tv.search = ""
-		tv.levelMin = slog.LevelDebug
-		tv.Refresh()
-		return nil
-	}
-	// Delegate vim scroll keys (j/k/g/G)
 	return VimScrollInput(tv.TextView)(event)
 }
