@@ -42,9 +42,9 @@ func (sd *SpanDetail) Show(s SpanData) {
 
 	// Header
 	typeHex := spanTypeHex(s.SpanType)
-	b.WriteString(fmt.Sprintf("\n %s %s",
+	fmt.Fprintf(&b, "\n %s %s",
 		BoldTag(HexMauve, "Span:"),
-		Tag(typeHex, s.SpanType)))
+		Tag(typeHex, s.SpanType))
 	if s.Name != "" {
 		b.WriteString(" — " + Tag(HexText, s.Name))
 	}
@@ -52,69 +52,69 @@ func (sd *SpanDetail) Show(s SpanData) {
 
 	// Status + Duration
 	icon := spanStatusIcon(s.Status)
-	b.WriteString(fmt.Sprintf(" %s %s  %s %s",
+	fmt.Fprintf(&b, " %s %s  %s %s",
 		Tag(HexOverlay0, "Status:"), icon+" "+s.Status,
-		Tag(HexOverlay0, "Duration:"), formatTraceDuration(s.DurationMs)))
+		Tag(HexOverlay0, "Duration:"), formatTraceDuration(s.DurationMs))
 	if s.Provider != "" {
-		b.WriteString(fmt.Sprintf("  %s %s", Tag(HexOverlay0, "Provider:"), s.Provider))
+		fmt.Fprintf(&b, "  %s %s", Tag(HexOverlay0, "Provider:"), s.Provider)
 	}
 	b.WriteString("\n")
 
 	// Model
 	if s.Model != "" {
-		b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "Model:"), Tag(HexBlue, s.Model)))
+		fmt.Fprintf(&b, " %s %s\n", Tag(HexOverlay0, "Model:"), Tag(HexBlue, s.Model))
 	}
 
 	// Tool
 	if s.ToolName != "" {
-		b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "Tool:"), Tag(HexTeal, s.ToolName)))
+		fmt.Fprintf(&b, " %s %s\n", Tag(HexOverlay0, "Tool:"), Tag(HexTeal, s.ToolName))
 	}
 
 	// Tokens
 	if s.InputTokens > 0 || s.OutputTokens > 0 {
-		b.WriteString(fmt.Sprintf(" %s %s in / %s out",
+		fmt.Fprintf(&b, " %s %s in / %s out",
 			Tag(HexOverlay0, "Tokens:"),
 			formatNumber(s.InputTokens),
-			formatNumber(s.OutputTokens)))
+			formatNumber(s.OutputTokens))
 		if s.Metadata != nil {
 			if s.Metadata.CacheReadTokens > 0 {
-				b.WriteString(fmt.Sprintf("  %s %s",
-					Tag(HexGreen, "cache-r:"), formatNumber(s.Metadata.CacheReadTokens)))
+				fmt.Fprintf(&b, "  %s %s",
+					Tag(HexGreen, "cache-r:"), formatNumber(s.Metadata.CacheReadTokens))
 			}
 			if s.Metadata.CacheCreationTokens > 0 {
-				b.WriteString(fmt.Sprintf("  %s %s",
-					Tag(HexYellow, "cache-w:"), formatNumber(s.Metadata.CacheCreationTokens)))
+				fmt.Fprintf(&b, "  %s %s",
+					Tag(HexYellow, "cache-w:"), formatNumber(s.Metadata.CacheCreationTokens))
 			}
 			if s.Metadata.ThinkingTokens > 0 {
-				b.WriteString(fmt.Sprintf("  %s %s",
-					Tag(HexPeach, "think:"), formatNumber(s.Metadata.ThinkingTokens)))
+				fmt.Fprintf(&b, "  %s %s",
+					Tag(HexPeach, "think:"), formatNumber(s.Metadata.ThinkingTokens))
 			}
 		}
 		b.WriteString("\n")
 	}
 
 	// ID
-	b.WriteString(fmt.Sprintf(" %s %s\n", Tag(HexOverlay0, "ID:"), Tag(HexOverlay0, s.ID)))
+	fmt.Fprintf(&b, " %s %s\n", Tag(HexOverlay0, "ID:"), Tag(HexOverlay0, s.ID))
 
 	b.WriteString("\n")
 
 	// Input preview
 	if s.InputPreview != "" {
-		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexOverlay0, "Input:")))
+		fmt.Fprintf(&b, " %s\n", BoldTag(HexOverlay0, "Input:"))
 		b.WriteString(formatPreview(s.InputPreview))
 		b.WriteString("\n")
 	}
 
 	// Output preview
 	if s.OutputPreview != "" {
-		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexOverlay0, "Output:")))
+		fmt.Fprintf(&b, " %s\n", BoldTag(HexOverlay0, "Output:"))
 		b.WriteString(formatPreview(s.OutputPreview))
 		b.WriteString("\n")
 	}
 
 	// Error
 	if s.Error != "" {
-		b.WriteString(fmt.Sprintf(" %s\n", BoldTag(HexRed, "Error:")))
+		fmt.Fprintf(&b, " %s\n", BoldTag(HexRed, "Error:"))
 		b.WriteString("   " + Tag(HexRed, s.Error) + "\n")
 	}
 
