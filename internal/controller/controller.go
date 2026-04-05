@@ -221,6 +221,12 @@ func (c *Controller) reconcileOnce() {
 	c.lastHash = hash
 
 	driftCount := int64(plan.Creates + plan.Updates)
+	hashMismatches := int64(0)
+	for _, ch := range plan.Changes {
+		if _, ok := ch.Diff["writeOnlyHash"]; ok {
+			hashMismatches++
+		}
+	}
 	c.metrics.mu.Lock()
 	if hasErrors {
 		c.metrics.SyncErrors++
@@ -233,6 +239,7 @@ func (c *Controller) reconcileOnce() {
 	if hasDrift {
 		c.metrics.DriftDetected++
 	}
+	c.metrics.WriteOnlyHashMismatches += hashMismatches
 	c.metrics.mu.Unlock()
 
 	c.logger.Info("reconcile complete",

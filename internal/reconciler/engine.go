@@ -301,6 +301,19 @@ func (e *Engine) stepObserve(ctx context.Context, rc *reconcileContext) error {
 
 // stepCompare compares desired spec against observed state to determine the action.
 func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
+	// Check sync-policy annotation — skip reconciliation entirely if Ignore
+	if rc.resource.Annotations[manifest.AnnotationSyncPolicy] == manifest.SyncPolicyIgnore {
+		rc.change.Action = ActionNoop
+		return nil
+	}
+
+	// Pre-compute write-only hash (used for both create and update paths)
+	if rc.resource.Annotations[manifest.AnnotationIgnoreWriteOnly] != "true" {
+		ignoreFields := manifest.ParseIgnoreFields(rc.resource.Annotations)
+		woFields := manifest.WriteOnlyFields(rc.resource.Kind)
+		rc.change.WriteOnlyHash = HashWriteOnlyFields(rc.spec, woFields, ignoreFields)
+	}
+
 	// Resource doesn't exist — create
 	if rc.current == nil {
 		rc.change.Action = ActionCreate
@@ -310,6 +323,21 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 	// Compare desired vs current, skipping write-only fields
 	exclude := manifest.WriteOnlyFields(rc.resource.Kind)
 	diffs := CompareSpecExcluding(rc.spec, rc.current, exclude)
+
+	// Check write-only hash drift using pre-computed hash.
+	// Hash was computed once above and is carried on Change for the execute phase,
+	// avoiding a second secret resolution that could produce a different value.
+	desiredHash := rc.change.WriteOnlyHash
+	observedHash, _ := rc.current[WriteOnlyHashField].(string)
+	if desiredHash != "" && desiredHash != observedHash {
+		e.logger.Info("write-only hash mismatch",
+			slog.String("kind", string(rc.resource.Kind)),
+			slog.String("name", rc.resource.Name),
+			slog.String("observed", observedHash),
+			slog.String("desired", desiredHash))
+		diffs[WriteOnlyHashField] = FieldDiff{Old: observedHash, New: desiredHash}
+	}
+
 	if len(diffs) == 0 {
 		if rc.force {
 			rc.change.Action = ActionUpdate
@@ -327,6 +355,11 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 
 func (e *Engine) execute(ctx context.Context, change Change, res manifest.Resource) error {
 	spec := e.resolveSpecSecrets(res.Spec)
+
+	// Inject pre-computed write-only hash (computed once during stepCompare)
+	if change.WriteOnlyHash != "" {
+		spec[WriteOnlyHashField] = change.WriteOnlyHash
+	}
 
 	switch change.Action {
 	case ActionCreate:

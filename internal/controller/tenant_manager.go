@@ -206,6 +206,8 @@ func (tm *TenantManager) AggregatedMetrics() *Metrics {
 		agg.SyncErrors += snap.SyncErrors
 		agg.DriftDetected += snap.DriftDetected
 		agg.DriftResources += snap.DriftResources
+		agg.ProviderVerifyErrors += snap.ProviderVerifyErrors
+		agg.WriteOnlyHashMismatches += snap.WriteOnlyHashMismatches
 		if snap.LastSyncTime.After(agg.LastSyncTime) {
 			agg.LastSyncTime = snap.LastSyncTime
 			agg.SyncDuration = snap.SyncDuration

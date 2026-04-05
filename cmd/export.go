@@ -55,7 +55,11 @@ func init() {
 }
 
 // internalFields are stripped from exported specs to keep manifests clean.
-var internalFields = []string{"id", "createdAt", "updatedAt", "createdBy", "created_at", "updated_at", "created_by"}
+var internalFields = []string{
+	"id", "createdAt", "updatedAt", "createdBy",
+	"created_at", "updated_at", "created_by",
+	"writeOnlyHash", "write_only_hash", // gcplane-internal tracking field
+}
 
 func buildExportManifest(ctx context.Context, provider *goclaw.Provider, ep, tok string) (*manifest.Manifest, error) {
 	m := &manifest.Manifest{

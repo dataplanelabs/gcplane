@@ -14,6 +14,7 @@ type mockProvider struct {
 	observed map[string]map[string]any
 	created  []string
 	updated  []string
+	lastSpec map[string]any // captures last spec sent to Create/Update
 }
 
 func newMockProvider() *mockProvider {
@@ -34,12 +35,14 @@ func (m *mockProvider) Observe(_ context.Context, kind manifest.ResourceKind, ke
 func (m *mockProvider) Create(_ context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	uid := fmt.Sprintf("%s/%s", kind, key)
 	m.created = append(m.created, uid)
+	m.lastSpec = spec
 	return nil
 }
 
 func (m *mockProvider) Update(_ context.Context, kind manifest.ResourceKind, key string, spec map[string]any) error {
 	uid := fmt.Sprintf("%s/%s", kind, key)
 	m.updated = append(m.updated, uid)
+	m.lastSpec = spec
 	return nil
 }
 
@@ -212,6 +215,187 @@ func (p *parallelMockProvider) Observe(ctx context.Context, kind manifest.Resour
 	result, err := p.mockProvider.Observe(ctx, kind, key)
 	p.current.Add(-1)
 	return result, err
+}
+
+func TestReconcile_ExecuteInjectsWriteOnlyHash(t *testing.T) {
+	provider := newMockProvider()
+	engine := NewEngine(provider, nil)
+
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindAgent,
+				Name: "bot",
+				Spec: map[string]any{
+					"model":        "gpt-4",
+					"contextFiles": []any{map[string]any{"IDENTITY.md": "content"}},
+				},
+			},
+		},
+	}
+
+	// Execute (not dry-run) to verify hash is injected into provider spec
+	_, result := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: false})
+	if result.Applied != 1 {
+		t.Fatalf("expected 1 applied, got %d", result.Applied)
+	}
+	hash, ok := provider.lastSpec["writeOnlyHash"].(string)
+	if !ok || hash == "" {
+		t.Error("expected writeOnlyHash injected into spec sent to provider")
+	}
+	if len(hash) != 64 {
+		t.Errorf("expected 64-char SHA-256 hex, got %d chars", len(hash))
+	}
+}
+
+func TestReconcile_WriteOnlyHashDriftDetected(t *testing.T) {
+	provider := newMockProvider()
+	// Agent exists in GoClaw with no hash (simulating first reconcile on existing cluster)
+	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4"}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindAgent,
+				Name: "bot",
+				Spec: map[string]any{
+					"model":        "gpt-4",
+					"contextFiles": []any{map[string]any{"IDENTITY.md": "I am a bot"}},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Updates != 1 {
+		t.Errorf("expected 1 update (hash mismatch), got updates=%d noops=%d", plan.Updates, plan.Noops)
+	}
+	// Verify the diff contains writeOnlyHash
+	for _, ch := range plan.Changes {
+		if ch.Action == ActionUpdate {
+			if _, ok := ch.Diff["writeOnlyHash"]; !ok {
+				t.Error("expected writeOnlyHash in diff")
+			}
+		}
+	}
+}
+
+func TestReconcile_WriteOnlyHashMatchesNoop(t *testing.T) {
+	// Compute expected hash for the spec
+	spec := map[string]any{
+		"model":        "gpt-4",
+		"contextFiles": []any{map[string]any{"IDENTITY.md": "I am a bot"}},
+	}
+	woFields := manifest.WriteOnlyFields(manifest.KindAgent)
+	expectedHash := HashWriteOnlyFields(spec, woFields, nil)
+
+	provider := newMockProvider()
+	provider.observed["Agent/bot"] = map[string]any{
+		"model":        "gpt-4",
+		"writeOnlyHash": expectedHash,
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindAgent, Name: "bot", Spec: spec},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected 1 noop (hash matches), got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}
+
+func TestReconcile_WriteOnlyHashIgnoreAnnotation(t *testing.T) {
+	provider := newMockProvider()
+	// Agent exists with no hash — normally would trigger update
+	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4"}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindAgent,
+				Name: "bot",
+				Annotations: map[string]string{
+					manifest.AnnotationIgnoreWriteOnly: "true",
+				},
+				Spec: map[string]any{
+					"model":        "gpt-4",
+					"contextFiles": []any{map[string]any{"IDENTITY.md": "content"}},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected noop when ignore-write-only annotation set, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}
+
+func TestReconcile_SyncPolicyIgnore(t *testing.T) {
+	provider := newMockProvider()
+	// Resource doesn't exist — normally would trigger create
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindProvider,
+				Name: "legacy",
+				Annotations: map[string]string{
+					manifest.AnnotationSyncPolicy: manifest.SyncPolicyIgnore,
+				},
+				Spec: map[string]any{"displayName": "Legacy"},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected noop with sync-policy=Ignore, got noops=%d creates=%d", plan.Noops, plan.Creates)
+	}
+}
+
+func TestReconcile_IgnoreFieldsAnnotation(t *testing.T) {
+	// Spec has contextFiles and systemPrompt, but systemPrompt is ignored
+	spec := map[string]any{
+		"model":        "gpt-4",
+		"contextFiles": []any{map[string]any{"IDENTITY.md": "content"}},
+		"systemPrompt": "Be helpful",
+	}
+	woFields := manifest.WriteOnlyFields(manifest.KindAgent)
+	// Hash computed with systemPrompt excluded
+	hashWithIgnore := HashWriteOnlyFields(spec, woFields, []string{"systemPrompt"})
+
+	provider := newMockProvider()
+	provider.observed["Agent/bot"] = map[string]any{
+		"model":         "gpt-4",
+		"writeOnlyHash": hashWithIgnore,
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindAgent,
+				Name: "bot",
+				Annotations: map[string]string{
+					manifest.AnnotationIgnoreFields: "systemPrompt",
+				},
+				Spec: spec,
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected noop with ignore-fields matching, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
 }
 
 func TestReconcile_ParallelProducesSameResultAsSequential(t *testing.T) {

@@ -15,12 +15,13 @@ const (
 
 // Change describes a single planned resource change.
 type Change struct {
-	Kind   manifest.ResourceKind `json:"kind"`
-	Name   string                `json:"name"`
-	Action Action                `json:"action"`
-	Diff   map[string]FieldDiff  `json:"diff,omitempty"`
-	Error  string                `json:"error,omitempty"`
-	Forced bool                  `json:"forced,omitempty"` // true when update triggered by --force with no diff
+	Kind           manifest.ResourceKind `json:"kind"`
+	Name           string                `json:"name"`
+	Action         Action                `json:"action"`
+	Diff           map[string]FieldDiff  `json:"diff,omitempty"`
+	Error          string                `json:"error,omitempty"`
+	Forced         bool                  `json:"forced,omitempty"`         // true when update triggered by --force with no diff
+	WriteOnlyHash  string                `json:"writeOnlyHash,omitempty"`  // pre-computed hash for execute phase
 }
 
 // FieldDiff shows the before/after for a single field.
