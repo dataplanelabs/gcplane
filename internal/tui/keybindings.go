@@ -137,19 +137,12 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 
 // handleCommand processes key events when the command bar is active.
 func (h *KeyHandler) handleCommand(event *tcell.EventKey) *tcell.EventKey {
-	if event.Key() == tcell.KeyEscape {
-		h.mode = ModeNormal
-		h.app.deactivateCommandBar()
-		return nil
-	}
+	// Let InputField's DoneFunc handle Escape and Enter
 	return event
 }
 
-// handleSearch processes key events in search/filter mode (P1 placeholder).
+// handleSearch processes key events in search/filter mode.
 func (h *KeyHandler) handleSearch(event *tcell.EventKey) *tcell.EventKey {
-	if event.Key() == tcell.KeyEscape {
-		h.mode = ModeNormal
-		return nil
-	}
+	// Let InputField's DoneFunc handle Escape and Enter
 	return event
 }
