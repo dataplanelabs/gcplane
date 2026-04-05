@@ -67,3 +67,26 @@ func (p *Provider) updateProvider(ctx context.Context, key string, spec map[stri
 	}
 	return err
 }
+
+// VerifyProvider checks whether a provider's API key is valid by calling the
+// GoClaw verify endpoint. Returns ErrUnauthorized if the key is stale/invalid,
+// ErrNotFound if the provider or verify endpoint does not exist, or another
+// error for network/server issues.
+func (p *Provider) VerifyProvider(ctx context.Context, key string) error {
+	current, err := p.observeProvider(ctx, key)
+	if err != nil {
+		return fmt.Errorf("verify provider %s: %w", key, err)
+	}
+	if current == nil {
+		return fmt.Errorf("verify provider %s: %w", key, ErrNotFound)
+	}
+
+	id, ok := current["id"].(string)
+	if !ok {
+		return fmt.Errorf("verify provider %s: missing id", key)
+	}
+
+	_, err = p.http.Post(ctx, "/v1/providers/"+id+"/verify", nil)
+	return err
+}
+

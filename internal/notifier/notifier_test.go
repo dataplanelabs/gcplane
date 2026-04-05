@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dataplanelabs/gcplane/internal/controller"
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 )
@@ -272,5 +273,89 @@ func TestWebhookNotifier_SendsFormatPayload(t *testing.T) {
 	}
 	if _, ok := received["embeds"]; !ok {
 		t.Error("expected discord embeds in payload")
+	}
+}
+
+// --- Provider Verify Failure Tests ---
+
+var testFailures = []controller.ProviderVerifyFailure{
+	{Name: "openai", Error: "unauthorized: Missing Authentication header"},
+	{Name: "anthropic", Error: "unauthorized: Invalid API key"},
+}
+
+func TestWebhookNotifier_VerifyFailure_NoOp_WhenURLEmpty(t *testing.T) {
+	n := New("", "")
+	err := n.NotifyProviderVerifyFailure(context.Background(), testFailures)
+	if err != nil {
+		t.Errorf("expected nil error for empty webhook URL, got %v", err)
+	}
+}
+
+func TestWebhookNotifier_VerifyFailure_NoOp_WhenFailuresEmpty(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	n := New(srv.URL, "slack")
+	if err := n.NotifyProviderVerifyFailure(context.Background(), nil); err != nil {
+		t.Errorf("expected nil error for empty failures, got %v", err)
+	}
+	if called {
+		t.Error("expected no HTTP call for empty failures")
+	}
+}
+
+func TestWebhookNotifier_VerifyFailure_SendsPayload(t *testing.T) {
+	var received map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &received)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	n := New(srv.URL, FormatSlack)
+	if err := n.NotifyProviderVerifyFailure(context.Background(), testFailures); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := received["blocks"]; !ok {
+		t.Error("expected slack blocks in verify failure payload")
+	}
+}
+
+func TestBuildVerifyFailurePayload_AllFormats(t *testing.T) {
+	formats := []string{FormatSlack, FormatDiscord, FormatGoogleChat, FormatTeams, FormatTelegram}
+	for _, f := range formats {
+		p := buildVerifyFailurePayload(f, testFailures)
+		b, _ := json.Marshal(p)
+		s := string(b)
+		if !strings.Contains(s, "openai") || !strings.Contains(s, "anthropic") {
+			t.Errorf("format %s: payload missing provider names", f)
+		}
+		if !strings.Contains(s, "FAILED") && !strings.Contains(s, "failed") {
+			// Telegram uses markdown, check for title content
+			if f != FormatTelegram {
+				t.Errorf("format %s: payload should indicate failure", f)
+			}
+		}
+	}
+}
+
+func TestDiscordVerifyPayload_UsesRedColor(t *testing.T) {
+	m := toMap(t, buildDiscordVerifyPayload(testFailures))
+	embeds := m["embeds"].([]any)
+	embed := embeds[0].(map[string]any)
+	if embed["color"] != float64(15158332) {
+		t.Errorf("discord verify embed color = %v, want 15158332 (red)", embed["color"])
+	}
+}
+
+func TestTeamsVerifyPayload_UsesRedColor(t *testing.T) {
+	m := toMap(t, buildTeamsVerifyPayload(testFailures))
+	if m["themeColor"] != "FF0000" {
+		t.Errorf("teams verify themeColor = %v, want FF0000", m["themeColor"])
 	}
 }

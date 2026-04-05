@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dataplanelabs/gcplane/internal/controller"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 )
 
@@ -102,3 +103,34 @@ func driftSummary(changes []reconciler.Change) string {
 func driftTitle(changes []reconciler.Change) string {
 	return fmt.Sprintf("GCPlane drift detected (%d resource(s))", len(changes))
 }
+// NotifyProviderVerifyFailure posts a formatted alert listing providers with invalid API keys.
+// Returns nil immediately when WebhookURL is empty or failures is empty.
+func (n *WebhookNotifier) NotifyProviderVerifyFailure(ctx context.Context, failures []controller.ProviderVerifyFailure) error {
+	if n.WebhookURL == "" || len(failures) == 0 {
+		return nil
+	}
+
+	payload := buildVerifyFailurePayload(n.Format, failures)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("notifier: marshal verify payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, n.WebhookURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("notifier: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := n.Client.Do(req)
+	if err != nil {
+		return fmt.Errorf("notifier: send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("notifier: unexpected status %d", resp.StatusCode)
+	}
+	return nil
+}
+

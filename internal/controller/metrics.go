@@ -13,7 +13,8 @@ type Metrics struct {
 	SyncDuration   time.Duration
 	LastSyncTime   time.Time
 	DriftDetected  int64 // counter: total drift events (cumulative)
-	DriftResources int64 // gauge: resources drifted in last sync cycle
+	DriftResources       int64 // gauge: resources drifted in last sync cycle
+	ProviderVerifyErrors int64 // counter: total provider key verification failures
 }
 
 // Snapshot returns a copy of the current metrics (thread-safe).
@@ -26,6 +27,7 @@ func (m *Metrics) Snapshot() Metrics {
 		SyncDuration:   m.SyncDuration,
 		LastSyncTime:   m.LastSyncTime,
 		DriftDetected:  m.DriftDetected,
-		DriftResources: m.DriftResources,
+		DriftResources:       m.DriftResources,
+		ProviderVerifyErrors: m.ProviderVerifyErrors,
 	}
 }

@@ -215,6 +215,9 @@ func (c *Controller) reconcileOnce() {
 		c.tracker.SetCondition(Condition{Type: ConditionDrifted, Status: "False"})
 	}
 
+	// Post-reconcile: verify provider API keys
+	c.verifyProviders(context.Background(), m)
+
 	c.lastHash = hash
 
 	driftCount := int64(plan.Creates + plan.Updates)

@@ -2,6 +2,8 @@ package goclaw
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -213,5 +215,79 @@ func TestProvider_Create_UnknownKind(t *testing.T) {
 	err := p.Create(context.Background(), manifest.ResourceKind("Unknown"), "x", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown kind")
+	}
+}
+
+// TestProvider_VerifyProvider_Success verifies that VerifyProvider returns nil
+// when the verify endpoint returns 200.
+func TestProvider_VerifyProvider_Success(t *testing.T) {
+	p, cleanup := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/providers":
+			json.NewEncoder(w).Encode(map[string]any{
+				"providers": []map[string]any{
+					{"id": "uuid-abc", "name": "test-provider", "provider_type": "openrouter"},
+				},
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/providers/uuid-abc/verify":
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"status":"valid"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer cleanup()
+
+	err := p.VerifyProvider(context.Background(), "test-provider")
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+}
+
+// TestProvider_VerifyProvider_Unauthorized verifies that VerifyProvider returns
+// ErrUnauthorized when the API key is invalid.
+func TestProvider_VerifyProvider_Unauthorized(t *testing.T) {
+	p, cleanup := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/providers":
+			json.NewEncoder(w).Encode(map[string]any{
+				"providers": []map[string]any{
+					{"id": "uuid-abc", "name": "bad-provider", "provider_type": "openrouter"},
+				},
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/providers/uuid-abc/verify":
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"error":"Missing Authentication header"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer cleanup()
+
+	err := p.VerifyProvider(context.Background(), "bad-provider")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("expected ErrUnauthorized, got: %v", err)
+	}
+}
+
+// TestProvider_VerifyProvider_NotFound verifies that VerifyProvider returns
+// ErrNotFound when the provider does not exist.
+func TestProvider_VerifyProvider_NotFound(t *testing.T) {
+	p, cleanup := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"providers": []map[string]any{},
+		})
+	}))
+	defer cleanup()
+
+	err := p.VerifyProvider(context.Background(), "nonexistent")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got: %v", err)
 	}
 }

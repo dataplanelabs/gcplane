@@ -195,4 +195,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintf(w, "# HELP gcplane_drift_resources Number of resources that drifted in the last sync cycle\n")
 	fmt.Fprintf(w, "# TYPE gcplane_drift_resources gauge\n")
 	fmt.Fprintf(w, "gcplane_drift_resources %d\n", m.DriftResources)
+	fmt.Fprintf(w, "# HELP gcplane_provider_verify_errors_total Total provider key verification failures\n")
+	fmt.Fprintf(w, "# TYPE gcplane_provider_verify_errors_total counter\n")
+	fmt.Fprintf(w, "gcplane_provider_verify_errors_total %d\n", m.ProviderVerifyErrors)
 }
