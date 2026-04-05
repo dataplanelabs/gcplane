@@ -43,13 +43,28 @@ func (p *Provider) observeBuiltinToolConfig(ctx context.Context, key string) (ma
 }
 
 // createBuiltinToolConfig sets a per-tenant config for a builtin tool.
+// When settings are provided (e.g., provider chain), also updates the global
+// tool definition since the tenant-config endpoint only persists enabled state.
 func (p *Provider) createBuiltinToolConfig(ctx context.Context, key string, spec map[string]any) error {
 	body := translateSpec(spec)
+
+	// Update tenant-level enabled state
 	path := fmt.Sprintf("/v1/tools/builtin/%s/tenant-config", toolName(key))
 	_, err := p.http.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("set builtin tool config %s: %w", key, err)
 	}
+
+	// If settings are provided, also update the global tool definition
+	// because the tenant-config endpoint only persists the enabled flag.
+	if _, hasSettings := body["settings"]; hasSettings {
+		globalPath := fmt.Sprintf("/v1/tools/builtin/%s", toolName(key))
+		settingsOnly := map[string]any{"settings": body["settings"]}
+		if _, err := p.http.Put(ctx, globalPath, settingsOnly); err != nil {
+			return fmt.Errorf("update global tool settings %s: %w", key, err)
+		}
+	}
+
 	return nil
 }
 
