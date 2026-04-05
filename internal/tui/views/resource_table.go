@@ -106,8 +106,15 @@ func (rt *ResourceTable) Refresh(changes []reconciler.Change) {
 			SetTextColor(ColorOverlay0).SetExpansion(1))
 	}
 
-	// Select first data row if available
+	// Select first data row if available, or show empty message
 	if len(rt.rows) > 0 {
+		rt.Table.Select(1, 0)
+	} else {
+		// Add a selectable placeholder row so tview table keeps handling keys
+		rt.Table.SetCell(1, 0, tview.NewTableCell(""))
+		rt.Table.SetCell(1, 1, tview.NewTableCell(Tag(HexOverlay0, "(no matching resources)")))
+		rt.Table.SetCell(1, 2, tview.NewTableCell(""))
+		rt.Table.SetCell(1, 3, tview.NewTableCell("").SetExpansion(1))
 		rt.Table.Select(1, 0)
 	}
 }
