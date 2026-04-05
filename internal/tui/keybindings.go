@@ -1,9 +1,8 @@
 package tui
 
 import (
-	"log/slog"
-
 	"github.com/dataplanelabs/gcplane/internal/manifest"
+	"github.com/dataplanelabs/gcplane/internal/tui/views"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -72,6 +71,12 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		return event
 	}
 
+	// Tab key on Traces tab toggles list/tree focus
+	if event.Key() == tcell.KeyTab && h.app.registry.ActiveTab() == TabTraces {
+		h.app.tracesPanel.ToggleFocus(h.app.tapp)
+		return nil
+	}
+
 	// Ctrl+E: edit selected resource — only on State tab, no overlay
 	if event.Key() == tcell.KeyCtrlE {
 		if h.app.registry.ActiveTab() == TabState && !h.app.registry.HasOverlay() {
@@ -105,14 +110,11 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 		case 's':
 			h.app.switchTab(TabState)
 			return nil
+		case 't':
+			h.app.switchTab(TabTraces)
+			return nil
 		case 'l':
 			h.app.switchTab(TabLogs)
-			return nil
-		case 'e':
-			h.app.switchTab(TabEvents)
-			return nil
-		case 't':
-			h.app.switchTab(TabTrace)
 			return nil
 		}
 	}
@@ -171,10 +173,8 @@ func (h *KeyHandler) handleNumberKey(r rune) {
 		}
 	case TabLogs:
 		h.handleLogLevelKey(r)
-	case TabEvents:
-		h.handleEventFilterKey(r)
-	case TabTrace:
-		h.handleTraceLevelKey(r)
+	case TabTraces:
+		// Future: agent/channel filter by number key
 	}
 }
 
@@ -185,46 +185,12 @@ func (h *KeyHandler) handleLogLevelKey(r rune) {
 	}
 }
 
-func (h *KeyHandler) handleEventFilterKey(r rune) {
-	filters := map[rune]string{
-		'1': "",        // all
-		'2': "agent",
-		'3': "chat",
-		'4': "health",
-		'5': "cron",
-		'6': "team.",
-	}
-	if f, ok := filters[r]; ok {
-		h.app.eventsPanel.SetFilter(f)
-	}
-}
-
-func (h *KeyHandler) handleTraceLevelKey(r rune) {
-	if h.app.traceView == nil {
-		return
-	}
-	levels := map[rune]slog.Level{
-		'1': slog.LevelDebug,
-		'2': slog.LevelInfo,
-		'3': slog.LevelWarn,
-		'4': slog.LevelError,
-	}
-	if lvl, ok := levels[r]; ok {
-		h.app.traceView.SetLevelMin(lvl)
-		h.app.traceView.Refresh()
-	}
-}
-
 func (h *KeyHandler) handlePauseResume() {
 	switch h.app.registry.ActiveTab() {
 	case TabLogs:
 		h.app.logsPanel.TogglePause()
-	case TabEvents:
-		h.app.eventsPanel.TogglePause()
-	case TabTrace:
-		if h.app.traceView != nil {
-			h.app.traceView.TogglePause()
-		}
+	case TabTraces:
+		h.app.tracesPanel.TogglePause()
 	}
 }
 
@@ -236,12 +202,9 @@ func (h *KeyHandler) handleClearFilters() {
 		h.app.refreshTable()
 	case TabLogs:
 		h.app.logsPanel.SetLevelMin("debug")
-	case TabEvents:
-		h.app.eventsPanel.SetFilter("")
-	case TabTrace:
-		if h.app.traceView != nil {
-			h.app.traceView.SetLevelMin(slog.LevelDebug)
-			h.app.traceView.Refresh()
-		}
+	case TabTraces:
+		h.app.traceStore.SetFilters(views.TraceFilters{Limit: 50})
+		h.app.tracesPanel.SetAgentFilter("")
+		h.app.tracesPanel.SetChannelFilter("")
 	}
 }

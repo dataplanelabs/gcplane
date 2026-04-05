@@ -82,9 +82,8 @@ func TestViewRegistrySwitchTab(t *testing.T) {
 	r := NewViewRegistry(pages, app)
 
 	r.Register(&stubView{name: "main"})
+	r.Register(&stubView{name: "traces"})
 	r.Register(&stubView{name: "logs"})
-	r.Register(&stubView{name: "events"})
-	r.Register(&stubView{name: "trace"})
 	r.Register(&stubView{name: "detail"})
 
 	// Default is TabState
@@ -127,18 +126,18 @@ func TestViewRegistrySwitchTab(t *testing.T) {
 
 	// Switch tab clears overlay
 	r.Push("detail")
-	r.SwitchTab(TabTrace)
+	r.SwitchTab(TabTraces)
 	if r.HasOverlay() {
 		t.Error("tab switch should clear overlay")
 	}
-	if r.Current() != "trace" {
-		t.Errorf("want trace, got %s", r.Current())
+	if r.Current() != "traces" {
+		t.Errorf("want traces, got %s", r.Current())
 	}
 
 	// Pop on empty overlay returns to active tab
 	page = r.Pop()
-	if page != "trace" {
-		t.Errorf("pop on empty overlay should return trace, got %s", page)
+	if page != "traces" {
+		t.Errorf("pop on empty overlay should return traces, got %s", page)
 	}
 }
 

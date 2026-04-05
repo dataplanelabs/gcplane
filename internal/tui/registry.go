@@ -12,9 +12,8 @@ type PrimaryTab int
 
 const (
 	TabState  PrimaryTab = iota
+	TabTraces
 	TabLogs
-	TabEvents
-	TabTrace
 )
 
 // tabMeta maps tabs to page names and display labels.
@@ -24,9 +23,8 @@ var tabMeta = []struct {
 	Key      string
 }{
 	{"main", "State", "S"},
+	{"traces", "Traces", "T"},
 	{"logs", "Logs", "L"},
-	{"events", "Events", "E"},
-	{"trace", "Trace", "T"},
 }
 
 // ViewRegistry manages named views backed by tview.Pages.

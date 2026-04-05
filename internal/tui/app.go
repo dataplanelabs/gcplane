@@ -10,7 +10,6 @@ import (
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
-	"github.com/dataplanelabs/gcplane/internal/tui/trace"
 	"github.com/dataplanelabs/gcplane/internal/tui/views"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -31,6 +30,12 @@ type LogTailer interface {
 	StopLogTail(ctx context.Context) error
 }
 
+// TraceFetcher is optionally implemented by providers that expose LLM trace data.
+type TraceFetcher interface {
+	ListTraces(ctx context.Context, f views.TraceFilters) ([]views.TraceData, int, error)
+	GetTrace(ctx context.Context, traceID string) (*views.TraceData, []views.SpanData, error)
+}
+
 // EventListenerSetup is optionally implemented by providers that support WS event streaming.
 type EventListenerSetup interface {
 	SetEventHandler(h goclaw.WSEventHandler)
@@ -49,12 +54,12 @@ type App struct {
 	table    *views.ResourceTable
 	detail   *views.ResourceDetail
 	drift    *views.DriftView
-	confirm      *views.ConfirmModal
-	traceView    *views.TraceView
-	traceHandler *trace.RingHandler
-	liveStore    *LiveStore
-	logsPanel    *views.LogsPanel
-	eventsPanel  *views.EventsPanel
+	confirm     *views.ConfirmModal
+	liveStore   *LiveStore
+	logsPanel   *views.LogsPanel
+	tracesPanel *views.TracesPanel
+	traceStore  *TraceStore
+	spanDetail  *views.SpanDetail
 
 	// Refresh infrastructure
 	refreshMu sync.Mutex
@@ -80,8 +85,7 @@ type Config struct {
 	Provider ProviderAPI
 	Engine   *reconciler.Engine
 	Interval string // e.g. "10s"
-	Attach       string               // optional: URL of running gcplane serve instance
-	TraceHandler *trace.RingHandler   // optional: ring handler for trace capture
+	Attach string // optional: URL of running gcplane serve instance
 }
 
 // NewApp creates and wires the TUI application.
@@ -114,20 +118,20 @@ func NewApp(cfg Config) (*App, error) {
 	}
 
 	app.bus = NewEventBus(app.tapp)
-	app.traceHandler = cfg.TraceHandler
-	if app.traceHandler != nil {
-		app.traceHandler.SetOnEntry(func(e trace.Entry) {
-			app.bus.Publish(Event{Type: EventTraceEntry, Payload: e})
-		})
-	}
 
 	// LiveStore — ring-buffered state from WS events
 	app.liveStore = NewLiveStore(500, 500)
 
-	// Wire WS event handler → LiveStore (if provider supports it)
+	// TraceStore — LLM agent traces from /v1/traces API
+	app.traceStore = NewTraceStore()
+
+	// Wire WS event handler → LiveStore + TraceStore (if provider supports it)
 	if setup, ok := app.Provider.(EventListenerSetup); ok {
 		setup.SetEventHandler(func(frame goclaw.WSEventFrame) {
 			app.liveStore.HandleEvent(frame)
+			if frame.Event == "trace.updated" {
+				app.traceStore.NotifyTraceUpdated()
+			}
 		})
 	}
 
@@ -171,12 +175,35 @@ func (a *App) buildLayout() {
 	a.logsPanel = views.NewLogsPanel()
 	a.registry.Register(a.logsPanel)
 
-	a.eventsPanel = views.NewEventsPanel()
-	a.registry.Register(a.eventsPanel)
+	a.tracesPanel = views.NewTracesPanel()
+	a.registry.Register(a.tracesPanel)
 
-	if a.traceHandler != nil {
-		a.traceView = views.NewTraceView(a.traceHandler)
-		a.registry.Register(a.traceView)
+	a.spanDetail = views.NewSpanDetail()
+	a.registry.Register(a.spanDetail)
+
+	// Wire TraceList selection → TraceStore
+	a.tracesPanel.List().OnSelect = func(traceID string) {
+		a.traceStore.SelectTrace(traceID)
+		a.triggerTraceDetailRefresh()
+	}
+
+	// Wire copy support
+	a.tracesPanel.List().OnCopy = func(text string) {
+		if err := views.CopyToClipboard(text); err == nil {
+			a.showStatus(views.Tag(views.HexGreen, "Copied: "+text))
+		}
+	}
+	a.tracesPanel.Tree().OnCopy = func(text string) {
+		if err := views.CopyToClipboard(text); err == nil {
+			a.showStatus(views.Tag(views.HexGreen, "Copied to clipboard"))
+		}
+	}
+
+	// Wire SpanTree detail → overlay
+	a.tracesPanel.Tree().OnDetail = func(span views.SpanData) {
+		a.spanDetail.Show(span)
+		a.pushView("span-detail")
+		a.tapp.SetFocus(a.spanDetail.TextView)
 	}
 
 	// Register overlay views
@@ -227,20 +254,17 @@ func (a *App) tabRefreshLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// TraceStore refresh for Traces tab
+			if a.registry.ActiveTab() == TabTraces {
+				a.refreshTraces()
+			}
+
 			if !a.liveStore.IsDirty() {
 				continue
 			}
 			a.tapp.QueueUpdateDraw(func() {
-				tab := a.registry.ActiveTab()
-				switch tab {
-				case TabLogs:
+				if a.registry.ActiveTab() == TabLogs {
 					a.logsPanel.Refresh(a.liveStore.Logs())
-				case TabEvents:
-					a.eventsPanel.Refresh(a.liveStore.Events())
-				case TabTrace:
-					if a.traceView != nil {
-						a.traceView.Refresh()
-					}
 				}
 				a.liveStore.MarkClean()
 			})
@@ -421,9 +445,6 @@ func (a *App) pushView(name string) {
 
 // switchTab switches to a primary tab, managing log tail lifecycle.
 func (a *App) switchTab(tab PrimaryTab) {
-	if tab == TabTrace && a.traceView == nil {
-		return
-	}
 	prev := a.registry.ActiveTab()
 	a.registry.SwitchTab(tab)
 	a.updateHeader()
@@ -435,7 +456,11 @@ func (a *App) switchTab(tab PrimaryTab) {
 		go a.stopLogTail()
 	}
 
-	// Set focus to the active tab's primary widget
+	// Initial trace list fetch when entering Traces tab
+	if tab == TabTraces && prev != TabTraces {
+		a.traceStore.NotifyTraceUpdated()
+	}
+
 	a.focusActiveTab()
 }
 
@@ -444,14 +469,10 @@ func (a *App) focusActiveTab() {
 	switch a.registry.ActiveTab() {
 	case TabState:
 		a.tapp.SetFocus(a.table.Table)
+	case TabTraces:
+		a.tapp.SetFocus(a.tracesPanel.FocusPrimitive())
 	case TabLogs:
 		a.tapp.SetFocus(a.logsPanel.TextView)
-	case TabEvents:
-		a.tapp.SetFocus(a.eventsPanel.TextView)
-	case TabTrace:
-		if a.traceView != nil {
-			a.tapp.SetFocus(a.traceView.TextView)
-		}
 	}
 }
 
@@ -517,6 +538,58 @@ func (a *App) stopLogTail() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = tailer.StopLogTail(ctx)
+	}
+}
+
+// refreshTraces handles async trace data refresh from TraceStore.
+func (a *App) refreshTraces() {
+	if a.tracesPanel.IsPaused() {
+		return
+	}
+
+	fetcher, ok := a.Provider.(TraceFetcher)
+	if !ok {
+		a.tapp.QueueUpdateDraw(func() {
+			a.tracesPanel.RefreshUnavailable("Traces not available (provider does not support trace API)")
+		})
+		return
+	}
+
+	if a.traceStore.NeedsListRefresh() {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := a.traceStore.RefreshList(ctx, fetcher); err != nil {
+				return // silently skip; will retry next tick
+			}
+			a.tapp.QueueUpdateDraw(func() {
+				a.tracesPanel.Refresh(
+					a.traceStore.Traces(),
+					a.traceStore.Total(),
+					a.traceStore.SelectedID(),
+				)
+			})
+		}()
+	}
+
+	if a.traceStore.NeedsDetailRefresh() {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := a.traceStore.RefreshDetail(ctx, fetcher); err != nil {
+				return
+			}
+			a.tapp.QueueUpdateDraw(func() {
+				a.tracesPanel.RefreshDetail(a.traceStore.SelectedSpanTree())
+			})
+		}()
+	}
+}
+
+// triggerTraceDetailRefresh kicks an immediate trace detail refresh if on Traces tab.
+func (a *App) triggerTraceDetailRefresh() {
+	if a.registry.ActiveTab() == TabTraces {
+		go a.refreshTraces()
 	}
 }
 
@@ -596,11 +669,8 @@ func (a *App) executeCommand(cmd string) {
 	case "logs":
 		a.switchTab(TabLogs)
 		return
-	case "events":
-		a.switchTab(TabEvents)
-		return
-	case "trace":
-		a.switchTab(TabTrace)
+	case "traces":
+		a.switchTab(TabTraces)
 		return
 	}
 
@@ -720,8 +790,8 @@ func helpText() string {
 
 	return fmt.Sprintf(`
  %s
-   %s State    %s Logs    %s Events    %s Trace
-   %s %s %s %s  via command
+   %s State    %s Traces    %s Logs
+   %s %s %s  via command
 
  %s
    %s         Move down/up
@@ -737,11 +807,17 @@ func helpText() string {
    %s AgentTeam  %s SysConfig  %s SecureCLI
    %s All
 
- %s (Logs/Trace tabs)
+ %s (Logs tab)
    %s DEBUG+   %s INFO+   %s WARN+   %s ERROR
 
- %s (Events tab)
-   %s All   %s Agent   %s Chat   %s Health   %s Cron   %s Team
+ %s (Traces tab)
+   %s       Toggle list / tree focus
+   %s     Select trace / expand-collapse span
+   %s/%s     Half-page scroll
+   %s       Toggle expand / %s Expand all
+   %s         Copy trace ID / span info
+   %s       Pause/resume auto-refresh
+   %s         Clear filters
 
  %s
    %s      Apply (reconcile all pending changes)
@@ -749,10 +825,6 @@ func helpText() string {
    %s      Edit selected resource ($EDITOR)
    %s      Apply all       %s Delete
    %s       Sync (attach)   %s  Tenant switch
-
- %s (Logs/Events/Trace)
-   %s       Pause/resume auto-scroll
-   %s         Clear filters
 
  %s
    %s           Filter by name
@@ -763,8 +835,8 @@ func helpText() string {
    %s           Refresh now
 `,
 		h("Tabs"),
-		k("s"), k("l"), k("e"), k("t"),
-		k(":state"), k(":logs"), k(":events"), k(":trace"),
+		k("s"), k("t"), k("l"),
+		k(":state"), k(":traces"), k(":logs"),
 		h("Navigation"),
 		k("j/k"), k("g/G"), k("Enter"), k("d"), k("Esc"), k("q"),
 		h("Number Keys"),
@@ -774,14 +846,16 @@ func helpText() string {
 		k("0"),
 		h("Number Keys"),
 		k("1"), k("2"), k("3"), k("4"),
-		h("Number Keys"),
-		k("1"), k("2"), k("3"), k("4"), k("5"), k("6"),
+		h("Traces"),
+		k("Tab"), k("Enter"),
+		k("Ctrl+D"), k("Ctrl+U"),
+		k("o"), k("O"),
+		k("y"),
+		k("Space"), k("c"),
 		h("Actions"),
 		k("Ctrl+R"), k("Ctrl+D"), k("Ctrl+E"),
 		k(":apply"), k(":delete"),
 		k(":sync"), k(":tenant X"),
-		h("Streaming"),
-		k("Space"), k("c"),
 		h("Search"),
 		k("/"), k("Enter"), k("Esc"),
 		h("Other"),

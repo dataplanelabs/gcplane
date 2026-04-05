@@ -42,19 +42,21 @@ internal/
 - SecureCLIGrant uses composite name `binaryName--agentKey` (e.g., `kubectl--assistant`)
 
 ## TUI Architecture
-- **Tabbed Layout** (v1.2+): 4 full-screen peer tabs (State, Logs, Events, Trace) switched via s/l/e/t keys
+- **Tabbed Layout** (v1.2+): 3 full-screen peer tabs (State, Traces, Logs) switched via s/t/l keys
 - `View` interface: `Name()`, `Primitive()`, `Activate()` — all views implement this
-- `ViewRegistry`: manages tab pages with overlay support (confirm modal, help)
+- `ViewRegistry`: manages tab pages with overlay support (confirm modal, help, span detail)
 - `EventBus`: typed pub/sub with `QueueUpdateDraw` thread safety
 - `LiveStore`: thread-safe shared state with atomic updates for real-time data
-- `RingHandler` (`trace/`): custom `slog.Handler` → 1000-entry ring buffer → trace view
+- `TraceStore`: thread-safe LLM trace store with dirty flags, WS event forwarding, list/detail refresh
+- `RingHandler` (`trace/`): custom `slog.Handler` → 1000-entry ring buffer for slog API call tracing
 - **Tab Components**:
   - State tab: ResourceTable (kind filtering via 0-9), ResourceDetail (Enter), DriftView (d key)
+  - Traces tab: Split panel — TraceList (left, 2:3 ratio) | SpanTree (right), Tab key toggles focus, Enter on span shows SpanDetail overlay
   - Logs tab: LogsPanel (level filtering 1-4, live streaming)
-  - Events tab: EventsPanel (type filtering 1-6, live streaming)
-  - Trace tab: TraceView (level filtering 1-4, shows API calls and reconciliation events)
+- **Trace Data Flow**: WS `trace.updated` → TraceStore.NotifyTraceUpdated() → tabRefreshLoop calls RefreshList/RefreshDetail → UI update via QueueUpdateDraw
+- **Span Tree**: Real LLM agent traces from GoClaw `/v1/traces` API, sorted by StartTime for deterministic ordering, color-coded by span type (agent=Mauve, llm_call=Blue, tool_call=Teal)
 - API logging: HTTPClient logs request/response (method, path, status, duration) via slog
-- Keybindings: Tab switch (s/l/e/t), edit (Ctrl+E), delete (Ctrl+D), reconcile (Ctrl+R), pause/resume (Space), clear filters (c)
+- Keybindings: Tab switch (s/t/l), edit (Ctrl+E), delete (Ctrl+D), reconcile (Ctrl+R), pause/resume (Space), clear filters (c), Traces-specific: Tab=focus toggle, Enter=select/expand, y=copy ID/info
 
 ## Testing
 ```bash

@@ -1,13 +1,11 @@
 package tui
 
 import (
-	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
-	"github.com/dataplanelabs/gcplane/internal/tui/trace"
 	"github.com/dataplanelabs/gcplane/internal/tui/views"
 )
 
@@ -120,22 +118,23 @@ func TestSmokeLocalDev(t *testing.T) {
 
 	t.Log("Smoke test passed — all TUI components work correctly")
 
-	// Test trace view rendering (no crash)
-	t.Run("TraceView", func(t *testing.T) {
-		handler := trace.NewRingHandler(100, slog.LevelDebug, nil)
-		logger := slog.New(handler)
-
-		logger.Info("observing resource", slog.String("kind", "Agent"), slog.String("name", "test"))
-		logger.Info("observe result", slog.String("kind", "Agent"), slog.Bool("exists", true))
-		logger.Debug("api.request", slog.String("method", "GET"), slog.String("path", "/api/agents"))
-
-		entries := handler.Snapshot()
-		if len(entries) != 3 {
-			t.Fatalf("want 3 trace entries, got %d", len(entries))
+	// Test TracesPanel rendering (no crash)
+	t.Run("TracesPanel", func(t *testing.T) {
+		panel := views.NewTracesPanel()
+		panel.Refresh(nil, 0, "")
+		panel.RefreshUnavailable("no provider")
+		panel.TogglePause()
+		if !panel.IsPaused() {
+			t.Fatal("should be paused")
 		}
+	})
 
-		tv := views.NewTraceView(handler)
-		tv.Refresh()
-		// Verify no crash — trace view renders entries
+	// Test TraceStore
+	t.Run("TraceStore", func(t *testing.T) {
+		store := NewTraceStore()
+		store.NotifyTraceUpdated()
+		if !store.NeedsListRefresh() {
+			t.Fatal("should need refresh")
+		}
 	})
 }
