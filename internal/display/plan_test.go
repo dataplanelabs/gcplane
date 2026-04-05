@@ -132,7 +132,6 @@ func TestPrintApplyResult_NoPanic(t *testing.T) {
 // --- Content validation tests ---
 
 func TestPrintCreate_Output(t *testing.T) {
-	t.Parallel()
 	out := captureOutput(t, func() {
 		printCreate(reconciler.Change{Kind: manifest.KindAgent, Name: "my-bot", Action: reconciler.ActionCreate})
 	})
@@ -142,7 +141,6 @@ func TestPrintCreate_Output(t *testing.T) {
 }
 
 func TestPrintUpdate_Output(t *testing.T) {
-	t.Parallel()
 	out := captureOutput(t, func() {
 		printUpdate(reconciler.Change{
 			Kind: manifest.KindProvider, Name: "anthropic", Action: reconciler.ActionUpdate,
@@ -160,7 +158,6 @@ func TestPrintUpdate_Output(t *testing.T) {
 }
 
 func TestPrintUpdate_Forced(t *testing.T) {
-	t.Parallel()
 	out := captureOutput(t, func() {
 		printUpdate(reconciler.Change{
 			Kind: manifest.KindAgent, Name: "bot", Action: reconciler.ActionUpdate, Forced: true,
@@ -172,7 +169,6 @@ func TestPrintUpdate_Forced(t *testing.T) {
 }
 
 func TestPrintDelete_Output(t *testing.T) {
-	t.Parallel()
 	out := captureOutput(t, func() {
 		printDelete(reconciler.Change{Kind: manifest.KindChannel, Name: "slack", Action: reconciler.ActionDelete})
 	})
@@ -182,7 +178,6 @@ func TestPrintDelete_Output(t *testing.T) {
 }
 
 func TestPrintNoop_InSync(t *testing.T) {
-	t.Parallel()
 	out := captureOutput(t, func() {
 		printNoop(reconciler.Change{Kind: manifest.KindAgent, Name: "bot", Action: reconciler.ActionNoop})
 	})
@@ -195,7 +190,6 @@ func TestPrintNoop_InSync(t *testing.T) {
 }
 
 func TestPrintNoop_WithError(t *testing.T) {
-	t.Parallel()
 	out := captureOutput(t, func() {
 		printNoop(reconciler.Change{Kind: manifest.KindAgent, Name: "bot", Action: reconciler.ActionNoop, Error: "timeout"})
 	})
@@ -208,7 +202,6 @@ func TestPrintNoop_WithError(t *testing.T) {
 }
 
 func TestPrintPlan_SummaryLine(t *testing.T) {
-	t.Parallel()
 	plan := &reconciler.Plan{
 		Changes: []reconciler.Change{
 			{Kind: manifest.KindProvider, Name: "a", Action: reconciler.ActionCreate},
@@ -224,7 +217,6 @@ func TestPrintPlan_SummaryLine(t *testing.T) {
 }
 
 func TestPrintDiff_NoChange(t *testing.T) {
-	t.Parallel()
 	plan := &reconciler.Plan{
 		Changes: []reconciler.Change{
 			{Kind: manifest.KindProvider, Name: "ok", Action: reconciler.ActionNoop},
