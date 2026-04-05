@@ -47,38 +47,43 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
-	// Ctrl+R: apply (reconcile) — works in any mode
+	// Escape is the universal "get out" key — force back to normal mode
+	if event.Key() == tcell.KeyEscape {
+		if h.mode != ModeNormal {
+			h.mode = ModeNormal
+			h.app.model.SetFilter("")
+			h.app.deactivateCommandBar()
+			h.app.refreshTable()
+			return nil
+		}
+		h.app.popView()
+		return nil
+	}
+
+	// In command/search mode, let the InputField handle all other keys
+	if h.mode == ModeCommand || h.mode == ModeSearch {
+		return event
+	}
+
+	// Ctrl+R: apply (reconcile) — works in normal mode
 	if event.Key() == tcell.KeyCtrlR {
 		h.app.applyAll()
 		return nil
 	}
 
-	// Ctrl+D: delete selected resource — only in normal mode on main page
-	if event.Key() == tcell.KeyCtrlD && h.mode == ModeNormal {
+	// Ctrl+D: delete selected resource — only on main page
+	if event.Key() == tcell.KeyCtrlD {
 		if h.app.registry.Current() == "main" {
 			h.app.deleteResource()
 			return nil
 		}
 	}
 
-	switch h.mode {
-	case ModeNormal:
-		return h.handleNormal(event)
-	case ModeCommand:
-		return h.handleCommand(event)
-	case ModeSearch:
-		return h.handleSearch(event)
-	}
-	return event
+	return h.handleNormal(event)
 }
 
 // handleNormal processes key events in normal (vim) mode.
 func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
-	if event.Key() == tcell.KeyEscape {
-		h.app.popView()
-		return nil
-	}
-
 	switch event.Rune() {
 	case 'q':
 		h.app.Stop()
@@ -135,14 +140,3 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
-// handleCommand processes key events when the command bar is active.
-func (h *KeyHandler) handleCommand(event *tcell.EventKey) *tcell.EventKey {
-	// Let InputField's DoneFunc handle Escape and Enter
-	return event
-}
-
-// handleSearch processes key events in search/filter mode.
-func (h *KeyHandler) handleSearch(event *tcell.EventKey) *tcell.EventKey {
-	// Let InputField's DoneFunc handle Escape and Enter
-	return event
-}
