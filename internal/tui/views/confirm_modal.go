@@ -14,7 +14,10 @@ type ConfirmModal struct {
 func NewConfirmModal() *ConfirmModal {
 	modal := tview.NewModal().
 		AddButtons([]string{"Yes", "No"}).
-		SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+		SetBackgroundColor(ColorMantle).
+		SetTextColor(ColorText).
+		SetButtonBackgroundColor(ColorMauve).
+		SetButtonTextColor(ColorBase)
 
 	return &ConfirmModal{Modal: modal}
 }

@@ -105,7 +105,7 @@ func (a *App) buildLayout() {
 	a.header = tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignLeft)
-	a.header.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	a.header.SetBackgroundColor(views.ColorMantle)
 	a.updateHeader()
 
 	// Resource table — main view
@@ -138,6 +138,8 @@ func (a *App) buildLayout() {
 		SetDynamicColors(true).
 		SetText(helpText())
 	helpView.SetBorder(true).SetTitle(" Help (? to close) ")
+	helpView.SetBorderColor(views.ColorSurface1)
+	helpView.SetTitleColor(views.ColorMauve)
 	a.pages.AddPage("help", helpView, true, false)
 
 	// Command bar — 1 row input
@@ -145,7 +147,8 @@ func (a *App) buildLayout() {
 		SetLabel(":").
 		SetFieldWidth(0).
 		SetDoneFunc(a.onCommandDone)
-	a.cmdBar.SetFieldBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	a.cmdBar.SetFieldBackgroundColor(views.ColorMantle)
+	a.cmdBar.SetLabelColor(views.ColorMauve)
 
 	// Root layout: header(1) + pages(flex) + cmdbar(1)
 	a.layout = tview.NewFlex().SetDirection(tview.FlexRow).
@@ -289,33 +292,34 @@ func (a *App) updateHeader() {
 	ep := a.model.GetEndpoint()
 	kind := a.model.GetKind()
 
-	kindLabel := "[green]all"
+	sep := views.HeaderSep()
+	kindLabel := views.Tag(views.HexGreen, "all")
 	if kind != "" {
-		kindLabel = "[green]" + string(kind)
+		kindLabel = views.Tag(views.HexGreen, string(kind))
 	}
 
 	// Status summary from current changes
 	summary := ""
 	if changes := a.model.GetChanges(); len(changes) > 0 {
-		summary = " | " + views.StatusSummary(changes)
+		summary = sep + views.StatusSummaryColored(changes)
 	}
 
 	lastRefresh := a.model.GetLastRefresh()
 	age := ""
 	if !lastRefresh.IsZero() {
-		age = fmt.Sprintf(" | %s ago", formatDuration(time.Since(lastRefresh)))
+		age = sep + views.Tag(views.HexOverlay0, formatDuration(time.Since(lastRefresh))+" ago")
 	}
 
 	mode := ""
 	if a.attachClient != nil {
-		mode = " | [blue]attach[-]"
+		mode = sep + views.Tag(views.HexBlue, "attach")
 		if a.tenant != "" {
-			mode = " | [blue]tenant:" + a.tenant + "[-]"
+			mode = sep + views.Tag(views.HexBlue, "tenant:"+a.tenant)
 		}
 	}
 
-	text := fmt.Sprintf(" [bold]gcplane[white] | %s | %s | %s%s%s%s",
-		name, ep, kindLabel, mode, summary, age)
+	text := fmt.Sprintf(" %s%s%s%s%s%s%s%s",
+		views.BoldTag(views.HexMauve, "gcplane"), sep, name, sep, ep, sep, kindLabel, mode) + summary + age
 	a.header.SetText(text)
 }
 
@@ -466,7 +470,7 @@ func (a *App) executeCommand(cmd string) {
 // handleTenantCommand processes ":tenant <name>" or ":tenant" to clear.
 func (a *App) handleTenantCommand(cmd string) {
 	if a.attachClient == nil {
-		a.showStatus("[yellow]Tenant switching only available in attach mode (--attach)[-]")
+		a.showStatus(views.Tag(views.HexYellow, "Tenant switching only available in attach mode (--attach)"))
 		return
 	}
 	parts := strings.Fields(cmd)
@@ -474,11 +478,11 @@ func (a *App) handleTenantCommand(cmd string) {
 		// Clear tenant filter
 		a.tenant = ""
 		a.model.manifestName = "attached: " + a.attachClient.baseURL
-		a.showStatus("[green]Showing all tenants[-]")
+		a.showStatus(views.Tag(views.HexGreen, "Showing all tenants"))
 	} else {
 		a.tenant = parts[1]
 		a.model.manifestName = "tenant: " + a.tenant
-		a.showStatus(fmt.Sprintf("[green]Switched to tenant: %s[-]", a.tenant))
+		a.showStatus(views.Tag(views.HexGreen, fmt.Sprintf("Switched to tenant: %s", a.tenant)))
 	}
 	a.triggerRefresh()
 }
@@ -499,9 +503,9 @@ func (a *App) triggerRemoteSync() {
 		}
 		a.tapp.QueueUpdateDraw(func() {
 			if err != nil {
-				a.showStatus(fmt.Sprintf("[red]Sync trigger failed: %s[-]", err))
+				a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Sync trigger failed: %s", err)))
 			} else {
-				a.showStatus("[green]Sync triggered[-]")
+				a.showStatus(views.Tag(views.HexGreen, "Sync triggered"))
 			}
 		})
 		// Refresh after a brief delay to let the sync complete
@@ -553,45 +557,68 @@ func formatDuration(d time.Duration) string {
 
 // helpText returns the help overlay content.
 func helpText() string {
-	return `
- [yellow]Navigation[white]
-   j/k         Move down/up
-   g/G         Jump to top/bottom
-   Enter       View resource detail
-   d           Show drift diff
-   Esc         Back / Close overlay
-   q           Quit
+	h := func(title string) string { return views.BoldTag(views.HexYellow, title) }
+	k := func(key string) string { return views.Tag(views.HexBlue, key) }
 
- [yellow]Kind Filter[white]
-   1 Provider   2 Agent      3 Channel
-   4 MCPServer  5 Skill      6 Tool
-   7 CronJob    8 AgentTeam  9 TTSConfig
-   0 All
+	return fmt.Sprintf(`
+ %s
+   %s         Move down/up
+   %s         Jump to top/bottom
+   %s       View resource detail
+   %s           Show drift diff
+   %s         Back / Close overlay
+   %s           Quit
 
- [yellow]Commands[white]
-   :provider   :agent    :channel   :mcp
-   :skill      :tool     :cron      :team    :tts
-   :all        Show all resources
-   :help       Show this help
-   :q          Quit
+ %s
+   %s Provider   %s Agent      %s Channel
+   %s MCPServer  %s Skill      %s CronJob
+   %s AgentTeam  %s SysConfig  %s SecureCLI
+   %s All
 
- [yellow]Search[white]
-   /           Filter by name (case-insensitive)
-   Enter       Apply filter
-   Esc         Cancel / clear filter
+ %s
+   %s   %s    %s   %s
+   %s      %s     %s      %s
+   %s        Show all resources
+   %s       Show this help
+   %s          Quit
 
- [yellow]Actions[white]
-   Ctrl+R      Apply (reconcile all pending changes)
-   Ctrl+D      Delete selected resource
-   e           Edit selected resource ($EDITOR)
-   :apply      Apply all changes
-   :delete     Delete selected resource
-   :sync       Trigger sync (attach mode)
-   :tenant X   Switch to tenant X (attach mode)
-   :tenant     Clear tenant filter
+ %s
+   %s           Filter by name (case-insensitive)
+   %s       Apply filter
+   %s         Cancel / clear filter
 
- [yellow]Other[white]
-   ?           Toggle this help
-   r           Refresh now
-`
+ %s
+   %s      Apply (reconcile all pending changes)
+   %s      Delete selected resource
+   %s           Edit selected resource ($EDITOR)
+   %s      Apply all changes
+   %s     Delete selected resource
+   %s       Trigger sync (attach mode)
+   %s   Switch to tenant X (attach mode)
+   %s     Clear tenant filter
+
+ %s
+   %s           Toggle this help
+   %s           Refresh now
+`,
+		h("Navigation"),
+		k("j/k"), k("g/G"), k("Enter"), k("d"), k("Esc"), k("q"),
+		h("Kind Filter"),
+		k("1"), k("2"), k("3"),
+		k("4"), k("5"), k("6"),
+		k("7"), k("8"), k("9"),
+		k("0"),
+		h("Commands"),
+		k(":provider"), k(":agent"), k(":channel"), k(":mcp"),
+		k(":skill"), k(":cron"), k(":team"), k(":cli"),
+		k(":all"), k(":help"), k(":q"),
+		h("Search"),
+		k("/"), k("Enter"), k("Esc"),
+		h("Actions"),
+		k("Ctrl+R"), k("Ctrl+D"), k("e"),
+		k(":apply"), k(":delete"), k(":sync"),
+		k(":tenant X"), k(":tenant"),
+		h("Other"),
+		k("?"), k("r"),
+	)
 }

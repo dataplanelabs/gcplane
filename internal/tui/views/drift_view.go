@@ -22,6 +22,8 @@ func NewDriftView() *DriftView {
 		SetScrollable(true).
 		SetWordWrap(true)
 	tv.SetBorder(true)
+	tv.SetBorderColor(ColorSurface1)
+	tv.SetTitleColor(ColorYellow)
 
 	// Vim-style scrolling
 	tv.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -56,29 +58,29 @@ func (dv *DriftView) Show(c reconciler.Change) {
 
 	switch {
 	case c.Error != "":
-		dv.TextView.SetText(fmt.Sprintf("[red]Error: %s[-]", c.Error))
+		dv.TextView.SetText(Tag(HexRed, fmt.Sprintf("Error: %s", c.Error)))
 
 	case c.Action == reconciler.ActionNoop:
-		dv.TextView.SetText("[green]No drift detected. Resource is in sync.[-]")
+		dv.TextView.SetText(Tag(HexGreen, "No drift detected. Resource is in sync."))
 
 	case c.Action == reconciler.ActionCreate:
-		dv.TextView.SetText("[yellow]Resource missing in GoClaw. Will be created on apply.[-]")
+		dv.TextView.SetText(Tag(HexYellow, "Resource missing in GoClaw. Will be created on apply."))
 
 	case c.Action == reconciler.ActionDelete:
-		dv.TextView.SetText("[blue]Resource exists in GoClaw but not in manifest (orphan).\nWill be deleted on apply with --prune.[-]")
+		dv.TextView.SetText(Tag(HexLavender, "Resource exists in GoClaw but not in manifest (orphan).\nWill be deleted on apply with --prune."))
 
 	case c.Action == reconciler.ActionUpdate:
 		dv.TextView.SetText(renderDiff(c.Diff))
 
 	default:
-		dv.TextView.SetText("[gray]Unknown state.[-]")
+		dv.TextView.SetText(Tag(HexOverlay0, "Unknown state."))
 	}
 }
 
 // renderDiff formats field-level diffs with red/green coloring.
 func renderDiff(diffs map[string]reconciler.FieldDiff) string {
 	if len(diffs) == 0 {
-		return "[green]No differences found.[-]"
+		return Tag(HexGreen, "No differences found.")
 	}
 
 	keys := make([]string, 0, len(diffs))
@@ -88,14 +90,16 @@ func renderDiff(diffs map[string]reconciler.FieldDiff) string {
 	sort.Strings(keys)
 
 	var b strings.Builder
-	_, _ = fmt.Fprintf(&b, "[bold]%d field(s) drifted:[-]\n\n", len(diffs))
+	_, _ = fmt.Fprintf(&b, "%s\n\n", BoldTag(HexMauve, fmt.Sprintf("%d field(s) drifted:", len(diffs))))
 
-	for _, k := range keys {
+	for i, k := range keys {
 		d := diffs[k]
-		_, _ = fmt.Fprintf(&b, "  [white]%s:[-]\n", k)
-		_, _ = fmt.Fprintf(&b, "    [red]- %s[-]\n", formatDiffVal(d.Old))
-		_, _ = fmt.Fprintf(&b, "    [green]+ %s[-]\n", formatDiffVal(d.New))
-		b.WriteString("\n")
+		_, _ = fmt.Fprintf(&b, "  %s\n", BoldTag(HexText, k+":"))
+		_, _ = fmt.Fprintf(&b, "    %s\n", Tag(HexRed, "- "+formatDiffVal(d.Old)))
+		_, _ = fmt.Fprintf(&b, "    %s\n", Tag(HexGreen, "+ "+formatDiffVal(d.New)))
+		if i < len(keys)-1 {
+			_, _ = fmt.Fprintf(&b, "  %s\n", Tag(HexOverlay0, "────────"))
+		}
 	}
 
 	return b.String()

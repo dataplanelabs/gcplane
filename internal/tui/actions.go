@@ -8,6 +8,7 @@ import (
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
+	"github.com/dataplanelabs/gcplane/internal/tui/views"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,7 +20,7 @@ func (a *App) applyAll() {
 	}
 	pending := plan.Creates + plan.Updates
 	if pending == 0 {
-		a.showStatus("[green]All resources in sync. Nothing to apply.[-]")
+		a.showStatus(views.Tag(views.HexGreen, "All resources in sync. Nothing to apply."))
 		return
 	}
 
@@ -32,7 +33,7 @@ func (a *App) applyAll() {
 		if !confirmed {
 			return
 		}
-		a.showStatus("[yellow]Applying...[-]")
+		a.showStatus(views.Tag(views.HexYellow, "Applying..."))
 		go a.doApply()
 	})
 	a.pages.SwitchToPage("confirm")
@@ -48,9 +49,9 @@ func (a *App) doApply() {
 
 	a.tapp.QueueUpdateDraw(func() {
 		if result.Failed > 0 {
-			a.showStatus(fmt.Sprintf("[red]Applied: %d, Failed: %d[-]", result.Applied, result.Failed))
+			a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Applied: %d, Failed: %d", result.Applied, result.Failed)))
 		} else {
-			a.showStatus(fmt.Sprintf("[green]Applied %d change(s) successfully[-]", result.Applied))
+			a.showStatus(views.Tag(views.HexGreen, fmt.Sprintf("Applied %d change(s) successfully", result.Applied)))
 		}
 	})
 }
@@ -70,7 +71,7 @@ func (a *App) deleteResource() {
 		if !confirmed {
 			return
 		}
-		a.showStatus(fmt.Sprintf("[yellow]Deleting %s/%s...[-]", c.Kind, c.Name))
+		a.showStatus(views.Tag(views.HexYellow, fmt.Sprintf("Deleting %s/%s...", c.Kind, c.Name)))
 		go a.doDelete(c.Kind, c.Name)
 	})
 	a.pages.SwitchToPage("confirm")
@@ -86,9 +87,9 @@ func (a *App) doDelete(kind manifest.ResourceKind, name string) {
 
 	a.tapp.QueueUpdateDraw(func() {
 		if err != nil {
-			a.showStatus(fmt.Sprintf("[red]Delete failed: %s[-]", err))
+			a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Delete failed: %s", err)))
 		} else {
-			a.showStatus(fmt.Sprintf("[green]Deleted %s/%s[-]", kind, name))
+			a.showStatus(views.Tag(views.HexGreen, fmt.Sprintf("Deleted %s/%s", kind, name)))
 		}
 	})
 }
@@ -103,7 +104,7 @@ func (a *App) editResource() {
 	// Observe current spec from GoClaw
 	observed, err := a.Provider.Observe(context.Background(), c.Kind, c.Name)
 	if err != nil {
-		a.showStatus(fmt.Sprintf("[red]Cannot edit: %s[-]", err))
+		a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Cannot edit: %s", err)))
 		return
 	}
 
@@ -116,14 +117,14 @@ func (a *App) editResource() {
 
 	yamlBytes, err := yaml.Marshal(doc)
 	if err != nil {
-		a.showStatus(fmt.Sprintf("[red]Marshal error: %s[-]", err))
+		a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Marshal error: %s", err)))
 		return
 	}
 
 	// Write to temp file
 	tmpFile, err := os.CreateTemp("", fmt.Sprintf("gcplane-%s-%s-*.yaml", c.Kind, c.Name))
 	if err != nil {
-		a.showStatus(fmt.Sprintf("[red]Temp file error: %s[-]", err))
+		a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Temp file error: %s", err)))
 		return
 	}
 	tmpPath := tmpFile.Name()
@@ -131,7 +132,7 @@ func (a *App) editResource() {
 
 	if _, err := tmpFile.Write(yamlBytes); err != nil {
 		_ = tmpFile.Close()
-		a.showStatus(fmt.Sprintf("[red]Write error: %s[-]", err))
+		a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Write error: %s", err)))
 		return
 	}
 	_ = tmpFile.Close()
@@ -154,20 +155,20 @@ func (a *App) editResource() {
 	// Read edited file
 	edited, err := os.ReadFile(tmpPath)
 	if err != nil {
-		a.showStatus(fmt.Sprintf("[red]Read error: %s[-]", err))
+		a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Read error: %s", err)))
 		return
 	}
 
 	// Parse edited YAML
 	var result map[string]any
 	if err := yaml.Unmarshal(edited, &result); err != nil {
-		a.showStatus(fmt.Sprintf("[red]Invalid YAML: %s[-]", err))
+		a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Invalid YAML: %s", err)))
 		return
 	}
 
 	spec, ok := result["spec"].(map[string]any)
 	if !ok {
-		a.showStatus("[red]Missing or invalid 'spec' in edited YAML[-]")
+		a.showStatus(views.Tag(views.HexRed, "Missing or invalid 'spec' in edited YAML"))
 		return
 	}
 
@@ -178,9 +179,9 @@ func (a *App) editResource() {
 
 		a.tapp.QueueUpdateDraw(func() {
 			if err != nil {
-				a.showStatus(fmt.Sprintf("[red]Update failed: %s[-]", err))
+				a.showStatus(views.Tag(views.HexRed, fmt.Sprintf("Update failed: %s", err)))
 			} else {
-				a.showStatus(fmt.Sprintf("[green]Updated %s/%s[-]", c.Kind, c.Name))
+				a.showStatus(views.Tag(views.HexGreen, fmt.Sprintf("Updated %s/%s", c.Kind, c.Name)))
 			}
 		})
 	}()

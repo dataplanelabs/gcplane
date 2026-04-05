@@ -27,6 +27,8 @@ func NewResourceDetail() *ResourceDetail {
 		SetScrollable(true).
 		SetWordWrap(true)
 	tv.SetBorder(true)
+	tv.SetBorderColor(ColorSurface1)
+	tv.SetTitleColor(ColorMauve)
 
 	// Vim-style scrolling
 	tv.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -63,7 +65,7 @@ type ProviderObserver interface {
 // Fetches data in a goroutine; caller must provide tview.Application for QueueUpdateDraw.
 func (rd *ResourceDetail) Show(kind manifest.ResourceKind, name string, provider ProviderObserver, tapp *tview.Application) {
 	rd.TextView.SetTitle(fmt.Sprintf(" %s/%s ", kind, name))
-	rd.TextView.SetText("[yellow]Loading...[-]")
+	rd.TextView.SetText(Tag(HexYellow, "Loading..."))
 	rd.TextView.ScrollToBeginning()
 
 	go func() {
@@ -71,17 +73,18 @@ func (rd *ResourceDetail) Show(kind manifest.ResourceKind, name string, provider
 
 		tapp.QueueUpdateDraw(func() {
 			if err != nil {
-				rd.TextView.SetText(fmt.Sprintf("[red]Error observing %s/%s:\n%s[-]", kind, name, err))
+				rd.TextView.SetText(Tag(HexRed, fmt.Sprintf("Error observing %s/%s:\n%s", kind, name, err)))
 				return
 			}
 			if observed == nil {
-				rd.TextView.SetText(fmt.Sprintf("[yellow]%s/%s not yet created in GoClaw.[-]\n\nRun [green]gcplane apply[-] to create it.", kind, name))
+				rd.TextView.SetText(Tag(HexYellow, fmt.Sprintf("%s/%s not yet created in GoClaw.", kind, name)) +
+					"\n\nRun " + Tag(HexGreen, "gcplane apply") + " to create it.")
 				return
 			}
 
 			yamlBytes, err := yaml.Marshal(observed)
 			if err != nil {
-				rd.TextView.SetText(fmt.Sprintf("[red]Failed to marshal YAML: %s[-]", err))
+				rd.TextView.SetText(Tag(HexRed, fmt.Sprintf("Failed to marshal YAML: %s", err)))
 				return
 			}
 
@@ -103,12 +106,12 @@ func highlightYAML(yamlStr string) string {
 			indent, key, colon, rest := m[1], m[2], m[3], m[4]
 			// Escape the rest portion for tview tags
 			rest = strings.ReplaceAll(rest, "[", "[[]")
-			highlighted := fmt.Sprintf("%s[blue]%s%s[-]%s", indent, key, colon, colorizeValue(rest))
+			highlighted := fmt.Sprintf("%s[%s]%s%s[-]%s", indent, HexLavender, key, colon, colorizeValue(rest))
 			result = append(result, highlighted)
 		} else if strings.HasPrefix(strings.TrimSpace(escaped), "#") {
-			result = append(result, "[gray]"+escaped+"[-]")
+			result = append(result, Tag(HexOverlay0, escaped))
 		} else if strings.HasPrefix(strings.TrimSpace(escaped), "- ") {
-			result = append(result, "[white]"+escaped+"[-]")
+			result = append(result, Tag(HexText, escaped))
 		} else {
 			result = append(result, escaped)
 		}
@@ -125,13 +128,13 @@ func colorizeValue(val string) string {
 
 	switch {
 	case trimmed == "true" || trimmed == "false":
-		return " [yellow]" + trimmed + "[-]"
+		return " " + Tag(HexPeach, trimmed)
 	case trimmed == "null" || trimmed == "~":
-		return " [gray]" + trimmed + "[-]"
+		return " " + Tag(HexOverlay0, trimmed)
 	case isNumeric(trimmed):
-		return " [yellow]" + trimmed + "[-]"
+		return " " + Tag(HexPeach, trimmed)
 	default:
-		return " [green]" + trimmed + "[-]"
+		return " " + Tag(HexGreen, trimmed)
 	}
 }
 

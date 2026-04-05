@@ -12,14 +12,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-// statusColors maps resource status to terminal colors.
-var statusColors = map[string]tcell.Color{
-	"InSync":  tcell.ColorGreen,
-	"Drifted": tcell.ColorYellow,
-	"Missing": tcell.ColorRed,
-	"Error":   tcell.ColorRed,
-	"Extra":   tcell.ColorBlue,
-}
 
 // tableRow holds pre-computed data for one table row.
 type tableRow struct {
@@ -50,6 +42,9 @@ func NewResourceTable() *ResourceTable {
 	rt.Table.SetFixed(1, 0)              // fixed header row
 	rt.Table.SetBorders(false)           // cleaner k9s look
 	rt.Table.SetSeparator(' ')
+	rt.Table.SetSelectedStyle(tcell.StyleDefault.
+		Background(ColorSurface0).
+		Foreground(ColorText))
 
 	// Handle table-specific keybindings
 	rt.Table.SetInputCapture(rt.handleInput)
@@ -66,8 +61,8 @@ func (rt *ResourceTable) Refresh(changes []reconciler.Change) {
 	headers := []string{"KIND", "NAME", "STATUS", "DRIFT"}
 	for col, h := range headers {
 		cell := tview.NewTableCell(h).
-			SetTextColor(tcell.ColorWhite).
-			SetAttributes(tcell.AttrBold).
+			SetTextColor(ColorSubtext0).
+			SetAttributes(tcell.AttrBold|tcell.AttrUnderline).
 			SetSelectable(false)
 		if col == len(headers)-1 {
 			cell.SetExpansion(1) // DRIFT column expands
@@ -93,22 +88,22 @@ func (rt *ResourceTable) Refresh(changes []reconciler.Change) {
 		rt.rows = append(rt.rows, row)
 		rowIdx := i + 1 // offset for header
 
-		// Kind cell
+		// Kind cell — each kind gets a distinct palette color
 		rt.Table.SetCell(rowIdx, 0, tview.NewTableCell(string(row.kind)).
-			SetTextColor(tcell.ColorWhite).SetMaxWidth(12))
+			SetTextColor(KindCellColor(row.kind)).SetMaxWidth(14))
 
 		// Name cell
 		rt.Table.SetCell(rowIdx, 1, tview.NewTableCell(row.name).
-			SetTextColor(tcell.ColorWhite).SetMaxWidth(30))
+			SetTextColor(ColorText).SetMaxWidth(30))
 
-		// Status cell with color
-		color := statusColors[row.status]
-		rt.Table.SetCell(rowIdx, 2, tview.NewTableCell(row.status).
-			SetTextColor(color).SetMaxWidth(10))
+		// Status cell with Unicode indicator
+		statusText, statusColor := StatusCell(row.status)
+		rt.Table.SetCell(rowIdx, 2, tview.NewTableCell(statusText).
+			SetTextColor(statusColor).SetMaxWidth(12))
 
 		// Drift info cell
 		rt.Table.SetCell(rowIdx, 3, tview.NewTableCell(row.driftInfo).
-			SetTextColor(tcell.ColorGray).SetExpansion(1))
+			SetTextColor(ColorOverlay0).SetExpansion(1))
 	}
 
 	// Select first data row if available
