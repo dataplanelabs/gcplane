@@ -19,6 +19,7 @@ func NewSpanTree() *SpanTree {
 	tree := tview.NewTreeView()
 	tree.SetBackgroundColor(ColorBase)
 	tree.SetGraphicsColor(ColorOverlay0)
+	tree.SetTopLevel(1) // hide invisible root, show its children as top-level
 
 	st := &SpanTree{Tree: tree}
 	tree.SetSelectedFunc(st.onSelected)
@@ -43,10 +44,14 @@ func (st *SpanTree) Refresh(roots []*SpanNode) {
 		st.addNode(root, node, 0)
 	}
 
-	st.Tree.SetRoot(root).SetCurrentNode(root)
-	// Expand root children (top-level agent spans)
-	for _, child := range root.GetChildren() {
+	st.Tree.SetRoot(root)
+	// Expand root children (top-level agent spans) and set focus to first
+	children := root.GetChildren()
+	for _, child := range children {
 		child.SetExpanded(true)
+	}
+	if len(children) > 0 {
+		st.Tree.SetCurrentNode(children[0])
 	}
 }
 

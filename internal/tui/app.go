@@ -187,16 +187,14 @@ func (a *App) buildLayout() {
 		a.triggerTraceDetailRefresh()
 	}
 
-	// Wire copy support
+	// Wire copy support — always show feedback
 	a.tracesPanel.List().OnCopy = func(text string) {
-		if err := views.CopyToClipboard(text); err == nil {
-			a.showStatus(views.Tag(views.HexGreen, "Copied: "+text))
-		}
+		_ = views.CopyToClipboard(text)
+		a.showStatus(views.Tag(views.HexGreen, "Copied: "+text))
 	}
 	a.tracesPanel.Tree().OnCopy = func(text string) {
-		if err := views.CopyToClipboard(text); err == nil {
-			a.showStatus(views.Tag(views.HexGreen, "Copied to clipboard"))
-		}
+		_ = views.CopyToClipboard(text)
+		a.showStatus(views.Tag(views.HexGreen, "Copied to clipboard"))
 	}
 
 	// Wire SpanTree detail → overlay
@@ -814,9 +812,9 @@ func helpText() string {
    %s       Toggle list / tree focus
    %s     Select trace / expand-collapse span
    %s/%s     Half-page scroll
-   %s       Toggle expand / %s Expand all
+   %s/%s   Expand-collapse / Expand all (tree)
    %s         Copy trace ID / span info
-   %s       Pause/resume auto-refresh
+   %s         Pause/resume auto-refresh
    %s         Clear filters
 
  %s
@@ -849,9 +847,9 @@ func helpText() string {
 		h("Traces"),
 		k("Tab"), k("Enter"),
 		k("Ctrl+D"), k("Ctrl+U"),
-		k("o"), k("O"),
+		k("Space/o"), k("O"),
 		k("y"),
-		k("Space"), k("c"),
+		k("p"), k("c"),
 		h("Actions"),
 		k("Ctrl+R"), k("Ctrl+D"), k("Ctrl+E"),
 		k(":apply"), k(":delete"),

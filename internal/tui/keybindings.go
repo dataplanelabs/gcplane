@@ -138,11 +138,34 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 		h.app.triggerRefresh()
 		return nil
 	case ' ':
+		// On Traces tab, pass Space to focused component (tree expand/collapse)
+		if h.app.registry.ActiveTab() == TabTraces {
+			return event
+		}
 		h.handlePauseResume()
 		return nil
 	case 'c':
 		h.handleClearFilters()
 		return nil
+	case 'y':
+		// On Traces tab, pass y to focused component (copy)
+		if h.app.registry.ActiveTab() == TabTraces {
+			return event
+		}
+		return event
+	case 'o', 'O':
+		// On Traces tab, pass o/O to focused component (expand/collapse)
+		if h.app.registry.ActiveTab() == TabTraces {
+			return event
+		}
+		return event
+	case 'p':
+		// Pause/resume on Traces tab (since Space is used for tree)
+		if h.app.registry.ActiveTab() == TabTraces {
+			h.app.tracesPanel.TogglePause()
+			return nil
+		}
+		return event
 	}
 
 	// Context-sensitive number keys
@@ -206,5 +229,6 @@ func (h *KeyHandler) handleClearFilters() {
 		h.app.traceStore.SetFilters(views.TraceFilters{Limit: 50})
 		h.app.tracesPanel.SetAgentFilter("")
 		h.app.tracesPanel.SetChannelFilter("")
+		h.app.traceStore.NotifyTraceUpdated() // trigger re-fetch
 	}
 }
