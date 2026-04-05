@@ -257,6 +257,24 @@ func (a *App) Stop() {
 	a.tapp.Stop()
 }
 
+// refreshActiveTab refreshes only the currently active tab's data.
+func (a *App) refreshActiveTab() {
+	switch a.registry.ActiveTab() {
+	case TabState:
+		a.triggerRefresh()
+	case TabTraces:
+		a.traceStore.NotifyTraceUpdated()
+		if a.tracesPanel.Level >= 1 {
+			a.traceStore.NotifyDetailDirty()
+		}
+	case TabLogs:
+		// Logs are live-streamed; force a redraw
+		a.tapp.QueueUpdateDraw(func() {
+			a.logsPanel.Refresh(a.liveStore.Logs())
+		})
+	}
+}
+
 // triggerRefresh sends a manual refresh signal (non-blocking).
 func (a *App) triggerRefresh() {
 	select {

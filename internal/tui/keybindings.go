@@ -87,9 +87,9 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		}
 	}
 
-	// Ctrl+R: refresh
+	// Ctrl+R: refresh active tab
 	if event.Key() == tcell.KeyCtrlR {
-		h.app.triggerRefresh()
+		h.app.refreshActiveTab()
 		return nil
 	}
 
@@ -167,7 +167,7 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 		h.app.activateSearch()
 		return nil
 	case 'r':
-		h.app.triggerRefresh()
+		h.app.refreshActiveTab()
 		return nil
 
 	// Vim motions — handled globally
