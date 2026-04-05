@@ -42,7 +42,7 @@ func NewKeyHandler(app *App) *KeyHandler {
 
 // Handle is the global input capture function for tview.Application.
 func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
-	if event.Key() == tcell.KeyCtrlC {
+	if event.Key() == tcell.KeyCtrlC || event.Key() == tcell.KeyCtrlQ {
 		h.app.Stop()
 		return nil
 	}
