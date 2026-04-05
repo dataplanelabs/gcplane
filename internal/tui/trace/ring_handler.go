@@ -46,6 +46,14 @@ func NewRingHandler(size int, level slog.Level, onEntry func(Entry)) *RingHandle
 	}
 }
 
+// SetOnEntry sets the callback invoked on each new entry.
+// Safe to call after construction (e.g., after event bus is wired).
+func (h *RingHandler) SetOnEntry(fn func(Entry)) {
+	h.core.mu.Lock()
+	defer h.core.mu.Unlock()
+	h.core.onEntry = fn
+}
+
 // Enabled reports whether the handler handles records at the given level.
 func (h *RingHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level

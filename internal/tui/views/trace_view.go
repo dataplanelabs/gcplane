@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/dataplanelabs/gcplane/internal/tui/trace"
@@ -147,14 +148,19 @@ func (tv *TraceView) messagePrefix(msg string) string {
 	}
 }
 
-// formatAttrs renders key=value pairs in muted color.
+// formatAttrs renders key=value pairs in muted color, sorted by key.
 func (tv *TraceView) formatAttrs(attrs map[string]any) string {
 	if len(attrs) == 0 {
 		return ""
 	}
+	keys := make([]string, 0, len(attrs))
+	for k := range attrs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	var parts []string
-	for k, v := range attrs {
-		parts = append(parts, fmt.Sprintf("%s=%v", k, v))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, attrs[k]))
 	}
 	return Tag(HexOverlay0, strings.Join(parts, " "))
 }

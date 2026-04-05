@@ -98,6 +98,11 @@ func NewApp(cfg Config) (*App, error) {
 
 	app.bus = NewEventBus(app.tapp)
 	app.traceHandler = cfg.TraceHandler
+	if app.traceHandler != nil {
+		app.traceHandler.SetOnEntry(func(e trace.Entry) {
+			app.bus.Publish(Event{Type: EventTraceEntry, Payload: e})
+		})
+	}
 	app.keys = NewKeyHandler(app)
 	app.buildLayout()
 	app.tapp.SetInputCapture(app.keys.Handle)
