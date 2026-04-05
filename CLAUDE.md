@@ -1,4 +1,4 @@
-# GCPlane (v1.1.4 — stable since 2026-04-05)
+# GCPlane (v1.1.5 — stable since 2026-04-05)
 
 Declarative GitOps control plane for GoClaw. Manages AI agents, providers, channels, MCP servers, cron jobs, and teams through YAML manifests.
 
