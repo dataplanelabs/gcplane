@@ -47,8 +47,9 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
-	// Escape is the universal "get out" key — force back to normal mode
+	// Escape is the universal "get out" key
 	if event.Key() == tcell.KeyEscape {
+		// If in command/search mode, reset to normal
 		if h.mode != ModeNormal {
 			h.mode = ModeNormal
 			h.app.model.SetFilter("")
@@ -56,6 +57,13 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 			h.app.refreshTable()
 			return nil
 		}
+		// If filter is active on main view, clear it
+		if h.app.model.GetFilter() != "" {
+			h.app.model.SetFilter("")
+			h.app.refreshTable()
+			return nil
+		}
+		// Otherwise pop view (back navigation)
 		h.app.popView()
 		return nil
 	}
