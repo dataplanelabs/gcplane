@@ -56,16 +56,28 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 			h.app.deactivateCommandBar()
 			return nil
 		}
-		// On Traces tab: drill back to root
-		if h.app.registry.ActiveTab() == TabTraces && h.app.tracesPanel.Level > 0 {
-			h.app.tracesPanel.DrillRoot(h.app.tapp)
-			return nil
-		}
-		// Pop overlay or clear filter
+		// Pop overlay first
 		if h.app.registry.HasOverlay() {
 			h.app.popView()
 			return nil
 		}
+		// On Traces tab: drill back one level (h behavior), or clear filter
+		if h.app.registry.ActiveTab() == TabTraces {
+			if h.app.tracesPanel.Level > 0 {
+				h.app.tracesPanel.DrillOut(h.app.tapp)
+				return nil
+			}
+			// At root: clear trace filter if active
+			h.app.tracesPanel.SetFilter("")
+			return nil
+		}
+		// On Logs tab: clear filter
+		if h.app.registry.ActiveTab() == TabLogs {
+			h.app.logsPanel.SetFilter("")
+			h.app.logsPanel.Refresh(h.app.liveStore.Logs())
+			return nil
+		}
+		// State tab: clear filter
 		if h.app.model.GetFilter() != "" {
 			h.app.model.SetFilter("")
 			h.app.refreshTable()
