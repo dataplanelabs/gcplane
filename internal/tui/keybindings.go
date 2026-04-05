@@ -55,7 +55,7 @@ func (h *KeyHandler) Handle(event *tcell.EventKey) *tcell.EventKey {
 
 	// Ctrl+D: delete selected resource — only in normal mode on main page
 	if event.Key() == tcell.KeyCtrlD && h.mode == ModeNormal {
-		if name, _ := h.app.pages.GetFrontPage(); name == "main" {
+		if h.app.registry.Current() == "main" {
 			h.app.deleteResource()
 			return nil
 		}
@@ -95,12 +95,22 @@ func (h *KeyHandler) handleNormal(event *tcell.EventKey) *tcell.EventKey {
 		h.app.activateSearch()
 		return nil
 	case 'e':
-		if name, _ := h.app.pages.GetFrontPage(); name == "main" {
+		if h.app.registry.Current() == "main" {
 			h.app.editResource()
 			return nil
 		}
 	case 'r':
 		h.app.triggerRefresh()
+		return nil
+	case 't':
+		if h.app.traceView != nil {
+			if h.app.registry.Current() == "trace" {
+				h.app.popView()
+			} else {
+				h.app.pushView("trace")
+				h.app.tapp.SetFocus(h.app.traceView.TextView)
+			}
+		}
 		return nil
 	case '0':
 		h.app.switchKind("")

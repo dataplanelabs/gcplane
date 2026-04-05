@@ -9,6 +9,7 @@ import (
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
+	"github.com/dataplanelabs/gcplane/internal/tui/trace"
 	"github.com/dataplanelabs/gcplane/internal/tui/views"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -25,18 +26,20 @@ type ProviderAPI interface {
 
 // App is the top-level TUI application, wiring layout, views, and keybindings.
 type App struct {
-	tapp      *tview.Application
-	model     *Model
-	layout    *tview.Flex
-	pages     *tview.Pages
-	header    *tview.TextView
-	cmdBar    *tview.InputField
-	keys      *KeyHandler
-	table     *views.ResourceTable
-	detail    *views.ResourceDetail
-	drift     *views.DriftView
-	confirm   *views.ConfirmModal
-	viewStack []string // page name stack for Esc navigation
+	tapp     *tview.Application
+	model    *Model
+	layout   *tview.Flex
+	registry *ViewRegistry
+	bus      *EventBus
+	header   *tview.TextView
+	cmdBar   *tview.InputField
+	keys     *KeyHandler
+	table    *views.ResourceTable
+	detail   *views.ResourceDetail
+	drift    *views.DriftView
+	confirm      *views.ConfirmModal
+	traceView    *views.TraceView
+	traceHandler *trace.RingHandler
 
 	// Refresh infrastructure
 	refreshMu sync.Mutex
@@ -60,7 +63,8 @@ type Config struct {
 	Provider ProviderAPI
 	Engine   *reconciler.Engine
 	Interval string // e.g. "10s"
-	Attach   string // optional: URL of running gcplane serve instance
+	Attach       string               // optional: URL of running gcplane serve instance
+	TraceHandler *trace.RingHandler   // optional: ring handler for trace capture
 }
 
 // NewApp creates and wires the TUI application.
@@ -92,6 +96,8 @@ func NewApp(cfg Config) (*App, error) {
 		app.model = NewModel(cfg.Manifest, cfg.Endpoint, interval)
 	}
 
+	app.bus = NewEventBus(app.tapp)
+	app.traceHandler = cfg.TraceHandler
 	app.keys = NewKeyHandler(app)
 	app.buildLayout()
 	app.tapp.SetInputCapture(app.keys.Handle)
@@ -126,21 +132,30 @@ func (a *App) buildLayout() {
 	// Confirmation modal
 	a.confirm = views.NewConfirmModal()
 
-	// Switchable main content area
-	a.pages = tview.NewPages()
-	a.pages.AddPage("main", a.table.Table, true, true)
-	a.pages.AddPage("detail", a.detail.TextView, true, false)
-	a.pages.AddPage("drift", a.drift.TextView, true, false)
-	a.pages.AddPage("confirm", a.confirm.Modal, true, false)
+	// View registry — manages all pages and navigation stack
+	pages := tview.NewPages()
+	a.registry = NewViewRegistry(pages, a.tapp)
+	a.registry.Register(a.table)
+	a.registry.Register(a.detail)
+	a.registry.Register(a.drift)
+	a.registry.Register(a.confirm)
+	a.registry.Register(views.NewHelpView(helpText()))
 
-	// Help overlay
-	helpView := tview.NewTextView().
-		SetDynamicColors(true).
-		SetText(helpText())
-	helpView.SetBorder(true).SetTitle(" Help (? to close) ")
-	helpView.SetBorderColor(views.ColorSurface1)
-	helpView.SetTitleColor(views.ColorMauve)
-	a.pages.AddPage("help", helpView, true, false)
+	// Trace view — register if handler is available
+	if a.traceHandler != nil {
+		a.traceView = views.NewTraceView(a.traceHandler)
+		a.registry.Register(a.traceView)
+
+		// Auto-refresh trace view when new entries arrive
+		a.bus.Subscribe(EventTraceEntry, func(_ Event) {
+			if a.registry.Current() == "trace" {
+				a.traceView.Refresh()
+			}
+		})
+	}
+
+	// Show main view by default
+	pages.SwitchToPage("main")
 
 	// Command bar — 1 row input
 	a.cmdBar = tview.NewInputField().
@@ -153,13 +168,13 @@ func (a *App) buildLayout() {
 	// Root layout: header(1) + pages(flex) + cmdbar(1)
 	a.layout = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(a.header, 1, 0, false).
-		AddItem(a.pages, 0, 1, true).
+		AddItem(a.registry.Pages(), 0, 1, true).
 		AddItem(a.cmdBar, 1, 0, false)
 }
 
 // Run starts the TUI event loop. Blocks until the app exits.
 func (a *App) Run() error {
-	a.viewStack = []string{"main"}
+	a.registry.Push("main")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
@@ -212,6 +227,7 @@ func (a *App) refreshDirect() {
 		a.table.Refresh(a.model.GetChanges())
 		a.updateHeader()
 	})
+	a.bus.Publish(Event{Type: EventPlanUpdated})
 }
 
 // refreshFromServe polls the gcplane serve HTTP API for status.
@@ -259,6 +275,7 @@ func (a *App) refreshFromServe() {
 		a.table.Refresh(a.model.GetChanges())
 		a.updateHeader()
 	})
+	a.bus.Publish(Event{Type: EventPlanUpdated})
 }
 
 // refreshLoop periodically triggers refresh; also handles manual refresh signals.
@@ -331,23 +348,13 @@ func (a *App) switchKind(kind manifest.ResourceKind) {
 
 // pushView navigates to a named page, preserving the stack for Esc.
 func (a *App) pushView(name string) {
-	a.viewStack = append(a.viewStack, name)
-	a.pages.SwitchToPage(name)
+	a.registry.Push(name)
 }
 
 // popView returns to the previous page in the view stack.
 func (a *App) popView() {
-	if len(a.viewStack) > 0 {
-		a.viewStack = a.viewStack[:len(a.viewStack)-1]
-	}
-	if len(a.viewStack) > 0 {
-		page := a.viewStack[len(a.viewStack)-1]
-		a.pages.SwitchToPage(page)
-		if page == "main" {
-			a.tapp.SetFocus(a.table.Table)
-		}
-	} else {
-		a.pages.SwitchToPage("main")
+	page := a.registry.Pop()
+	if page == "main" {
 		a.tapp.SetFocus(a.table.Table)
 	}
 }
@@ -368,11 +375,10 @@ func (a *App) showDrift(c reconciler.Change) {
 
 // toggleHelp shows or hides the help overlay.
 func (a *App) toggleHelp() {
-	if name, _ := a.pages.GetFrontPage(); name == "help" {
-		a.pages.SwitchToPage("main")
-		a.tapp.SetFocus(a.table.Table)
+	if a.registry.Current() == "help" {
+		a.popView()
 	} else {
-		a.pages.SwitchToPage("help")
+		a.pushView("help")
 	}
 }
 
@@ -598,6 +604,12 @@ func helpText() string {
    %s     Clear tenant filter
 
  %s
+   %s           Toggle trace log
+   %s       Pause/resume auto-scroll
+   %s         Filter level (DEBUG/INFO/WARN/ERROR)
+   %s           Reset filters
+
+ %s
    %s           Toggle this help
    %s           Refresh now
 `,
@@ -618,6 +630,8 @@ func helpText() string {
 		k("Ctrl+R"), k("Ctrl+D"), k("e"),
 		k(":apply"), k(":delete"), k(":sync"),
 		k(":tenant X"), k(":tenant"),
+		h("Trace View"),
+		k("t"), k("Space"), k("1-4"), k("c"),
 		h("Other"),
 		k("?"), k("r"),
 	)

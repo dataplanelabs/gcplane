@@ -28,7 +28,7 @@ func (a *App) applyAll() {
 		pending, plan.Creates, plan.Updates)
 
 	a.confirm.Show(msg, func(confirmed bool) {
-		a.pages.SwitchToPage("main")
+		a.registry.Pages().SwitchToPage("main")
 		a.tapp.SetFocus(a.table.Table)
 		if !confirmed {
 			return
@@ -36,7 +36,7 @@ func (a *App) applyAll() {
 		a.showStatus(views.Tag(views.HexYellow, "Applying..."))
 		go a.doApply()
 	})
-	a.pages.SwitchToPage("confirm")
+	a.registry.Pages().SwitchToPage("confirm")
 	a.tapp.SetFocus(a.confirm.Modal)
 }
 
@@ -66,7 +66,7 @@ func (a *App) deleteResource() {
 	msg := fmt.Sprintf("Delete %s/%s from GoClaw?", c.Kind, c.Name)
 
 	a.confirm.Show(msg, func(confirmed bool) {
-		a.pages.SwitchToPage("main")
+		a.registry.Pages().SwitchToPage("main")
 		a.tapp.SetFocus(a.table.Table)
 		if !confirmed {
 			return
@@ -74,7 +74,7 @@ func (a *App) deleteResource() {
 		a.showStatus(views.Tag(views.HexYellow, fmt.Sprintf("Deleting %s/%s...", c.Kind, c.Name)))
 		go a.doDelete(c.Kind, c.Name)
 	})
-	a.pages.SwitchToPage("confirm")
+	a.registry.Pages().SwitchToPage("confirm")
 	a.tapp.SetFocus(a.confirm.Modal)
 }
 

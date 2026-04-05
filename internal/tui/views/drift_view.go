@@ -51,6 +51,15 @@ func NewDriftView() *DriftView {
 	return &DriftView{TextView: tv}
 }
 
+// Name implements View.
+func (dv *DriftView) Name() string { return "drift" }
+
+// Primitive implements View.
+func (dv *DriftView) Primitive() tview.Primitive { return dv.TextView }
+
+// Activate implements View.
+func (dv *DriftView) Activate() {}
+
 // Show renders the drift diff for a given change.
 func (dv *DriftView) Show(c reconciler.Change) {
 	dv.TextView.SetTitle(fmt.Sprintf(" Drift: %s/%s ", c.Kind, c.Name))

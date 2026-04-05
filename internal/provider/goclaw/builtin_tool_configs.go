@@ -30,12 +30,13 @@ func (p *Provider) observeBuiltinToolConfig(ctx context.Context, key string) (ma
 	apiName := toolName(key)
 	for _, t := range resp.Tools {
 		if strVal(t, "name") == apiName {
-			// GoClaw list response includes "tenant_enabled" when tenant-scoped.
-			// If present, it's the per-tenant override; otherwise use global "enabled".
+			// GoClaw list response includes "tenant_enabled" only when a per-tenant
+			// config override exists. If absent, the tool uses the global "enabled"
+			// and we return nil so the reconciler creates the tenant config.
 			if te, ok := t["tenant_enabled"]; ok {
 				return map[string]any{"enabled": te}, nil
 			}
-			return map[string]any{"enabled": t["enabled"]}, nil
+			return nil, nil
 		}
 	}
 	return nil, nil

@@ -56,6 +56,15 @@ func NewResourceDetail() *ResourceDetail {
 	return &ResourceDetail{TextView: tv}
 }
 
+// Name implements View.
+func (rd *ResourceDetail) Name() string { return "detail" }
+
+// Primitive implements View.
+func (rd *ResourceDetail) Primitive() tview.Primitive { return rd.TextView }
+
+// Activate implements View.
+func (rd *ResourceDetail) Activate() {}
+
 // ProviderObserver is the minimal interface needed to observe a resource.
 type ProviderObserver interface {
 	Observe(ctx context.Context, kind manifest.ResourceKind, key string) (map[string]any, error)

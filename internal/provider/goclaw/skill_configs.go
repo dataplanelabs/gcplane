@@ -26,11 +26,8 @@ func (p *Provider) observeSkillConfig(ctx context.Context, key string) (map[stri
 			if tc, ok := s["tenant_config"].(map[string]any); ok {
 				return translateResult(tc), nil
 			}
-			// Skill exists but no tenant config — return current enabled state
-			result := map[string]any{
-				"enabled": s["enabled"],
-			}
-			return translateResult(result), nil
+			// Skill exists but no tenant config — return nil so reconciler creates it
+			return nil, nil
 		}
 	}
 	return nil, nil

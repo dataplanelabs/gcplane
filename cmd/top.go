@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"log/slog"
+
 	"github.com/dataplanelabs/gcplane/internal/provider/goclaw"
 	"github.com/dataplanelabs/gcplane/internal/reconciler"
 	"github.com/dataplanelabs/gcplane/internal/tui"
+	"github.com/dataplanelabs/gcplane/internal/tui/trace"
 	"github.com/spf13/cobra"
 )
 
@@ -64,17 +67,23 @@ func runTop(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	// Trace handler captures engine + provider logs for TUI display
+	traceHandler := trace.NewRingHandler(1000, slog.LevelDebug, nil)
+	logger := slog.New(traceHandler)
+
+	provOpts = append(provOpts, goclaw.WithLogger(logger))
 	provider := goclaw.New(ep, tok, provOpts...)
 	defer provider.Close()
 
-	engine := reconciler.NewEngine(provider, nil)
+	engine := reconciler.NewEngine(provider, logger)
 
 	app, err := tui.NewApp(tui.Config{
-		Manifest: m,
-		Endpoint: ep,
-		Provider: provider,
-		Engine:   engine,
-		Interval: topInterval,
+		Manifest:     m,
+		Endpoint:     ep,
+		Provider:     provider,
+		Engine:       engine,
+		Interval:     topInterval,
+		TraceHandler: traceHandler,
 	})
 	if err != nil {
 		return err

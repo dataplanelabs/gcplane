@@ -112,6 +112,15 @@ func (rt *ResourceTable) Refresh(changes []reconciler.Change) {
 	}
 }
 
+// Name implements View.
+func (rt *ResourceTable) Name() string { return "main" }
+
+// Primitive implements View.
+func (rt *ResourceTable) Primitive() tview.Primitive { return rt.Table }
+
+// Activate implements View.
+func (rt *ResourceTable) Activate() {}
+
 // GetSelectedChange returns the change for the currently selected row.
 func (rt *ResourceTable) GetSelectedChange() *reconciler.Change {
 	row, _ := rt.Table.GetSelection()

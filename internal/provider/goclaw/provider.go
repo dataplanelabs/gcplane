@@ -5,6 +5,8 @@ package goclaw
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"sync"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
@@ -31,6 +33,13 @@ func WithUserID(id string) Option {
 	}
 }
 
+// WithLogger sets the logger for API request/response tracing.
+func WithLogger(logger *slog.Logger) Option {
+	return func(p *Provider) {
+		p.logger = logger
+	}
+}
+
 // Provider communicates with a GoClaw instance to observe and mutate resources.
 type Provider struct {
 	endpoint   string
@@ -38,6 +47,7 @@ type Provider struct {
 	tenantID   string // slug (e.g., "acme-corp")
 	tenantUUID string // resolved UUID — lazily populated on first create
 	userID     string // X-GoClaw-User-Id header (default: "gcplane")
+	logger     *slog.Logger
 	http       *HTTPClient
 	ws         *WSClient
 	wsMu       sync.Mutex
@@ -60,7 +70,10 @@ func New(endpoint, token string, opts ...Option) *Provider {
 	for _, opt := range opts {
 		opt(p)
 	}
-	p.http = NewHTTPClient(endpoint, token, p.tenantID, p.userID)
+	if p.logger == nil {
+		p.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	p.http = NewHTTPClient(endpoint, token, p.tenantID, p.userID, p.logger)
 	p.ws = NewWSClient(endpoint, token, p.tenantID, p.userID)
 	return p
 }

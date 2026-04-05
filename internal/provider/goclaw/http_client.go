@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -25,12 +26,13 @@ type HTTPClient struct {
 	token      string
 	httpClient *http.Client
 	headers    map[string]string // extra headers to send with every request
+	logger     *slog.Logger
 }
 
 // NewHTTPClient creates a new authenticated HTTP client for GoClaw.
 // tenantID is optional — when set, all requests include X-GoClaw-Tenant-Id header.
 // userID is optional — defaults to "gcplane". Must match GOCLAW_OWNER_IDS for tenant management.
-func NewHTTPClient(baseURL, token, tenantID, userID string) *HTTPClient {
+func NewHTTPClient(baseURL, token, tenantID, userID string, logger *slog.Logger) *HTTPClient {
 	if userID == "" {
 		userID = "gcplane"
 	}
@@ -40,11 +42,15 @@ func NewHTTPClient(baseURL, token, tenantID, userID string) *HTTPClient {
 	if tenantID != "" {
 		headers["X-GoClaw-Tenant-Id"] = tenantID
 	}
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	return &HTTPClient{
 		baseURL:    baseURL,
 		token:      token,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		headers:    headers,
+		logger:     logger,
 	}
 }
 
@@ -83,6 +89,11 @@ func (c *HTTPClient) doJSON(ctx context.Context, method, path string, body any) 
 }
 
 func (c *HTTPClient) do(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+	start := time.Now()
+	c.logger.Debug("api.request",
+		slog.String("method", method),
+		slog.String("path", path))
+
 	url := c.baseURL + path
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
@@ -97,7 +108,13 @@ func (c *HTTPClient) do(ctx context.Context, method, path string, body io.Reader
 	}
 
 	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
 	if err != nil {
+		c.logger.Warn("api.error",
+			slog.String("method", method),
+			slog.String("path", path),
+			slog.Any("error", err),
+			slog.Duration("duration", duration))
 		return nil, fmt.Errorf("http %s %s: %w", method, path, err)
 	}
 	defer resp.Body.Close()
@@ -108,6 +125,12 @@ func (c *HTTPClient) do(ctx context.Context, method, path string, body io.Reader
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
+
+	c.logger.Debug("api.response",
+		slog.String("method", method),
+		slog.String("path", path),
+		slog.Int("status", resp.StatusCode),
+		slog.Duration("duration", duration))
 
 	if err := classifyStatus(resp.StatusCode, respBody); err != nil {
 		return nil, err

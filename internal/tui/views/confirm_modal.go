@@ -22,6 +22,15 @@ func NewConfirmModal() *ConfirmModal {
 	return &ConfirmModal{Modal: modal}
 }
 
+// Name implements View.
+func (cm *ConfirmModal) Name() string { return "confirm" }
+
+// Primitive implements View.
+func (cm *ConfirmModal) Primitive() tview.Primitive { return cm.Modal }
+
+// Activate implements View.
+func (cm *ConfirmModal) Activate() {}
+
 // Show displays the modal with a message and calls onConfirm(true/false).
 func (cm *ConfirmModal) Show(message string, onConfirm func(confirmed bool)) {
 	cm.Modal.SetText(message)
