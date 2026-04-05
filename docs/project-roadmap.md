@@ -115,6 +115,16 @@
 - Updated dependency order: Channel → CronJob → SecureCLI → SecureCLIGrant → AgentTeam
 - Resource kinds expanded from 12 to 14
 
+### v1.2.0 (2026-04-05) — TUI Extensibility + Trace
+- TUI extensibility: View interface + ViewRegistry pattern for modular view registration
+- EventBus: Typed publish/subscribe with QueueUpdateDraw safety for thread-safe UI updates
+- Trace view (`t` key): Real-time reconciliation events, API calls, error context
+- Ring handler: slog.Handler capture with 1000-entry ring buffer for trace data
+- API request logging: HTTP client method, path, status, duration in trace
+- 11 new tests (27 total TUI tests), race-detector clean
+- 6 registered views: ResourceTable, ResourceDetail, DriftView, TraceView, ConfirmModal, HelpView
+- No new external dependencies
+
 ## Release Timeline
 
 | Version | Status | Release Date | Focus |
@@ -123,4 +133,5 @@
 | v0.7.2 | Released | 2026-03-25 | Credentials, Tenant Isolation |
 | v0.8.0 | Released | 2026-03-24 | First-class Multi-tenant |
 | v1.0.0 | Released | 2026-04-02 | Production Release (Stable) |
-| **v1.1.0** | **Latest** | **2026-04-05** | **Secure CLI & Grants** |
+| v1.1.0 | Released | 2026-04-05 | Secure CLI & Grants |
+| **v1.2.0** | **Latest** | **2026-04-05** | **TUI Extensibility + Trace** |

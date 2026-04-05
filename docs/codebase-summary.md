@@ -12,8 +12,8 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 |--------|-------|
 | **Language** | Go 1.25+ |
 | **Total Dependencies** | 5 direct |
-| **Test Coverage** | 81.3% (161+ tests) |
-| **Codebase Lines** | ~14,778 LOC |
+| **Test Coverage** | 81.3%+ (172+ tests, +11 TUI in v1.2) |
+| **Codebase Lines** | ~15,500 LOC (v1.2) |
 | **Binary Size** | Single statically-linked executable |
 | **Resource Kinds** | 14 (Tenant + 8 core + 5 config) |
 | **Transport Protocols** | HTTP REST + WebSocket RPC v3 |
@@ -124,17 +124,26 @@ GCPlane v1.0.0 is a declarative GitOps control plane for managing GoClaw deploym
 | `server.go` | Server startup, graceful shutdown, middleware |
 | `handlers.go` | /healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git |
 
-### internal/tui/ — Interactive Terminal UI (~2191 LOC)
-**Purpose**: k9s-style resource browser with real-time monitoring
+### internal/tui/ — Interactive Terminal UI (v1.2+, ~3300 LOC)
+**Purpose**: k9s-style resource browser with extensible view architecture and real-time tracing
 
 | File | Responsibility |
 |------|-----------------|
-| `app.go` | Main app, layout, refresh loop, keybinding dispatch |
+| `app.go` | Main app, ViewRegistry wiring, refresh loop, layout |
+| `registry.go` | ViewRegistry: register/switch/stack views dynamically |
+| `event_bus.go` | Typed pub/sub with QueueUpdateDraw safety |
 | `model.go` | Thread-safe shared state, resource cache |
-| `keybindings.go` | Vim-style mode dispatch (browse, search, detail, drift, help) |
-| `views/resource_table.go` | Resource list with status coloring (InSync/Drifted/Missing/Error/Extra) |
+| `keybindings.go` | Vim-style mode dispatch (browse, search, detail, drift, trace, help) |
+| `views/view.go` | View interface (Name, Primitive, Activate) |
+| `views/resource_table.go` | Resource list with status coloring |
 | `views/resource_detail.go` | YAML view with syntax highlighting |
 | `views/drift_view.go` | Field-level drift comparison (red/green diff) |
+| `views/trace_view.go` | Real-time reconciliation events, API calls, logs |
+| `views/confirm_modal.go` | Confirmation dialog for destructive ops |
+| `views/help_view.go` | Help overlay with keybinding reference |
+| `trace/ring_handler.go` | slog.Handler with 1000-entry ring buffer |
+| `trace/entry.go` | TraceEntry structure |
+| `trace/types.go` | Event types (EventTraceEntry, etc.) |
 
 ### Other Packages
 
@@ -263,11 +272,12 @@ GoClaw uses UUIDs internally. GCPlane manifests use human-readable names. Resolu
 ## Testing
 
 ### Test Coverage
-- **Overall**: 81.3% (161+ tests)
+- **Overall**: 81.3%+ (172+ tests, +11 TUI tests in v1.2)
 - **Provider**: 81.9% (HTTP + WS mock tests)
 - **Source**: 86.0% (FileSource dirs + GitSource)
 - **Controller**: 91.4% (reconcile loop + metrics)
 - **Reconciler**: High coverage via table-driven tests
+- **TUI**: 27 tests (ResourceTable, Registry, RingHandler, smoke test)
 
 ### Test Organization
 - Unit tests alongside source files (`*_test.go`)
@@ -295,7 +305,9 @@ GoClaw uses UUIDs internally. GCPlane manifests use human-readable names. Resolu
 | v0.7.0 | 2026-03-18 | Interactive TUI (top command), vim keybindings |
 | v0.7.2 | 2026-03-25 | Channel credentials restructure, tenant isolation enforcement |
 | v0.8.0 | 2026-03-24 | First-class multi-tenant: Tenant CRUD, per-tenant config, 13 kinds |
-| **v1.0.0** | **2026-04-02** | **Production release: Stable API, removed Tool/TTSConfig, added SystemConfig, 12 kinds** |
+| v1.0.0 | 2026-04-02 | Production release: Stable API, removed Tool/TTSConfig, added SystemConfig, 12 kinds |
+| v1.1.0 | 2026-04-05 | Secure CLI & Grants: SecureCLI/SecureCLIGrant resources, 14 kinds |
+| **v1.2.0** | **2026-04-05** | **TUI Extensibility: View interface, ViewRegistry, EventBus, Trace view with slog capture** |
 
 ### GoClaw Compatibility
 Tested against: **ghcr.io/nextlevelbuilder/goclaw:full** (v2.x)

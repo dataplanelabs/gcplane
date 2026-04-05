@@ -1,6 +1,6 @@
 # Per-tenant config overrides for Acme Corp.
 # BuiltinToolConfig: enable/disable builtin tools for this tenant.
-# Tool names use snake_case (matching GoClaw internal names).
+# Tool names use kebab-case (converted to snake_case for GoClaw API).
 resources:
   - kind: BuiltinToolConfig
     name: exec

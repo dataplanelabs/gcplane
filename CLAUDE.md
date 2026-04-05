@@ -25,6 +25,8 @@ internal/
   display/        — Colored terminal output (plan, diff, prune warning)
   secrets/        — ${ENV_VAR} and file:// resolution
   tui/            — Interactive terminal UI (k9s-style resource browser with vim keybindings)
+    views/        — View components (table, detail, drift, trace, help, confirm)
+    trace/        — slog ring buffer handler for trace capture
 ```
 
 ## Key Patterns
@@ -38,6 +40,14 @@ internal/
 - Provider `apiKey` is write-only (masked as "***" in API responses)
 - SecureCLI `env` is write-only (encrypted env vars for CLI credential injection)
 - SecureCLIGrant uses composite name `binaryName--agentKey` (e.g., `kubectl--assistant`)
+
+## TUI Architecture
+- `View` interface: `Name()`, `Primitive()`, `Activate()` — all views implement this
+- `ViewRegistry`: wraps `tview.Pages` with push/pop navigation stack
+- `EventBus`: typed pub/sub with `QueueUpdateDraw` thread safety
+- `RingHandler` (`trace/`): custom `slog.Handler` → 1000-entry ring buffer → trace view
+- Trace view (`t` key): shows reconciliation events, API calls, errors with Catppuccin colors
+- API logging: HTTPClient logs request/response (method, path, status, duration) via slog
 
 ## Testing
 ```bash

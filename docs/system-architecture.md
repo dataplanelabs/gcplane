@@ -109,14 +109,24 @@ gcplane/
 │   │   └── resolver.go              # ${ENV}, file://, SOPS support
 │   ├── display/                     # Terminal output formatting
 │   │   └── plan.go                  # Terraform-style colored diff + prune warnings
-│   └── tui/                         # Interactive terminal UI (k9s-style)
-│       ├── app.go                   # Main app, layout, refresh loop
-│       ├── model.go                 # Thread-safe shared state
-│       ├── keybindings.go           # Vim-style mode dispatch
-│       └── views/
-│           ├── resource_table.go    # Resource list with status coloring
-│           ├── resource_detail.go   # YAML view with syntax highlighting
-│           └── drift_view.go        # Field-level drift diff
+│   ├── tui/                         # Interactive terminal UI (k9s-style, v1.2+)
+│   │   ├── app.go                   # Main app, wiring, refresh loop
+│   │   ├── model.go                 # Thread-safe shared state
+│   │   ├── keybindings.go           # Vim-style mode dispatch
+│   │   ├── registry.go              # ViewRegistry for modular view registration
+│   │   ├── event_bus.go             # Typed pub/sub with QueueUpdateDraw safety
+│   │   └── views/
+│   │       ├── view.go              # View interface (Name, Primitive, Activate)
+│   │       ├── resource_table.go    # Resource list with status coloring
+│   │       ├── resource_detail.go   # YAML view with syntax highlighting
+│   │       ├── drift_view.go        # Field-level drift diff
+│   │       ├── trace_view.go        # Real-time trace/log view
+│   │       ├── confirm_modal.go     # Confirmation dialog
+│   │       └── help_view.go         # Help overlay
+│   └── tui/trace/                   # Trace capture (v1.2+)
+│       ├── ring_handler.go          # slog.Handler with 1000-entry ring buffer
+│       ├── entry.go                 # TraceEntry structure
+│       └── types.go                 # Event types (EventTraceEntry, etc.)
 └── examples/
     ├── minimal.yaml                 # Minimal manifest example (camelCase)
     ├── production.yaml              # Production manifest example (camelCase)
@@ -242,17 +252,24 @@ Manifest values support `${ENV_VAR}` substitution and `file://path` references. 
 4. Expose status endpoints (/healthz, /readyz, /metrics, /api/v1/status, /api/v1/sync, /api/v1/webhook/git)
 5. Graceful shutdown on SIGINT/SIGTERM
 
-### Top (interactive dashboard)
+### Top (interactive dashboard) — v1.2+
 1. Load + validate manifest
 2. Resolve connection config (flags > env > manifest)
-3. Create tview app with shared state model (thread-safe)
+3. Create TUI app with extensible ViewRegistry:
+   a. Register 6 views: ResourceTable, ResourceDetail, DriftView, TraceView, ConfirmModal, HelpView
+   b. Create EventBus for publish/subscribe
+   c. Create RingHandler (1000 entries) for slog capture
+   d. Wire provider/engine logger → RingHandler → EventBus
 4. Start refresh goroutine on `--interval` (default 10s):
    a. List all resources from GoClaw
    b. Compute status (InSync, Drifted, Missing, Error, Extra)
    c. Update shared model (atomic write)
-5. Render resource table with status coloring
-6. Handle vim-style keybindings:
-   - j/k: navigate, g/G: jump, Enter: show YAML, d: show drift, /: search, :: commands
-   - 0-9: filter by kind, r: refresh, ?: help, q: quit
-7. Detail views: YAML syntax highlighting, field-level diff on drift
-8. Graceful shutdown on Ctrl+C (close WS connection, cleanup tview)
+   d. Publish plan.updated event (views subscribe)
+5. Handle vim-style keybindings with multi-view support:
+   - j/k: navigate, g/G: jump, Enter: show detail, d: show drift, t: toggle trace
+   - /: search, ?: help, Esc: return to table, q: quit
+   - 0-9: filter by kind, r: refresh, :: commands
+6. Views receive events:
+   - ResourceTable subscribes to plan.updated, refreshes on event
+   - TraceView subscribes to trace.*, displays real-time logs and API calls
+7. Graceful shutdown on Ctrl+C (close WS, cleanup tview)
