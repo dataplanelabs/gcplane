@@ -15,12 +15,12 @@ go build -o gcplane .
 
 ## Version & Requirements
 
-**GCPlane v1.0.0+** requires **GoClaw 2.x** with RPC v3 support.
+**GCPlane v1.3.0+** requires **GoClaw 3.x**. GCPlane v1.0.0–v1.2.x works with GoClaw 2.x.
 
 | Requirement | Version |
 |-------------|---------|
 | Go | 1.25+ (build only) |
-| GoClaw | 2.x (runtime) |
+| GoClaw | 3.x (runtime) |
 | Docker | (optional, for local dev) |
 
 Check your GCPlane version:
@@ -61,7 +61,7 @@ resources:
       displayName: "Assistant"
       provider: anthropic
       model: claude-sonnet-4-20250514
-      agentType: open
+      agentType: predefined
       status: active
 ```
 

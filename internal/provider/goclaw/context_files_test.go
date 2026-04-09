@@ -105,7 +105,7 @@ func TestSyncContextFiles_PostsToImportEndpoint(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents":
 			json.NewEncoder(w).Encode(map[string]any{
 				"agents": []map[string]any{
-					{"id": "uuid-123", "agent_key": "test-agent", "agent_type": "open"},
+					{"id": "uuid-123", "agent_key": "test-agent", "agent_type": "predefined"},
 				},
 			})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/agents/uuid-123/import":

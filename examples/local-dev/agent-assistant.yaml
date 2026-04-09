@@ -5,7 +5,7 @@ resources:
       displayName: "Assistant"
       provider: zai-coding
       model: glm-5.1
-      agentType: open
+      agentType: predefined
       status: active
       isDefault: true
       contextWindow: 200000

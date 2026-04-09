@@ -11,7 +11,7 @@ permissions:
 env:
   UPSTREAM_IMAGE: ghcr.io/nextlevelbuilder/goclaw
   # Last known GoClaw version (updated manually after verifying E2E)
-  KNOWN_VERSION: "v2.13.0-full"
+  KNOWN_VERSION: "v3.1.1-full"
 
 jobs:
   check-upstream:

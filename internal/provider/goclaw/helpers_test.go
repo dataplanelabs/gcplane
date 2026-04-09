@@ -174,6 +174,43 @@ func TestStripInternal_AgentConfigFields(t *testing.T) {
 	}
 }
 
+func TestStripInternal_V3PromotedFields(t *testing.T) {
+	input := map[string]any{
+		"id":                     "uuid-1",
+		"agent_key":              "my-agent",
+		// v3 observable scalars — must survive
+		"emoji":                  "🤖",
+		"agent_description":      "A helpful agent",
+		"thinking_level":         "high",
+		"max_tokens":             8192,
+		"self_evolve":            true,
+		"skill_evolve":           false,
+		"skill_nudge_interval":   10,
+		// v3 promoted JSONB configs — must be stripped
+		"reasoning_config":       map[string]any{"mode": "extended"},
+		"workspace_sharing":      map[string]any{"memory": true},
+		"chatgpt_oauth_routing":  map[string]any{},
+		"shell_deny_groups":      map[string]any{"groups": []string{"admin"}},
+		"kg_dedup_config":        map[string]any{"threshold": 0.9},
+	}
+
+	result := stripInternal(input)
+
+	// Observable scalars must survive
+	for _, f := range []string{"emoji", "agent_description", "thinking_level", "max_tokens", "self_evolve", "skill_evolve", "skill_nudge_interval"} {
+		if _, ok := result[f]; !ok {
+			t.Errorf("expected observable field %q to survive stripInternal", f)
+		}
+	}
+
+	// v3 promoted JSONB configs must be stripped
+	for _, f := range []string{"reasoning_config", "workspace_sharing", "chatgpt_oauth_routing", "shell_deny_groups", "kg_dedup_config"} {
+		if _, ok := result[f]; ok {
+			t.Errorf("expected v3 JSONB config %q to be stripped", f)
+		}
+	}
+}
+
 func TestStrVal_NilMap(t *testing.T) {
 	// should not panic on nil map
 	defer func() {

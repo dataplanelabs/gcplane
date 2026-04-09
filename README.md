@@ -123,7 +123,7 @@ resources:
       displayName: "Assistant"
       provider: anthropic
       model: claude-sonnet-4-20250514
-      agentType: open
+      agentType: predefined
       status: active
       isDefault: true
 EOF
@@ -201,9 +201,10 @@ mise run serve
 
 | GCPlane | GoClaw | Tested |
 |---------|--------|--------|
-| v0.7.x+ | 2.x | CI E2E |
+| v1.3.0+ | 3.x | CI E2E |
+| v1.0.0–v1.2.x | 2.x | CI E2E |
 
-GCPlane is tested against [GoClaw](https://github.com/nextlevelbuilder/goclaw) `v2.x` in CI. The E2E workflow spins up GoClaw via `ghcr.io/nextlevelbuilder/goclaw:full` with PostgreSQL and runs validate, plan, apply, diff, export, and destroy commands.
+GCPlane is tested against [GoClaw](https://github.com/nextlevelbuilder/goclaw) `v3.x` in CI. The E2E workflow spins up GoClaw via `ghcr.io/nextlevelbuilder/goclaw:full` with PostgreSQL and runs validate, plan, apply, diff, export, and destroy commands.
 
 ## License
 

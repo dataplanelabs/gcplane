@@ -8,7 +8,7 @@ GCPlane v1.0.0 supports two multi-tenant deployment models:
    - One GoClaw instance with tenant isolation via `connection.tenantId` header
    - Tenant CRUD via `Tenant` resource kind
    - Per-tenant configs: `BuiltinToolConfig`, `SkillConfig`, `MCPCredentials`, `SystemConfig`
-   - GoClaw 2.x required
+   - GoClaw 3.x required
 
 2. **Multiple GoClaw instances** (federated model)
    - Each tenant = dedicated GoClaw endpoint
@@ -31,7 +31,7 @@ goclaw-config/
 
 Run with: `gcplane serve --tenants-dir ./goclaw-config/`
 
-## Isolation Model (GoClaw 2.x)
+## Isolation Model (GoClaw 3.x)
 
 | Boundary | Isolation Level | Notes |
 |----------|----------------|-------|

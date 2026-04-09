@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:
-  GOCLAW_VERSION: "full"  # floating tag → v2.x (currently v2.13.0)
+  GOCLAW_VERSION: "full"  # floating tag → v3.x (currently v3.1.1)
 
 jobs:
   e2e:

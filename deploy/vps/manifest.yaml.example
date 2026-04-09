@@ -58,9 +58,9 @@ resources:
       provider: anthropic
       # Model ID as accepted by the provider.
       model: claude-sonnet-4-20250514
-      # open = users can start new conversations
-      # predefined = system-initiated only (cron, webhooks)
-      agentType: open
+      # predefined = standard agent type (v3 default)
+      # open = deprecated in v3 (auto-converts to predefined)
+      agentType: predefined
       status: active
       toolsConfig:
         # Profiles: minimal | coding | full

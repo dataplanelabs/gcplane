@@ -127,7 +127,7 @@ resources:
       displayName: "%s"
       provider: %s
       model: %s
-      agentType: open
+      agentType: predefined
       status: active
       isDefault: true
 `, name, ep, provName, prov.displayName, prov.providerType, prov.apiBase, prov.envVar,

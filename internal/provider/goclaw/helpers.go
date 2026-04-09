@@ -56,6 +56,9 @@ var internalFields = []string{
 	// Complex JSONB configs (managed by GoClaw UI, not manifests)
 	"tools_config", "sandbox_config", "subagents_config",
 	"memory_config", "compaction_config", "context_pruning", "other_config",
+	// v3 promoted JSONB configs (complex structures, managed via UI)
+	"reasoning_config", "workspace_sharing", "chatgpt_oauth_routing",
+	"shell_deny_groups", "kg_dedup_config",
 	// Accounting & metadata
 	"frontmatter", "budget_monthly_cents",
 	"agent_count", "has_credentials", "credentials",

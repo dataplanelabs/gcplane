@@ -12,6 +12,9 @@ var writeOnlyFields = map[ResourceKind][]string{
 		// (managed via GoClaw UI at runtime, stripped from observe by internalFields)
 		"toolsConfig", "sandboxConfig", "subagentsConfig",
 		"memoryConfig", "compactionConfig", "contextPruning", "otherConfig",
+		// v3 promoted JSONB configs (complex structures, write-only)
+		"reasoningConfig", "workspaceSharing", "chatgptOauthRouting",
+		"shellDenyGroups", "kgDedupConfig",
 	},
 	KindChannel:           {"agentKey", "credentials", "config"},
 	KindMCPServer:         {"grants"},

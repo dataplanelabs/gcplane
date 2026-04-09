@@ -34,9 +34,13 @@ internal/
 - `WriteOnlyFields` in `manifest/field_config.go` — fields excluded from comparison (secrets, grants, tokens, JSONB configs)
 - `stripInternal` in `provider/goclaw/helpers.go` — removes API-internal fields from observe results
 - CronJob observe has additional camelCase stripping (WS RPC returns camelCase unlike HTTP)
+- CronJob `deliver`, `deliverChannel`, `deliverTo`, `stateless`, `wakeHeartbeat`, `deleteAfterRun` are observable (top-level columns since GoClaw upstream promotion from payload JSONB)
+- CronJob `message` and `agentKey` are write-only; `agentKey` resolved to `agentId` UUID on create/update
 - Prune: `--prune` flag, deletes in reverse `DeleteOrder()`, only `created_by=gcplane`
 - Composites: `CompositeDefinition` expanded during load via Go `text/template`
 - Agent `contextWindow` and `maxToolIterations` are observable (manageable from manifests)
+- Agent v3 promoted scalars (`emoji`, `agentDescription`, `thinkingLevel`, `maxTokens`, `selfEvolve`, `skillEvolve`, `skillNudgeInterval`) are observable
+- Agent v3 promoted JSONB configs (`reasoningConfig`, `workspaceSharing`, `chatgptOauthRouting`, `shellDenyGroups`, `kgDedupConfig`) are write-only
 - Provider `apiKey` is write-only (masked as "***" in API responses)
 - SecureCLI `env` is write-only (encrypted env vars for CLI credential injection)
 - SecureCLIGrant uses composite name `binaryName--agentKey` (e.g., `kubectl--assistant`)
@@ -73,4 +77,7 @@ mise run setup         # start GoClaw docker + apply config
 ```
 
 ## GoClaw Compatibility
-Tested against `ghcr.io/nextlevelbuilder/goclaw:full` (v2.x)
+Tested against `ghcr.io/nextlevelbuilder/goclaw:full` (v3.x — v3.1.1+)
+- v3 promoted 12 agent fields from `other_config` JSONB to top-level columns
+- v3 deprecated `agentType: open` (defaults to `predefined`)
+- v3 added Facebook Messenger and Pancake channel types

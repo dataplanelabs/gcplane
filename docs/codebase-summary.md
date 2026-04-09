@@ -322,7 +322,7 @@ GoClaw uses UUIDs internally. GCPlane manifests use human-readable names. Resolu
 | **v1.2.0** | **2026-04-05** | **TUI Extensibility: View interface, ViewRegistry, EventBus, Trace view with slog capture** |
 
 ### GoClaw Compatibility
-Tested against: **ghcr.io/nextlevelbuilder/goclaw:full** (v2.x)
+Tested against: **ghcr.io/nextlevelbuilder/goclaw:full** (v3.x)
 
 **RPC Protocol**: v3 (WebSocket)
 - Connect handshake: token, user_id, optional tenant_id

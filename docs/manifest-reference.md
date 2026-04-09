@@ -4,7 +4,14 @@
 
 | GCPlane | Requires | RPC |
 |---------|----------|-----|
-| v1.0.0+ | GoClaw 2.x | v3 |
+| v1.3.0+ | GoClaw 3.x | v3 |
+| v1.0.0–v1.2.x | GoClaw 2.x | v3 |
+
+### GoClaw v3 Breaking Changes
+
+- **Agent `agentType: open` deprecated** — v3 auto-converts to `predefined`. Use `predefined` in new manifests.
+- **12 agent fields promoted** from `other_config` JSONB to dedicated columns. 7 are now observable (compared during reconcile), 5 remain write-only (complex JSONB configs).
+- **New channel types**: `facebook` (Facebook Messenger) and `pancake` (Pancake CRM hub).
 
 ## Format
 
@@ -85,7 +92,71 @@ Channel credentials are stored in a `credentials` object (nested structure, not 
       dmPolicy: open
 ```
 
+### Facebook Messenger Channel (v3)
+```yaml
+- kind: Channel
+  name: facebook-main
+  spec:
+    displayName: "Facebook Messenger"
+    channelType: facebook
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      pageAccessToken: ${FB_PAGE_ACCESS_TOKEN}
+      appSecret: ${FB_APP_SECRET}
+      verifyToken: ${FB_VERIFY_TOKEN}
+```
+
+### Pancake Channel (v3)
+```yaml
+- kind: Channel
+  name: pancake-crm
+  spec:
+    displayName: "Pancake CRM"
+    channelType: pancake
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      apiKey: ${PANCAKE_API_KEY}
+```
+
 **Note:** The `credentials` field is write-only (excluded from comparison). Tokens are not returned by GoClaw during observe, preventing phantom diffs.
+
+## CronJob Configuration
+
+CronJobs use WebSocket RPC (camelCase). Fields `deliver`, `deliverChannel`, `deliverTo`, `stateless`, `wakeHeartbeat`, and `deleteAfterRun` are observable (compared during reconcile). The `message` and `agentKey` fields are write-only.
+
+```yaml
+- kind: CronJob
+  name: daily-report
+  spec:
+    schedule:
+      kind: cron             # "cron", "every", or "at"
+      expr: "0 9 * * 1-5"   # cron expression (kind=cron)
+      tz: Asia/Saigon        # IANA timezone
+    message: "Generate daily report and summarize findings"
+    agentKey: report-bot     # resolved to agentId UUID
+    enabled: true
+    deliver: true            # deliver result to channel
+    deliverChannel: telegram # target channel name
+    deliverTo: "@admin"      # recipient within channel
+    stateless: true          # skip session save (default true for new jobs)
+    wakeHeartbeat: false     # wake agent via heartbeat before run
+    deleteAfterRun: false    # remove job after first execution
+```
+
+| Field | Type | Observable | Description |
+|-------|------|-----------|-------------|
+| `schedule` | object | Yes | When to run (kind, expr/everyMs/atMs, tz) |
+| `enabled` | bool | Yes | Active/paused |
+| `message` | string | No (write-only) | Prompt sent to agent |
+| `agentKey` | string | No (write-only) | Agent name, resolved to UUID |
+| `deliver` | bool | Yes | Deliver output to channel |
+| `deliverChannel` | string | Yes | Target channel for delivery |
+| `deliverTo` | string | Yes | Recipient within channel |
+| `stateless` | bool | Yes | Fresh session per run (saves tokens) |
+| `wakeHeartbeat` | bool | Yes | Send heartbeat before execution |
+| `deleteAfterRun` | bool | Yes | One-shot job (auto-deletes) |
 
 ## Tool Configuration
 
@@ -118,6 +189,49 @@ Agents support per-agent tool policies via `toolsConfig` in the spec:
 | `all` | all built-in tools |
 
 Individual tool overrides take precedence over profile defaults.
+
+## Agent Fields (v3 Promoted)
+
+GoClaw v3 promoted 12 fields from the `other_config` JSONB bag to dedicated columns. These are now directly manageable from manifests.
+
+### Observable Fields (compared during reconcile)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `emoji` | string | `""` | Agent avatar emoji |
+| `agentDescription` | string | `""` | Agent description / summoning prompt |
+| `thinkingLevel` | string | `"off"` | Reasoning effort: `off`, `low`, `medium`, `high` |
+| `maxTokens` | int | `0` | Max output tokens (0 = provider default) |
+| `selfEvolve` | bool | `false` | Enable agent self-evolution |
+| `skillEvolve` | bool | `false` | Enable skill evolution |
+| `skillNudgeInterval` | int | `0` | Skill nudge interval in messages |
+
+These fields are optional. Omitting them from the manifest causes no drift — only fields present in the manifest spec are compared.
+
+### Write-Only Fields (set but not compared)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `reasoningConfig` | object | Advanced reasoning settings (override mode, budget tokens) |
+| `workspaceSharing` | object | Workspace sharing policy (memory, knowledge graph toggles) |
+| `chatgptOauthRouting` | object | ChatGPT OAuth routing config |
+| `shellDenyGroups` | object | Shell command deny groups |
+| `kgDedupConfig` | object | Knowledge graph dedup configuration |
+
+```yaml
+- kind: Agent
+  name: smart-agent
+  spec:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    emoji: "🧠"
+    agentDescription: "Research assistant with reasoning"
+    thinkingLevel: high
+    maxTokens: 8192
+    selfEvolve: true
+    contextWindow: 200000
+    maxToolIterations: 50
+```
 
 ## Secret Resolution
 

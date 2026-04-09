@@ -26,7 +26,7 @@ resources:
       displayName: "Code Assistant"
       provider: anthropic
       model: claude-sonnet-4-20250514
-      agentType: open
+      agentType: predefined
       status: active
       isDefault: true
       toolsConfig:

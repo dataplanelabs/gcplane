@@ -156,9 +156,10 @@ gcplane/
 
 | GCPlane | Tested GoClaw | RPC Protocol | Key Features |
 |---------|---------------|--------------|--------------|
+| v1.3.0+ | 3.x | v3 | v3 promoted fields, facebook/pancake channels |
 | v1.1.0+ | 2.x | v3 | 14 kinds (+ SecureCLI/Grant), full multi-tenant, stable API |
 
-**Tested Image**: `ghcr.io/nextlevelbuilder/goclaw:full` (v2.x)
+**Tested Image**: `ghcr.io/nextlevelbuilder/goclaw:full` (v3.x)
 
 ### Dependency Versions
 | Dependency | Version | Usage |
