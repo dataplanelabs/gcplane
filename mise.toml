@@ -5,7 +5,7 @@ F = "examples/local-dev"
 GOCLAW_DIR = "../../nextlevelbuilder/goclaw"
 
 [tools]
-go = "1.25"
+go = "1.25.9"
 golangci-lint = "2.11"
 
 # ============================================================
