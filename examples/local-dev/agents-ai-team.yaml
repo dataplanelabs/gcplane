@@ -55,8 +55,8 @@ resources:
       role: prompt-engineer
     spec:
       displayName: "Prompt Engineer"
-      provider: gemini
-      model: gemini-2.5-flash
+      provider: dashscope
+      model: qwen-plus-latest
       agentType: predefined
       status: active
       toolsConfig:

@@ -60,7 +60,7 @@ var internalFields = []string{
 	"reasoning_config", "workspace_sharing", "chatgpt_oauth_routing",
 	"shell_deny_groups", "kg_dedup_config",
 	// Accounting & metadata
-	"frontmatter", "budget_monthly_cents",
+	"frontmatter",
 	"agent_count", "has_credentials", "credentials",
 }
 

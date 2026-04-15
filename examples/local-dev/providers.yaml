@@ -46,3 +46,12 @@ resources:
         embedding:
           enabled: true
           model: text-embedding-3-small
+
+  - kind: Provider
+    name: dashscope
+    spec:
+      displayName: "Alibaba DashScope (Qwen)"
+      providerType: openai_compat
+      apiBase: https://dashscope.aliyuncs.com/compatible-mode/v1
+      apiKey: ${GOCLAW_DASHSCOPE_API_KEY}
+      enabled: true

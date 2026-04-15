@@ -9,8 +9,12 @@ resources:
       credentials:
         token: ${GOCLAW_TELEGRAM_TOKEN}
       config:
-        dmPolicy: open
-        groupPolicy: open
+        dmPolicy: pairing
+        groupPolicy: pairing
+        requireMention: true
+        historyLimit: 50
+        dmStream: true
+        reactionLevel: minimal
 
   - kind: Channel
     name: slack-main
@@ -24,5 +28,8 @@ resources:
         appToken: ${GOCLAW_SLACK_APP_TOKEN}
       config:
         dmPolicy: open
-        groupPolicy: open
+        groupPolicy: pairing
+        requireMention: true
         reactionLevel: full
+        dmStream: true
+        groupStream: true
