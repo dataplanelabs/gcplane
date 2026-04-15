@@ -4,14 +4,15 @@
 
 | GCPlane | Requires | RPC |
 |---------|----------|-----|
-| v1.3.0+ | GoClaw 3.x | v3 |
+| v1.3.0+ | GoClaw 3.x (tested v3.7.1) | v3 |
 | v1.0.0–v1.2.x | GoClaw 2.x | v3 |
 
 ### GoClaw v3 Breaking Changes
 
 - **Agent `agentType: open` deprecated** — v3 auto-converts to `predefined`. Use `predefined` in new manifests.
 - **12 agent fields promoted** from `other_config` JSONB to dedicated columns. 7 are now observable (compared during reconcile), 5 remain write-only (complex JSONB configs).
-- **New channel types**: `facebook` (Facebook Messenger) and `pancake` (Pancake CRM hub).
+- **Agent `budgetMonthlyCents`** — optional monthly spending limit (cents). Observable.
+- **New channel types**: `whatsapp` (WhatsApp via bridge), `zalo_oa` (Zalo OA), `facebook` (Facebook Messenger), `pancake` (Pancake CRM hub).
 
 ## Format
 
@@ -58,7 +59,35 @@ Resources are applied in dependency order: Tenant → Provider → Agent → Ski
 
 ## Channel Configuration
 
-Channel credentials are stored in a `credentials` object (nested structure, not top-level fields). The structure varies by channel type:
+Channels have three nested sections in `spec`:
+
+| Section | Observable | Purpose |
+|---------|-----------|---------|
+| top-level (`displayName`, `channelType`, `agentKey`, `enabled`) | Yes (except `agentKey`) | Identity + lifecycle |
+| `credentials` | **No** (write-only) | Platform secrets — varies by channel type |
+| `config` | **No** (write-only JSONB) | Runtime policy / streaming / behavior tuning |
+
+Both `credentials` and `config` are passed through to GoClaw untouched (nested blobs, excluded from comparison to prevent phantom diffs from secrets/JSONB reordering). This means gcplane transparently supports **any** config field GoClaw adds without requiring a gcplane release.
+
+### Common `config` Fields
+
+These are the standard fields the GoClaw gateway supports on most channels. Include only what you need — unset fields use GoClaw's defaults.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `dmPolicy` | string | `pairing` | Who can DM: `pairing` / `open` / `allowlist` / `disabled` |
+| `groupPolicy` | string | `pairing` | Who can invite to groups: `pairing` / `open` / `allowlist` / `disabled` |
+| `allowFrom` | []string | `[]` | Platform user IDs allowed when policy is `allowlist` |
+| `requireMention` | bool | `true` | In groups, only respond when `@`-mentioned |
+| `historyLimit` | int | `50` | Pending group messages kept for context |
+| `blockReply` | bool | inherit | Per-channel `block_reply` override — omit to inherit gateway default |
+| `mediaMaxBytes` | int64 | gateway default | Download cap for inbound media |
+| `dmStream` | bool | `false` | Progressive streaming in DMs (edit-in-place) |
+| `groupStream` | bool | `false` | Progressive streaming in groups |
+| `reasoningStream` | bool | `true` | Stream reasoning trace separately |
+| `reactionLevel` | string | `off` | Emoji status reactions: `off` / `minimal` / `full` |
+
+> Legacy note: earlier gcplane docs used `open` / `closed` for `dmPolicy` / `groupPolicy`. GoClaw 3.x uses the richer `pairing` / `open` / `allowlist` / `disabled` enum — prefer the new values. Older `open` / `closed` strings still work during migration.
 
 ### Telegram Channel
 ```yaml
@@ -72,8 +101,12 @@ Channel credentials are stored in a `credentials` object (nested structure, not 
     credentials:
       token: ${TELEGRAM_BOT_TOKEN}
     config:
-      dmPolicy: open       # or "closed"
-      groupPolicy: open    # or "closed"
+      dmPolicy: pairing
+      groupPolicy: pairing
+      requireMention: true
+      historyLimit: 50
+      dmStream: true
+      reactionLevel: minimal
 ```
 
 ### Slack Channel
@@ -90,6 +123,49 @@ Channel credentials are stored in a `credentials` object (nested structure, not 
       appToken: ${SLACK_APP_TOKEN}
     config:
       dmPolicy: open
+      groupPolicy: pairing
+      requireMention: true
+      reactionLevel: full
+      dmStream: true
+      groupStream: true
+```
+
+### Discord Channel
+```yaml
+- kind: Channel
+  name: discord-main
+  spec:
+    displayName: "Discord Bot"
+    channelType: discord
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      token: ${DISCORD_BOT_TOKEN}
+    config:
+      dmPolicy: allowlist
+      allowFrom:
+        - "123456789012345678"   # Discord user IDs
+      groupPolicy: pairing
+      requireMention: true
+```
+
+### Feishu (Lark) Channel
+```yaml
+- kind: Channel
+  name: feishu-main
+  spec:
+    displayName: "Feishu Bot"
+    channelType: feishu
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      appId: ${FEISHU_APP_ID}
+      appSecret: ${FEISHU_APP_SECRET}
+      verificationToken: ${FEISHU_VERIFICATION_TOKEN}
+    config:
+      dmPolicy: pairing
+      groupPolicy: pairing
+      requireMention: true
 ```
 
 ### Facebook Messenger Channel (v3)
@@ -105,6 +181,43 @@ Channel credentials are stored in a `credentials` object (nested structure, not 
       pageAccessToken: ${FB_PAGE_ACCESS_TOKEN}
       appSecret: ${FB_APP_SECRET}
       verifyToken: ${FB_VERIFY_TOKEN}
+    config:
+      dmPolicy: open
+      dmStream: false
+```
+
+### WhatsApp Channel (v3.7+)
+```yaml
+- kind: Channel
+  name: whatsapp-main
+  spec:
+    displayName: "WhatsApp Bot"
+    channelType: whatsapp
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      bridgeUrl: ${WHATSAPP_BRIDGE_URL}
+    config:
+      dmPolicy: pairing
+      groupPolicy: pairing
+```
+
+### Zalo OA Channel (v3.7+)
+```yaml
+- kind: Channel
+  name: zalo-oa-main
+  spec:
+    displayName: "Zalo OA Bot"
+    channelType: zalo_oa
+    agentKey: bot-agent
+    enabled: true
+    credentials:
+      token: ${ZALO_OA_TOKEN}
+      webhookSecret: ${ZALO_WEBHOOK_SECRET}
+    config:
+      dmPolicy: pairing
+      webhookUrl: https://example.com/webhook/zalo
+      mediaMaxMb: 25
 ```
 
 ### Pancake Channel (v3)
@@ -118,9 +231,11 @@ Channel credentials are stored in a `credentials` object (nested structure, not 
     enabled: true
     credentials:
       apiKey: ${PANCAKE_API_KEY}
+    config:
+      dmPolicy: open
 ```
 
-**Note:** The `credentials` field is write-only (excluded from comparison). Tokens are not returned by GoClaw during observe, preventing phantom diffs.
+**Write-only behavior:** Because `credentials` and `config` are nested write-only blobs, drift inside them is **not** detected during reconcile. To force a re-sync after editing `config`, bump any observable field (e.g. toggle `enabled`) or re-apply with `--force`. Secrets are never returned by GoClaw, so they're always re-sent verbatim from the manifest.
 
 ## CronJob Configuration
 
@@ -205,6 +320,7 @@ GoClaw v3 promoted 12 fields from the `other_config` JSONB bag to dedicated colu
 | `selfEvolve` | bool | `false` | Enable agent self-evolution |
 | `skillEvolve` | bool | `false` | Enable skill evolution |
 | `skillNudgeInterval` | int | `0` | Skill nudge interval in messages |
+| `budgetMonthlyCents` | int | `nil` | Monthly spending limit in cents (nil = unlimited) |
 
 These fields are optional. Omitting them from the manifest causes no drift — only fields present in the manifest spec are compared.
 

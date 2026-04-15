@@ -40,6 +40,7 @@ internal/
 - Composites: `CompositeDefinition` expanded during load via Go `text/template`
 - Agent `contextWindow` and `maxToolIterations` are observable (manageable from manifests)
 - Agent v3 promoted scalars (`emoji`, `agentDescription`, `thinkingLevel`, `maxTokens`, `selfEvolve`, `skillEvolve`, `skillNudgeInterval`) are observable
+- Agent `budgetMonthlyCents` is observable (optional monthly spending limit in cents, nil = unlimited)
 - Agent v3 promoted JSONB configs (`reasoningConfig`, `workspaceSharing`, `chatgptOauthRouting`, `shellDenyGroups`, `kgDedupConfig`) are write-only
 - Provider `apiKey` is write-only (masked as "***" in API responses)
 - SecureCLI `env` is write-only (encrypted env vars for CLI credential injection)
@@ -77,7 +78,9 @@ mise run setup         # start GoClaw docker + apply config
 ```
 
 ## GoClaw Compatibility
-Tested against `ghcr.io/nextlevelbuilder/goclaw:full` (v3.x — v3.1.1+)
+Tested against `ghcr.io/nextlevelbuilder/goclaw:full` (v3.x — v3.7.1)
 - v3 promoted 12 agent fields from `other_config` JSONB to top-level columns
 - v3 deprecated `agentType: open` (defaults to `predefined`)
-- v3 added Facebook Messenger and Pancake channel types
+- v3 added WhatsApp (`whatsapp`) and Zalo OA (`zalo_oa`) channel types
+- v3 added Facebook Messenger and Pancake channel types (feature branch, not yet in main)
+- v3 added agent `budgetMonthlyCents` top-level column (observable)
