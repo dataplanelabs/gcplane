@@ -1,6 +1,20 @@
 package manifest
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
+
+// splitAgentLinkName mirrors the provider-side parser for composite AgentLink
+// names. Kept here so the manifest validator can reject malformed names without
+// importing the provider package.
+func splitAgentLinkName(name string) (string, string, error) {
+	parts := strings.Split(name, "--")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid AgentLink name %q: expected format sourceAgent--targetAgent", name)
+	}
+	return parts[0], parts[1], nil
+}
 
 // validateReferences checks cross-resource references in the manifest.
 // Returns all broken references as errors (not fail-on-first).
@@ -73,6 +87,31 @@ func validateReferences(m *Manifest) []error {
 				if !index[KindAgent][member] {
 					errs = append(errs, fmt.Errorf("%s: member references Agent %q which is not declared", prefix, member))
 				}
+			}
+		case KindAgentLink:
+			// Composite name "sourceAgent--targetAgent" is the canonical identity.
+			// spec.sourceAgent / spec.targetAgent must agree with the name halves
+			// (when provided) to prevent silent divergence between manifest intent
+			// and the resolved API call.
+			nameSrc, nameTgt, parseErr := splitAgentLinkName(r.Name)
+			if parseErr != nil {
+				errs = append(errs, fmt.Errorf("%s: %v", prefix, parseErr))
+				continue
+			}
+			specSrc := specStr(r.Spec, "sourceAgent")
+			specTgt := specStr(r.Spec, "targetAgent")
+			if specSrc != "" && specSrc != nameSrc {
+				errs = append(errs, fmt.Errorf("%s: spec.sourceAgent %q must match name prefix %q", prefix, specSrc, nameSrc))
+			}
+			if specTgt != "" && specTgt != nameTgt {
+				errs = append(errs, fmt.Errorf("%s: spec.targetAgent %q must match name suffix %q", prefix, specTgt, nameTgt))
+			}
+			// Both halves must reference declared Agents.
+			if !index[KindAgent][nameSrc] {
+				errs = append(errs, fmt.Errorf("%s: sourceAgent references Agent %q which is not declared", prefix, nameSrc))
+			}
+			if !index[KindAgent][nameTgt] {
+				errs = append(errs, fmt.Errorf("%s: targetAgent references Agent %q which is not declared", prefix, nameTgt))
 			}
 		}
 	}

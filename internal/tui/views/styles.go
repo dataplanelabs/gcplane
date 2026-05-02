@@ -97,6 +97,7 @@ var KindColor = map[manifest.ResourceKind]tcell.Color{
 	manifest.KindSystemConfig:      ColorRosewater,
 	manifest.KindSecureCLI:         ColorPink,
 	manifest.KindSecureCLIGrant:    ColorFlamingo,
+	manifest.KindAgentLink:         ColorSky,
 }
 
 // StatusCell returns a formatted status string with Unicode indicator and its color.
