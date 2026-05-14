@@ -14,6 +14,8 @@ func toolName(key string) string {
 
 // observeBuiltinToolConfig checks if a builtin tool has a tenant-level config override.
 // Key is kebab-case manifest name (e.g., "exec", "web-fetch") — converted to snake_case for API.
+// When a tenant override exists, the list API returns "tenant_enabled" and optionally
+// "tenant_settings" — both are surfaced in the observed state so drift detection works.
 func (p *Provider) observeBuiltinToolConfig(ctx context.Context, key string) (map[string]any, error) {
 	data, err := p.http.Get(ctx, "/v1/tools/builtin")
 	if err != nil {
@@ -29,40 +31,40 @@ func (p *Provider) observeBuiltinToolConfig(ctx context.Context, key string) (ma
 
 	apiName := toolName(key)
 	for _, t := range resp.Tools {
-		if strVal(t, "name") == apiName {
-			// GoClaw list response includes "tenant_enabled" only when a per-tenant
-			// config override exists. If absent, the tool uses the global "enabled"
-			// and we return nil so the reconciler creates the tenant config.
-			if te, ok := t["tenant_enabled"]; ok {
-				return map[string]any{"enabled": te}, nil
-			}
+		if strVal(t, "name") != apiName {
+			continue
+		}
+		// GoClaw list response includes "tenant_enabled" only when a per-tenant
+		// config override exists. If absent, the tool uses the global defaults
+		// and we return nil so the reconciler creates the tenant config.
+		te, hasTenantEnabled := t["tenant_enabled"]
+		if !hasTenantEnabled {
 			return nil, nil
 		}
+		observed := map[string]any{"enabled": te}
+		// "tenant_settings" is present when the tenant has a settings override.
+		// Include it so drift detection can compare against the desired spec.
+		if ts, ok := t["tenant_settings"]; ok && ts != nil {
+			// tenant_settings arrives as map[string]any from JSON decode.
+			observed["settings"] = ts
+		}
+		return observed, nil
 	}
 	return nil, nil
 }
 
 // createBuiltinToolConfig sets a per-tenant config for a builtin tool.
-// When settings are provided (e.g., provider chain), also updates the global
-// tool definition since the tenant-config endpoint only persists enabled state.
+// Both enabled and settings are written to the tenant-config endpoint, which
+// persists each field independently so either can be omitted without clearing
+// the other. The previous approach of writing settings to the global PUT
+// endpoint required master-scope access and applied changes to all tenants.
 func (p *Provider) createBuiltinToolConfig(ctx context.Context, key string, spec map[string]any) error {
 	body := translateSpec(spec)
 
-	// Update tenant-level enabled state
 	path := fmt.Sprintf("/v1/tools/builtin/%s/tenant-config", toolName(key))
 	_, err := p.http.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("set builtin tool config %s: %w", key, err)
-	}
-
-	// If settings are provided, also update the global tool definition
-	// because the tenant-config endpoint only persists the enabled flag.
-	if _, hasSettings := body["settings"]; hasSettings {
-		globalPath := fmt.Sprintf("/v1/tools/builtin/%s", toolName(key))
-		settingsOnly := map[string]any{"settings": body["settings"]}
-		if _, err := p.http.Put(ctx, globalPath, settingsOnly); err != nil {
-			return fmt.Errorf("update global tool settings %s: %w", key, err)
-		}
 	}
 
 	return nil

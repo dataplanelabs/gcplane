@@ -461,10 +461,10 @@ func newTestLogger(buf *bytes.Buffer) *slog.Logger {
 }
 
 func TestWarnBlindNoop_EmitsWarnWhenBlindFieldPresent(t *testing.T) {
-	// BuiltinToolConfig with settings (a blind field) — noop should emit WARN
+	// MCPCredentials.credentials is write-only (encrypted, not returned by list API).
+	// Noop with credentials present in spec → emit WARN.
 	provider := newMockProvider()
-	// Observed state has only "enabled" (what the list API returns)
-	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{"enabled": true}
+	provider.observed["MCPCredentials/misa"] = map[string]any{"name": "misa"}
 
 	var buf bytes.Buffer
 	engine := NewEngine(provider, newTestLogger(&buf))
@@ -472,13 +472,11 @@ func TestWarnBlindNoop_EmitsWarnWhenBlindFieldPresent(t *testing.T) {
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{
-				Kind: manifest.KindBuiltinToolConfig,
-				Name: "create-image",
+				Kind: manifest.KindMCPCredentials,
+				Name: "misa",
 				Spec: map[string]any{
-					"enabled": true,
-					"settings": map[string]any{
-						"providers": []any{"dashscope", "openai"},
-					},
+					"name":        "misa",
+					"credentials": map[string]any{"token": "secret-xyz"},
 				},
 			},
 		},
@@ -493,15 +491,15 @@ func TestWarnBlindNoop_EmitsWarnWhenBlindFieldPresent(t *testing.T) {
 	if !strings.Contains(out, "no-op may hide drift") {
 		t.Errorf("expected blind-noop warning in log output, got:\n%s", out)
 	}
-	if !strings.Contains(out, "settings") {
-		t.Errorf("expected 'settings' in warning log, got:\n%s", out)
+	if !strings.Contains(out, "credentials") {
+		t.Errorf("expected 'credentials' in warning log, got:\n%s", out)
 	}
 }
 
 func TestWarnBlindNoop_NoWarnWhenBlindFieldAbsent(t *testing.T) {
-	// BuiltinToolConfig without settings — noop should NOT warn
+	// MCPCredentials without credentials in spec — noop should NOT warn.
 	provider := newMockProvider()
-	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{"enabled": true}
+	provider.observed["MCPCredentials/misa"] = map[string]any{"name": "misa"}
 
 	var buf bytes.Buffer
 	engine := NewEngine(provider, newTestLogger(&buf))
@@ -509,9 +507,9 @@ func TestWarnBlindNoop_NoWarnWhenBlindFieldAbsent(t *testing.T) {
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{
-				Kind: manifest.KindBuiltinToolConfig,
-				Name: "create-image",
-				Spec: map[string]any{"enabled": true},
+				Kind: manifest.KindMCPCredentials,
+				Name: "misa",
+				Spec: map[string]any{"name": "misa"},
 			},
 		},
 	}
@@ -528,9 +526,9 @@ func TestWarnBlindNoop_NoWarnWhenBlindFieldAbsent(t *testing.T) {
 }
 
 func TestWarnBlindNoop_NoWarnWhenBlindFieldEmptyMap(t *testing.T) {
-	// settings present but empty — should NOT warn (trivial value)
+	// MCPCredentials.credentials present but empty — should NOT warn (trivial value).
 	provider := newMockProvider()
-	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{"enabled": true}
+	provider.observed["MCPCredentials/misa"] = map[string]any{"name": "misa"}
 
 	var buf bytes.Buffer
 	engine := NewEngine(provider, newTestLogger(&buf))
@@ -538,11 +536,11 @@ func TestWarnBlindNoop_NoWarnWhenBlindFieldEmptyMap(t *testing.T) {
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{
-				Kind: manifest.KindBuiltinToolConfig,
-				Name: "create-image",
+				Kind: manifest.KindMCPCredentials,
+				Name: "misa",
 				Spec: map[string]any{
-					"enabled":  true,
-					"settings": map[string]any{},
+					"name":        "misa",
+					"credentials": map[string]any{},
 				},
 			},
 		},
@@ -723,5 +721,94 @@ func TestWarnBlindNoop_NoWarnOnForce(t *testing.T) {
 	out := buf.String()
 	if strings.Contains(out, "no-op may hide drift") {
 		t.Errorf("unexpected blind-noop warning on forced update:\n%s", out)
+	}
+}
+func TestReconcile_BuiltinToolConfig_SettingsDriftDetected(t *testing.T) {
+	provider := newMockProvider()
+	// Observed state: dashscope is first in the chain (what's on the cluster)
+	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{
+		"enabled": true,
+		"settings": map[string]any{
+			"providers": []any{"dashscope", "openai"},
+		},
+	}
+
+	engine := NewEngine(provider, nil)
+	// Desired state: codex-cnb is now first (what the user wants)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "create-image",
+				Spec: map[string]any{
+					"enabled": true,
+					"settings": map[string]any{
+						"providers": []any{"codex-cnb", "dashscope"},
+					},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Updates != 1 {
+		t.Errorf("expected 1 update when provider chain changes, got updates=%d noops=%d", plan.Updates, plan.Noops)
+	}
+	if plan.Noops != 0 {
+		t.Errorf("expected 0 noops, got %d (settings drift silently ignored)", plan.Noops)
+	}
+}
+
+func TestReconcile_BuiltinToolConfig_SettingsNoSpuriousDrift(t *testing.T) {
+	// No spurious drift when observed and desired settings are identical.
+	provider := newMockProvider()
+	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{
+		"enabled": true,
+		"settings": map[string]any{
+			"providers": []any{"dashscope", "openai"},
+		},
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "create-image",
+				Spec: map[string]any{
+					"enabled": true,
+					"settings": map[string]any{
+						"providers": []any{"dashscope", "openai"},
+					},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected 1 noop for identical settings, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}
+
+func TestReconcile_BuiltinToolConfig_BackwardCompat_NoSettings(t *testing.T) {
+	// Backward compat: existing tenants with only enabled (no settings) still reconcile correctly.
+	provider := newMockProvider()
+	provider.observed["BuiltinToolConfig/exec"] = map[string]any{"enabled": true}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "exec",
+				Spec: map[string]any{"enabled": true},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected noop for enabled-only BuiltinToolConfig, got noops=%d updates=%d", plan.Noops, plan.Updates)
 	}
 }
