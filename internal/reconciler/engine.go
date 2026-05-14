@@ -344,6 +344,7 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 			rc.change.Forced = true
 		} else {
 			rc.change.Action = ActionNoop
+			e.warnBlindNoop(rc)
 		}
 		return nil
 	}
@@ -351,6 +352,41 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 	rc.change.Action = ActionUpdate
 	rc.change.Diff = diffs
 	return nil
+}
+
+// warnBlindNoop emits a WARN when a noop hides potential drift in write-only fields.
+// It fires when the desired spec contains at least one write-only field with a
+// non-trivial value (non-nil, non-empty map/slice). The reconciler cannot compare
+// those fields because the GoClaw list API does not return them.
+func (e *Engine) warnBlindNoop(rc *reconcileContext) {
+	blindFields := manifest.WriteOnlyFields(rc.resource.Kind)
+	var present []string
+	for _, field := range blindFields {
+		val, ok := rc.spec[field]
+		if !ok || val == nil {
+			continue
+		}
+		switch v := val.(type) {
+		case map[string]any:
+			if len(v) == 0 {
+				continue
+			}
+		case []any:
+			if len(v) == 0 {
+				continue
+			}
+		}
+		present = append(present, field)
+	}
+	if len(present) == 0 {
+		return
+	}
+	e.logger.Warn("resource no-op may hide drift in unobservable fields",
+		slog.String("kind", string(rc.resource.Kind)),
+		slog.String("name", rc.resource.Name),
+		slog.Any("unobservable_fields", present),
+		slog.String("hint", "this field is not returned by the GoClaw list API; the reconciler cannot detect drift in it. Force re-apply by toggling another observable field (e.g. enabled) or by deleting and re-creating the resource."),
+	)
 }
 
 func (e *Engine) execute(ctx context.Context, change Change, res manifest.Resource) error {
