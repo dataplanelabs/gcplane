@@ -223,6 +223,89 @@ func (p *Provider) listAllSecureCLIs(ctx context.Context) ([]reconciler.Resource
 	return infos, nil
 }
 
+// listAllAgentLinks returns ResourceInfo for every agent link in GoClaw via WS RPC.
+// agents.links.list requires an agentId — there is no tenant-wide list endpoint.
+// Strategy: enumerate all agents in the tenant, list links from each as source
+// (direction=from), and emit one ResourceInfo per link with composite name
+// "sourceKey--targetKey". Each link has exactly one source so no dedup needed.
+// Skips links with team_id set — those are managed by the AgentTeam subsystem.
+func (p *Provider) listAllAgentLinks(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	if err := p.ensureWS(ctx); err != nil {
+		return nil, fmt.Errorf("ws connect for agent links: %w", err)
+	}
+
+	// Enumerate agents in tenant.
+	agentData, err := p.http.Get(ctx, "/v1/agents")
+	if err != nil {
+		return nil, fmt.Errorf("list agents: %w", err)
+	}
+	var agentResp struct {
+		Agents []map[string]any `json:"agents"`
+	}
+	if err := json.Unmarshal(agentData, &agentResp); err != nil {
+		return nil, fmt.Errorf("parse agents response: %w", err)
+	}
+
+	// Build agentID → agentKey map for translating target IDs back to keys.
+	keyByID := make(map[string]string, len(agentResp.Agents))
+	var sourceAgents []map[string]any
+	for _, a := range agentResp.Agents {
+		if !p.matchesTenant(ctx, a) {
+			continue
+		}
+		id := strVal(a, "id")
+		key := strVal(a, "agent_key")
+		if id == "" || key == "" {
+			continue
+		}
+		keyByID[id] = key
+		sourceAgents = append(sourceAgents, a)
+	}
+
+	infos := make([]reconciler.ResourceInfo, 0)
+	for _, a := range sourceAgents {
+		sourceID := strVal(a, "id")
+		sourceKey := strVal(a, "agent_key")
+
+		payload, err := p.ws.Call(ctx, "agents.links.list", map[string]any{
+			"agentId":   sourceID,
+			"direction": "from",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("agents.links.list for %s: %w", sourceKey, err)
+		}
+		var resp struct {
+			Links []map[string]any `json:"links"`
+		}
+		if err := json.Unmarshal(payload, &resp); err != nil {
+			return nil, fmt.Errorf("parse agents.links.list response: %w", err)
+		}
+
+		for _, link := range resp.Links {
+			camel := translateResult(link)
+			// Skip team-managed links — owned by AgentTeam subsystem.
+			if tid := strVal(camel, "teamId"); tid != "" {
+				continue
+			}
+			targetID := strVal(camel, "targetAgentId")
+			targetKey := keyByID[targetID]
+			if targetKey == "" {
+				// Prefer the joined key if denormalized in the response; else skip.
+				targetKey = strVal(camel, "targetAgentKey")
+				if targetKey == "" {
+					continue
+				}
+			}
+			infos = append(infos, reconciler.ResourceInfo{
+				Kind:      manifest.KindAgentLink,
+				Name:      sourceKey + "--" + targetKey,
+				CreatedBy: strVal(camel, "createdBy"),
+			})
+		}
+	}
+	return infos, nil
+}
+
 // listAllTenants returns ResourceInfo for every tenant in GoClaw.
 func (p *Provider) listAllTenants(ctx context.Context) ([]reconciler.ResourceInfo, error) {
 	data, err := p.http.Get(ctx, "/v1/tenants")

@@ -214,6 +214,82 @@ func TestValidateReferences_BrokenTeamLead(t *testing.T) {
 	}
 }
 
+func TestValidateReferences_BrokenAgentLink(t *testing.T) {
+	// Spec values match name halves but agents are not declared.
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindAgentLink, Name: "ghost--also-ghost", Spec: map[string]any{
+				"sourceAgent": "ghost",
+				"targetAgent": "also-ghost",
+			}},
+		},
+	}
+	errs := Validate(m)
+	hasSrc, hasTgt := false, false
+	for _, e := range errs {
+		if strings.Contains(e.Error(), "sourceAgent") && strings.Contains(e.Error(), "ghost") {
+			hasSrc = true
+		}
+		if strings.Contains(e.Error(), "targetAgent") && strings.Contains(e.Error(), "also-ghost") {
+			hasTgt = true
+		}
+	}
+	if !hasSrc || !hasTgt {
+		t.Errorf("expected ref errors for both sourceAgent and targetAgent, got: %v", errs)
+	}
+}
+
+func TestValidateReferences_AgentLinkSpecNameMismatch(t *testing.T) {
+	// Composite name says "planner--coder" but spec.sourceAgent says "ghost".
+	// Without the name-match rule, the create call would silently use the name.
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindProvider, Name: "p", Spec: map[string]any{}},
+			{Kind: KindAgent, Name: "planner", Spec: map[string]any{"provider": "p"}},
+			{Kind: KindAgent, Name: "coder", Spec: map[string]any{"provider": "p"}},
+			{Kind: KindAgentLink, Name: "planner--coder", Spec: map[string]any{
+				"sourceAgent": "ghost", // mismatch
+				"targetAgent": "coder",
+			}},
+		},
+	}
+	errs := Validate(m)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Error(), "must match name prefix") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected name-prefix mismatch error, got: %v", errs)
+	}
+}
+
+func TestValidateReferences_AgentLinkBadName(t *testing.T) {
+	// 3-segment name should be rejected by the validator.
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindAgentLink, Name: "a--b--c", Spec: map[string]any{}},
+		},
+	}
+	errs := Validate(m)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Error(), "invalid AgentLink name") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected invalid-name error for 3-segment composite, got: %v", errs)
+	}
+}
+
 func TestValidateReferences_MultipleErrors(t *testing.T) {
 	m := &Manifest{
 		APIVersion: "gcplane.io/v1",

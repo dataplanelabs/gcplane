@@ -344,6 +344,7 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 			rc.change.Forced = true
 		} else {
 			rc.change.Action = ActionNoop
+			e.warnBlindNoop(rc, desiredHash, observedHash)
 		}
 		return nil
 	}
@@ -351,6 +352,54 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 	rc.change.Action = ActionUpdate
 	rc.change.Diff = diffs
 	return nil
+}
+
+// warnBlindNoop emits a WARN when a noop hides potential drift in write-only fields.
+// It fires when the desired spec contains at least one write-only field with a
+// non-trivial value (non-nil, non-empty map/slice/string). The reconciler cannot
+// compare those fields directly because the GoClaw list API does not return them.
+//
+// Suppressed when the write-only-hash mechanism conclusively proved no drift —
+// i.e., both desiredHash and observedHash are present and matched. In that case
+// the kind echoes a writeOnlyHash and we can trust the hash comparison; warning
+// would be spurious and would desensitize operators before they hit the real
+// silent-noop case the warning is designed to catch.
+func (e *Engine) warnBlindNoop(rc *reconcileContext, desiredHash, observedHash string) {
+	if desiredHash != "" && observedHash != "" {
+		return
+	}
+	blindFields := manifest.WriteOnlyFields(rc.resource.Kind)
+	var present []string
+	for _, field := range blindFields {
+		val, ok := rc.spec[field]
+		if !ok || val == nil {
+			continue
+		}
+		switch v := val.(type) {
+		case map[string]any:
+			if len(v) == 0 {
+				continue
+			}
+		case []any:
+			if len(v) == 0 {
+				continue
+			}
+		case string:
+			if v == "" {
+				continue
+			}
+		}
+		present = append(present, field)
+	}
+	if len(present) == 0 {
+		return
+	}
+	e.logger.Warn("resource no-op may hide drift in unobservable fields",
+		slog.String("kind", string(rc.resource.Kind)),
+		slog.String("name", rc.resource.Name),
+		slog.Any("unobservable_fields", present),
+		slog.String("hint", "this field is not returned by the GoClaw list API; the reconciler cannot detect drift in it. Force re-apply by toggling another observable field (e.g. enabled) or by deleting and re-creating the resource."),
+	)
 }
 
 func (e *Engine) execute(ctx context.Context, change Change, res manifest.Resource) error {

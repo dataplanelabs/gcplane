@@ -27,6 +27,10 @@ var writeOnlyFields = map[ResourceKind][]string{
 	KindMCPCredentials:    {"credentials"},      // credentials are write-only (encrypted)
 	KindSecureCLI:         {"env"},              // encrypted env vars are write-only
 	KindSecureCLIGrant:    {"agentKey", "binaryName"}, // manifest references, not in API response
+	KindAgentLink: {
+		"sourceAgent", "targetAgent", // manifest references resolved to UUIDs at create time
+		"settings", // per-user grants and rate limits — JSONB write-only
+	},
 }
 
 // WriteOnlyFields returns the write-only fields for a resource kind.

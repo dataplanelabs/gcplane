@@ -87,3 +87,66 @@ func newWSTestServer(t *testing.T, responses []wsResponse, httpRoutes http.Handl
 	return p, srv.Close
 }
 
+// newWSTestServerSmart is a variant of newWSTestServer that routes
+// agents.links.list calls based on the agentId parameter. Used to mock
+// realistic per-agent link enumeration. The handler also serves /v1/agents
+// from the provided agents slice.
+func newWSTestServerSmart(t *testing.T, agents []map[string]any, linksByAgentID map[string][]map[string]any) (*Provider, func()) {
+	t.Helper()
+
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/agents", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"agents": agents})
+	})
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		for {
+			var req requestFrame
+			if err := conn.ReadJSON(&req); err != nil {
+				return
+			}
+			if req.Method == "connect" {
+				_ = conn.WriteJSON(responseFrame{Type: "res", ID: req.ID, OK: true})
+				continue
+			}
+			if req.Method != "agents.links.list" {
+				_ = conn.WriteJSON(responseFrame{
+					Type:  "res",
+					ID:    req.ID,
+					OK:    false,
+					Error: &rpcError{Message: "method not found: " + req.Method},
+				})
+				continue
+			}
+			// Parse agentId from params and look up the canned response.
+			paramsBytes, _ := json.Marshal(req.Params)
+			var params struct {
+				AgentID string `json:"agentId"`
+			}
+			_ = json.Unmarshal(paramsBytes, &params)
+			links := linksByAgentID[params.AgentID]
+			if links == nil {
+				links = []map[string]any{}
+			}
+			payload, _ := json.Marshal(map[string]any{"links": links})
+			_ = conn.WriteJSON(responseFrame{
+				Type:    "res",
+				ID:      req.ID,
+				OK:      true,
+				Payload: json.RawMessage(payload),
+			})
+		}
+	})
+
+	srv := httptest.NewServer(mux)
+	p := New(srv.URL, "test-token")
+	return p, srv.Close
+}
+
