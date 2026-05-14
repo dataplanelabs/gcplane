@@ -451,3 +451,96 @@ func TestReconcile_ParallelProducesSameResultAsSequential(t *testing.T) {
 		t.Errorf("changes count mismatch: sequential=%d parallel=%d", len(seqPlan.Changes), len(parPlan.Changes))
 	}
 }
+
+// TestReconcile_BuiltinToolConfig_SettingsDriftDetected verifies that after removing
+// "settings" from the write-only list, the reconciler detects drift when the provider
+// chain changes. Reproduces the incident: create-image noop despite settings change.
+func TestReconcile_BuiltinToolConfig_SettingsDriftDetected(t *testing.T) {
+	provider := newMockProvider()
+	// Observed state: dashscope is first in the chain (what's on the cluster)
+	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{
+		"enabled": true,
+		"settings": map[string]any{
+			"providers": []any{"dashscope", "openai"},
+		},
+	}
+
+	engine := NewEngine(provider, nil)
+	// Desired state: codex-cnb is now first (what the user wants)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "create-image",
+				Spec: map[string]any{
+					"enabled": true,
+					"settings": map[string]any{
+						"providers": []any{"codex-cnb", "dashscope"},
+					},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Updates != 1 {
+		t.Errorf("expected 1 update when provider chain changes, got updates=%d noops=%d", plan.Updates, plan.Noops)
+	}
+	if plan.Noops != 0 {
+		t.Errorf("expected 0 noops, got %d (settings drift silently ignored)", plan.Noops)
+	}
+}
+
+func TestReconcile_BuiltinToolConfig_SettingsNoSpuriousDrift(t *testing.T) {
+	// No spurious drift when observed and desired settings are identical.
+	provider := newMockProvider()
+	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{
+		"enabled": true,
+		"settings": map[string]any{
+			"providers": []any{"dashscope", "openai"},
+		},
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "create-image",
+				Spec: map[string]any{
+					"enabled": true,
+					"settings": map[string]any{
+						"providers": []any{"dashscope", "openai"},
+					},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected 1 noop for identical settings, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}
+
+func TestReconcile_BuiltinToolConfig_BackwardCompat_NoSettings(t *testing.T) {
+	// Backward compat: existing tenants with only enabled (no settings) still reconcile correctly.
+	provider := newMockProvider()
+	provider.observed["BuiltinToolConfig/exec"] = map[string]any{"enabled": true}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "exec",
+				Spec: map[string]any{"enabled": true},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Errorf("expected noop for enabled-only BuiltinToolConfig, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}

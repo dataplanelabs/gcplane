@@ -21,7 +21,7 @@ var writeOnlyFields = map[ResourceKind][]string{
 	KindCronJob:           {"agentKey", "message"},
 	KindAgentTeam:         {"lead", "members", "displayName"},
 	KindSkill:             {},
-	KindBuiltinToolConfig: {"settings"}, // provider chain settings not returned by list API
+	KindBuiltinToolConfig: {}, // settings are observable via tenant_settings in list response
 	KindSkillConfig:       {},
 	KindSystemConfig:      {},
 	KindMCPCredentials:    {"credentials"},      // credentials are write-only (encrypted)
