@@ -624,3 +624,104 @@ func TestWarnBlindNoop_GenericAcrossKinds(t *testing.T) {
 		t.Errorf("expected 'apiKey' in warning log, got:\n%s", out)
 	}
 }
+
+func TestWarnBlindNoop_NoWarnOnHashConfirmedNoop(t *testing.T) {
+	// Agent with contextFiles (a blind field) AND writeOnlyHash echoed by server
+	// → hash mechanism conclusively proved no drift → must NOT warn.
+	// Regression guard: without this suppression, every Agent reconcile would spam
+	// the warning every loop, defeating the PR's purpose.
+	spec := map[string]any{
+		"model":        "gpt-4",
+		"contextFiles": []any{map[string]any{"IDENTITY.md": "I am a bot"}},
+	}
+	woFields := manifest.WriteOnlyFields(manifest.KindAgent)
+	expectedHash := HashWriteOnlyFields(spec, woFields, nil)
+
+	provider := newMockProvider()
+	provider.observed["Agent/bot"] = map[string]any{
+		"model":         "gpt-4",
+		"writeOnlyHash": expectedHash,
+	}
+
+	var buf bytes.Buffer
+	engine := NewEngine(provider, newTestLogger(&buf))
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindAgent, Name: "bot", Spec: spec},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Fatalf("expected 1 noop (hash matches), got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+
+	out := buf.String()
+	if strings.Contains(out, "no-op may hide drift") {
+		t.Errorf("unexpected blind-noop warning when hash mechanism proved no drift:\n%s", out)
+	}
+}
+
+func TestWarnBlindNoop_NoWarnWhenBlindFieldEmptyString(t *testing.T) {
+	// Provider with apiKey: "" — empty-string blind field → treat as trivial, no warn.
+	provider := newMockProvider()
+	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
+
+	var buf bytes.Buffer
+	engine := NewEngine(provider, newTestLogger(&buf))
+
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindProvider,
+				Name: "anthropic",
+				Spec: map[string]any{
+					"displayName": "Anthropic",
+					"apiKey":      "",
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Fatalf("expected 1 noop, got noops=%d", plan.Noops)
+	}
+
+	out := buf.String()
+	if strings.Contains(out, "no-op may hide drift") {
+		t.Errorf("unexpected blind-noop warning for empty-string apiKey:\n%s", out)
+	}
+}
+
+func TestWarnBlindNoop_NoWarnOnForce(t *testing.T) {
+	// Force flag turns a would-be-noop into an update — warn must not fire.
+	provider := newMockProvider()
+	provider.observed["BuiltinToolConfig/create-image"] = map[string]any{"enabled": true}
+
+	var buf bytes.Buffer
+	engine := NewEngine(provider, newTestLogger(&buf))
+
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindBuiltinToolConfig,
+				Name: "create-image",
+				Spec: map[string]any{
+					"enabled":  true,
+					"settings": map[string]any{"providers": []any{"dashscope"}},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true, Force: true})
+	if plan.Updates != 1 {
+		t.Fatalf("expected 1 forced update, got updates=%d noops=%d", plan.Updates, plan.Noops)
+	}
+
+	out := buf.String()
+	if strings.Contains(out, "no-op may hide drift") {
+		t.Errorf("unexpected blind-noop warning on forced update:\n%s", out)
+	}
+}

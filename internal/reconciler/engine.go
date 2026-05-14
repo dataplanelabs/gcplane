@@ -344,7 +344,7 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 			rc.change.Forced = true
 		} else {
 			rc.change.Action = ActionNoop
-			e.warnBlindNoop(rc)
+			e.warnBlindNoop(rc, desiredHash, observedHash)
 		}
 		return nil
 	}
@@ -356,9 +356,18 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 
 // warnBlindNoop emits a WARN when a noop hides potential drift in write-only fields.
 // It fires when the desired spec contains at least one write-only field with a
-// non-trivial value (non-nil, non-empty map/slice). The reconciler cannot compare
-// those fields because the GoClaw list API does not return them.
-func (e *Engine) warnBlindNoop(rc *reconcileContext) {
+// non-trivial value (non-nil, non-empty map/slice/string). The reconciler cannot
+// compare those fields directly because the GoClaw list API does not return them.
+//
+// Suppressed when the write-only-hash mechanism conclusively proved no drift —
+// i.e., both desiredHash and observedHash are present and matched. In that case
+// the kind echoes a writeOnlyHash and we can trust the hash comparison; warning
+// would be spurious and would desensitize operators before they hit the real
+// silent-noop case the warning is designed to catch.
+func (e *Engine) warnBlindNoop(rc *reconcileContext, desiredHash, observedHash string) {
+	if desiredHash != "" && observedHash != "" {
+		return
+	}
 	blindFields := manifest.WriteOnlyFields(rc.resource.Kind)
 	var present []string
 	for _, field := range blindFields {
@@ -373,6 +382,10 @@ func (e *Engine) warnBlindNoop(rc *reconcileContext) {
 			}
 		case []any:
 			if len(v) == 0 {
+				continue
+			}
+		case string:
+			if v == "" {
 				continue
 			}
 		}
