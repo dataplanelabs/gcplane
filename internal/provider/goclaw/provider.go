@@ -224,6 +224,8 @@ func (p *Provider) Create(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.createChannelInstance(ctx, key, spec)
 	case manifest.KindMCPServer:
 		return p.createMCPServer(ctx, key, spec)
+	case manifest.KindSkill:
+		return p.createSkill(ctx, key, spec)
 	case manifest.KindCronJob:
 		return p.createCronJob(ctx, key, spec)
 	case manifest.KindAgentTeam:
@@ -317,7 +319,7 @@ func (p *Provider) Delete(ctx context.Context, kind manifest.ResourceKind, key s
 	case manifest.KindAgentLink:
 		return p.deleteAgentLink(ctx, key)
 	case manifest.KindSkill:
-		return nil // not deletable
+		return p.deleteSkill(ctx, key)
 	default:
 		return fmt.Errorf("delete not implemented for kind %s", kind)
 	}

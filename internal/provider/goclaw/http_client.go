@@ -80,6 +80,59 @@ func (c *HTTPClient) Delete(ctx context.Context, path string) error {
 	return err
 }
 
+// PostMultipart performs an authenticated POST with a multipart body.
+// Used for skill ZIP uploads. The default Content-Type set by do() (application/json)
+// is overridden via the contentType argument.
+func (c *HTTPClient) PostMultipart(ctx context.Context, path string, body io.Reader, contentType string) ([]byte, error) {
+	return c.doRaw(ctx, http.MethodPost, path, body, contentType)
+}
+
+func (c *HTTPClient) doRaw(ctx context.Context, method, path string, body io.Reader, contentType string) ([]byte, error) {
+	start := time.Now()
+	url := c.baseURL + path
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.Header.Set("Accept", "application/json")
+	for k, v := range c.headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		c.logger.Warn("api.error",
+			slog.String("method", method),
+			slog.String("path", path),
+			slog.Any("error", err),
+			slog.Duration("duration", duration))
+		return nil, fmt.Errorf("http %s %s: %w", method, path, err)
+	}
+	defer resp.Body.Close()
+
+	const maxResponseSize = 10 << 20
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	c.logger.Debug("api.response",
+		slog.String("method", method),
+		slog.String("path", path),
+		slog.Int("status", resp.StatusCode),
+		slog.Duration("duration", duration))
+
+	if err := classifyStatus(resp.StatusCode, respBody); err != nil {
+		return nil, err
+	}
+	return respBody, nil
+}
+
 func (c *HTTPClient) doJSON(ctx context.Context, method, path string, body any) ([]byte, error) {
 	data, err := json.Marshal(body)
 	if err != nil {

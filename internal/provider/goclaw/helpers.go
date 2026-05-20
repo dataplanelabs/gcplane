@@ -62,6 +62,11 @@ var internalFields = []string{
 	// Accounting & metadata
 	"frontmatter",
 	"agent_count", "has_credentials", "credentials",
+	// Skill-specific server-managed fields (not authored in manifests)
+	"file_path", "file_size", "file_hash", "path", "baseDir", "source",
+	"missing_deps", "deps", "is_system", "author",
+	// Skill tenant-config field — surfaced separately via KindSkillConfig
+	"tenant_enabled",
 }
 
 // stripInternal removes API-internal fields from an observed resource.
