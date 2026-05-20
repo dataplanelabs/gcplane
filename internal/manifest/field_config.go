@@ -20,7 +20,14 @@ var writeOnlyFields = map[ResourceKind][]string{
 	KindMCPServer:         {"grants"},
 	KindCronJob:           {"agentKey", "message"},
 	KindAgentTeam:         {"lead", "members", "displayName"},
-	KindSkill:             {},
+	KindSkill: {
+		// sourceDir is the local filesystem path used by gcplane to build the
+		// upload ZIP; goclaw never returns it.
+		"sourceDir",
+		// version is goclaw-assigned (auto-bumped on upload); excluded from diff
+		// so re-applying without code changes doesn't surface drift.
+		"version",
+	},
 	KindBuiltinToolConfig: {}, // settings are observable via tenant_settings in list response
 	KindSkillConfig:       {},
 	KindSystemConfig:      {},

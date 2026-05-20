@@ -8,6 +8,11 @@ import (
 
 // observeSkillConfig checks if a skill has a tenant-level config override.
 // Key is the skill slug.
+//
+// goclaw's GET /v1/skills returns a flat `tenant_enabled` field per skill when
+// the caller is tenant-scoped. The field is a JSON-null when no override exists,
+// and a bool (true/false) when an override is present. We exploit the nil-ness
+// of the unmarshalled pointer to distinguish "no override" from "explicit value".
 func (p *Provider) observeSkillConfig(ctx context.Context, key string) (map[string]any, error) {
 	data, err := p.http.Get(ctx, "/v1/skills")
 	if err != nil {
@@ -22,13 +27,19 @@ func (p *Provider) observeSkillConfig(ctx context.Context, key string) (map[stri
 	}
 
 	for _, s := range resp.Skills {
-		if strVal(s, "slug") == key {
-			if tc, ok := s["tenant_config"].(map[string]any); ok {
-				return translateResult(tc), nil
-			}
-			// Skill exists but no tenant config — return nil so reconciler creates it
+		if strVal(s, "slug") != key {
+			continue
+		}
+		raw, present := s["tenant_enabled"]
+		if !present || raw == nil {
+			// Field absent or JSON null → no tenant override
 			return nil, nil
 		}
+		enabled, ok := raw.(bool)
+		if !ok {
+			return nil, fmt.Errorf("skill %q: tenant_enabled has unexpected type %T", key, raw)
+		}
+		return translateResult(map[string]any{"enabled": enabled}), nil
 	}
 	return nil, nil
 }

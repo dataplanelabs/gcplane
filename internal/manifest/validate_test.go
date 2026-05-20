@@ -347,3 +347,45 @@ func TestValidate_NewKinds(t *testing.T) {
 		})
 	}
 }
+
+func TestValidate_SkillSpec(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    map[string]any
+		wantErr string
+	}{
+		{"valid full spec", map[string]any{"visibility": "tenant", "status": "active", "tags": []any{"a", "b"}}, ""},
+		{"empty spec ok", map[string]any{}, ""},
+		{"bad visibility", map[string]any{"visibility": "weird"}, "visibility"},
+		{"bad status", map[string]any{"status": "frozen"}, "status"},
+		{"tags not list", map[string]any{"tags": "single-string"}, "tags must be a list"},
+		{"tags duplicate", map[string]any{"tags": []any{"x", "x"}}, "duplicate"},
+		{"tags non-string", map[string]any{"tags": []any{"ok", 42}}, "must be a string"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Manifest{
+				APIVersion: "gcplane.io/v1",
+				Kind:       "Manifest",
+				Resources: []Resource{
+					{Kind: KindSkill, Name: "my-skill", Spec: tc.spec},
+				},
+			}
+			errs := Validate(m)
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected no errors, got: %v", errs)
+				}
+				return
+			}
+			joined := ""
+			for _, e := range errs {
+				joined += e.Error() + "\n"
+			}
+			if !strings.Contains(joined, tc.wantErr) {
+				t.Errorf("expected error containing %q, got: %s", tc.wantErr, joined)
+			}
+		})
+	}
+}

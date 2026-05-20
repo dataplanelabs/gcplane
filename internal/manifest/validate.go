@@ -68,10 +68,58 @@ func Validate(m *Manifest) []error {
 		if r.Spec == nil {
 			errs = append(errs, fmt.Errorf("%s: spec is required for %s", prefix, uid))
 		}
+
+		if r.Kind == KindSkill {
+			errs = append(errs, validateSkillSpec(prefix, r.Spec)...)
+		}
 	}
 
 	// Cross-resource reference validation
 	errs = append(errs, validateReferences(m)...)
 
+	return errs
+}
+
+// Skill enum values mirror goclaw's DB CHECK constraints (see goclaw
+// internal/store/sqlitestore/schema.sql `skills` table). Keep in sync.
+var (
+	skillVisibilityValues = map[string]bool{"private": true, "internal": true, "public": true, "tenant": true}
+	skillStatusValues     = map[string]bool{"active": true, "archived": true, "deleted": true, "draft": true}
+)
+
+func validateSkillSpec(prefix string, spec map[string]any) []error {
+	if spec == nil {
+		return nil
+	}
+	var errs []error
+	if v, ok := spec["visibility"].(string); ok && v != "" {
+		if !skillVisibilityValues[v] {
+			errs = append(errs, fmt.Errorf("%s: spec.visibility %q must be one of [private internal public tenant]", prefix, v))
+		}
+	}
+	if s, ok := spec["status"].(string); ok && s != "" {
+		if !skillStatusValues[s] {
+			errs = append(errs, fmt.Errorf("%s: spec.status %q must be one of [active archived deleted draft]", prefix, s))
+		}
+	}
+	if tags, ok := spec["tags"]; ok && tags != nil {
+		list, isList := tags.([]any)
+		if !isList {
+			errs = append(errs, fmt.Errorf("%s: spec.tags must be a list of strings", prefix))
+		} else {
+			seen := make(map[string]bool, len(list))
+			for i, t := range list {
+				s, ok := t.(string)
+				if !ok {
+					errs = append(errs, fmt.Errorf("%s: spec.tags[%d] must be a string", prefix, i))
+					continue
+				}
+				if seen[s] {
+					errs = append(errs, fmt.Errorf("%s: spec.tags duplicate %q", prefix, s))
+				}
+				seen[s] = true
+			}
+		}
+	}
 	return errs
 }

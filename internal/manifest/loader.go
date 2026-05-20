@@ -80,6 +80,11 @@ func loadDir(dir string) (*Manifest, error) {
 		if ext != ".yaml" && ext != ".yml" {
 			continue
 		}
+		// skill-overrides.yaml is loaded by the skill walker — skip here so it
+		// doesn't fail the manifest schema check.
+		if e.Name() == skillOverridesFile {
+			continue
+		}
 
 		m, err := loadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
@@ -102,6 +107,21 @@ func loadDir(dir string) (*Manifest, error) {
 			seen[key] = true
 			merged.Resources = append(merged.Resources, r)
 		}
+	}
+
+	// Synthesize KindSkill/KindSkillConfig from the filesystem tree, then
+	// merge — conflict-checked against YAML-declared resources via `seen`.
+	skillRes, err := LoadSkillResources(dir)
+	if err != nil {
+		return nil, fmt.Errorf("load filesystem skills in %s: %w", dir, err)
+	}
+	for _, r := range skillRes {
+		key := string(r.Kind) + "/" + r.Name
+		if seen[key] {
+			return nil, fmt.Errorf("%s declared both in YAML and as filesystem skill — remove one (dir: %s)", key, dir)
+		}
+		seen[key] = true
+		merged.Resources = append(merged.Resources, r)
 	}
 
 	if err := ExpandComposites(merged); err != nil {
