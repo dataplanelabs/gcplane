@@ -327,14 +327,32 @@ func (e *Engine) stepCompare(_ context.Context, rc *reconcileContext) error {
 	// Check write-only hash drift using pre-computed hash.
 	// Hash was computed once above and is carried on Change for the execute phase,
 	// avoiding a second secret resolution that could produce a different value.
+	//
+	// Drift conditions:
+	//   1. Both hashes present and differ          → real rotation/change
+	//   2. Desired present, observed empty, kind   → first reconcile after the
+	//      supports writeOnlyHash on goclaw side     goclaw migration adding
+	//                                                writeOnlyHash echo (existing
+	//                                                rows have empty default).
+	//                                                One-shot update populates
+	//                                                observed; subsequent
+	//                                                reconciles converge.
+	//
+	// For kinds whose goclaw side does NOT echo writeOnlyHash, the empty
+	// observed value cannot mean "drift" — it means "no support." Treating it
+	// as drift would create an infinite update loop. Those kinds keep the
+	// strict both-non-empty check and fall through to warnBlindNoop instead.
 	desiredHash := rc.change.WriteOnlyHash
 	observedHash, _ := rc.current[WriteOnlyHashField].(string)
-	if desiredHash != "" && observedHash != "" && desiredHash != observedHash {
+	hashesDiffer := desiredHash != "" && desiredHash != observedHash
+	canAutoHeal := observedHash == "" && manifest.SupportsWriteOnlyHash(rc.resource.Kind)
+	if hashesDiffer && (observedHash != "" || canAutoHeal) {
 		e.logger.Info("write-only hash mismatch",
 			slog.String("kind", string(rc.resource.Kind)),
 			slog.String("name", rc.resource.Name),
 			slog.String("observed", observedHash),
-			slog.String("desired", desiredHash))
+			slog.String("desired", desiredHash),
+			slog.Bool("observed_empty", observedHash == ""))
 		diffs[WriteOnlyHashField] = FieldDiff{Old: observedHash, New: desiredHash}
 	}
 

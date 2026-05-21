@@ -45,3 +45,26 @@ var writeOnlyFields = map[ResourceKind][]string{
 func WriteOnlyFields(kind ResourceKind) []string {
 	return writeOnlyFields[kind]
 }
+
+// kindsSupportingWriteOnlyHash lists resource kinds whose goclaw side accepts
+// and echoes back a writeOnlyHash field on list/get. Only these kinds get the
+// "empty observedHash treated as drift" safety-net in engine.stepCompare —
+// for kinds NOT in this set, goclaw silently drops the field, so an empty
+// observed value would otherwise create an infinite update loop.
+//
+// Add a kind here only after confirming goclaw migration + handler support.
+// Current support:
+//   - KindCronJob:  migration 000059 (goclaw)
+//   - KindProvider: migration 000060 (goclaw)
+var kindsSupportingWriteOnlyHash = map[ResourceKind]bool{
+	KindCronJob:  true,
+	KindProvider: true,
+}
+
+// SupportsWriteOnlyHash returns true if goclaw is known to persist + echo
+// the writeOnlyHash field for this kind. The reconciler uses this to decide
+// whether an empty observed hash should be treated as drift (auto-heal) or
+// as the legacy blind-noop case (kind whose goclaw side never echoes hash).
+func SupportsWriteOnlyHash(kind ResourceKind) bool {
+	return kindsSupportingWriteOnlyHash[kind]
+}
