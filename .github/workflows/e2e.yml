@@ -6,7 +6,10 @@ on:
     branches: [main]
 
 env:
-  GOCLAW_VERSION: "full"  # floating tag → v3.x (currently v3.1.1)
+  # latest-full tracks the dataplanelabs/goclaw fork's main branch (includes
+  # our migrations like 000060 write_only_hash that aren't yet upstream).
+  # Pin to a specific tag (e.g. v3.11.7-full) before each gcplane release.
+  GOCLAW_VERSION: "latest-full"
 
 jobs:
   e2e:
@@ -44,7 +47,7 @@ jobs:
             -e GOCLAW_GATEWAY_TOKEN=test-token-ci \
             -e GOCLAW_ENCRYPTION_KEY=$(openssl rand -hex 32) \
             -e GOCLAW_POSTGRES_DSN=postgres://goclaw:goclaw@localhost:5432/goclaw?sslmode=disable \
-            ghcr.io/nextlevelbuilder/goclaw:${{ env.GOCLAW_VERSION }}
+            ghcr.io/dataplanelabs/goclaw:${{ env.GOCLAW_VERSION }}
 
           for i in $(seq 1 30); do
             if curl -sf http://localhost:18790/health > /dev/null 2>&1; then
