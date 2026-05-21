@@ -33,10 +33,17 @@ type skillFrontmatter struct {
 
 // skillOverlay is loaded from an optional frontmatter.yaml co-located with
 // SKILL.md. It carries fields gcplane needs at apply time but that don't fit
-// inside SKILL.md's frontmatter (e.g. tags, status).
+// inside SKILL.md's frontmatter (e.g. tags, status, per-agent grants).
 type skillOverlay struct {
-	Tags   []string `yaml:"tags,omitempty"`
-	Status string   `yaml:"status,omitempty"`
+	Tags   []string             `yaml:"tags,omitempty"`
+	Status string               `yaml:"status,omitempty"`
+	Grants *skillGrantsOverlay  `yaml:"grants,omitempty"`
+}
+
+// skillGrantsOverlay mirrors the MCPServer `grants.agents` shape so per-agent
+// skill enablement is authored the same way across the manifest.
+type skillGrantsOverlay struct {
+	Agents []string `yaml:"agents,omitempty"`
 }
 
 // skillOverridesDoc is the schema of <tenant>/skill-overrides.yaml.
@@ -155,6 +162,13 @@ func loadSkillDir(skillDir, slug, scope string) (Resource, error) {
 				tags[i] = t
 			}
 			spec["tags"] = tags
+		}
+		if overlay.Grants != nil && len(overlay.Grants.Agents) > 0 {
+			agents := make([]any, len(overlay.Grants.Agents))
+			for i, a := range overlay.Grants.Agents {
+				agents[i] = a
+			}
+			spec["grants"] = map[string]any{"agents": agents}
 		}
 	} else if !os.IsNotExist(err) {
 		return Resource{}, fmt.Errorf("read %s: %w", overlayPath, err)
