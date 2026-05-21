@@ -68,6 +68,9 @@ func TestSkill_Update_FiltersToWritableFields(t *testing.T) {
 			json.NewDecoder(r.Body).Decode(&putBody)
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(putBody)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents":
+			// Empty tenant — applySkillGrants finds nothing to add/remove.
+			json.NewEncoder(w).Encode(map[string]any{"agents": []map[string]any{}})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -228,6 +231,70 @@ func TestSkill_Create_UploadsZIP(t *testing.T) {
 	}
 	if !gotMultipart {
 		t.Error("server never saw a multipart upload")
+	}
+}
+
+// TestSkill_Update_ReconcilesGrants verifies update path: when spec declares
+// grants.agents=[van-anh], a currently-granted [old-bot] is revoked and
+// van-anh is granted.
+func TestSkill_Update_ReconcilesGrants(t *testing.T) {
+	var grantedAgentIDs []string
+	var revokedAgentIDs []string
+
+	p, cleanup := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/skills":
+			json.NewEncoder(w).Encode(map[string]any{
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "sales-of-day"}},
+			})
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/skills/skill-uuid":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents":
+			json.NewEncoder(w).Encode(map[string]any{
+				"agents": []map[string]any{
+					{"id": "agent-van-anh", "agent_key": "van-anh"},
+					{"id": "agent-old-bot", "agent_key": "old-bot"},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent-van-anh/skills":
+			// van-anh: not yet granted
+			json.NewEncoder(w).Encode(map[string]any{
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "sales-of-day", "granted": false}},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent-old-bot/skills":
+			// old-bot: currently granted, must be revoked
+			json.NewEncoder(w).Encode(map[string]any{
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "sales-of-day", "granted": true}},
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/skills/skill-uuid/grants/agent":
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			grantedAgentIDs = append(grantedAgentIDs, body["agent_id"].(string))
+			w.WriteHeader(http.StatusCreated)
+		case r.Method == http.MethodDelete:
+			// /v1/skills/skill-uuid/grants/agent/{agentID}
+			parts := strings.Split(r.URL.Path, "/")
+			revokedAgentIDs = append(revokedAgentIDs, parts[len(parts)-1])
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer cleanup()
+
+	spec := map[string]any{
+		"description": "daily sales summary",
+		"grants":      map[string]any{"agents": []any{"van-anh"}},
+	}
+	if err := p.Update(context.Background(), manifest.KindSkill, "sales-of-day", spec); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	if len(grantedAgentIDs) != 1 || grantedAgentIDs[0] != "agent-van-anh" {
+		t.Errorf("expected grant for agent-van-anh, got %v", grantedAgentIDs)
+	}
+	if len(revokedAgentIDs) != 1 || revokedAgentIDs[0] != "agent-old-bot" {
+		t.Errorf("expected revoke for agent-old-bot, got %v", revokedAgentIDs)
 	}
 }
 

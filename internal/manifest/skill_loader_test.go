@@ -123,6 +123,29 @@ func TestLoadSkillResources_FrontmatterOverlay(t *testing.T) {
 	}
 }
 
+func TestLoadSkillResources_GrantsOverlay(t *testing.T) {
+	dir := t.TempDir()
+	writeSkill(t, dir, "with-grants", "---\nname: With Grants\n---\n")
+
+	overlay := []byte("grants:\n  agents:\n    - van-anh\n    - assistant\n")
+	if err := os.WriteFile(filepath.Join(dir, "skills", "with-grants", "frontmatter.yaml"), overlay, 0o644); err != nil {
+		t.Fatalf("write overlay: %v", err)
+	}
+
+	res, err := LoadSkillResources(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	grants, ok := res[0].Spec["grants"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected grants map, got %v", res[0].Spec["grants"])
+	}
+	agents, _ := grants["agents"].([]any)
+	if len(agents) != 2 || agents[0] != "van-anh" || agents[1] != "assistant" {
+		t.Errorf("grants.agents overlay not applied: %v", agents)
+	}
+}
+
 func TestLoadDir_YamlAndFilesystemConflict(t *testing.T) {
 	root := t.TempDir()
 	// YAML resource

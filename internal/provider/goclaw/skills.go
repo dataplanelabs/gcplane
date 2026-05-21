@@ -31,6 +31,9 @@ var skillWritableFields = map[string]struct{}{
 // observeSkill fetches a skill by slug from GoClaw.
 // goclaw's list response keys skills by `slug`; the older code matched on
 // `key`, which never resolved against a real backend.
+//
+// Also folds per-agent grants into spec["grants"]["agents"] so the reconciler
+// can detect grant drift the same way it does for MCPServer.
 func (p *Provider) observeSkill(ctx context.Context, key string) (map[string]any, error) {
 	data, err := p.http.Get(ctx, "/v1/skills")
 	if err != nil {
@@ -46,7 +49,14 @@ func (p *Provider) observeSkill(ctx context.Context, key string) (map[string]any
 
 	for _, s := range resp.Skills {
 		if matchSkillKey(s, key) && p.matchesTenant(ctx, s) {
-			return translateResult(stripInternal(s)), nil
+			skillID := strVal(s, "id")
+			result := translateResult(stripInternal(s))
+			if skillID != "" {
+				if agentKeys, err := p.listSkillGrantAgentKeys(ctx, skillID); err == nil {
+					result["grants"] = map[string]any{"agents": agentKeys}
+				}
+			}
+			return result, nil
 		}
 	}
 	return nil, nil
@@ -102,8 +112,17 @@ func (p *Provider) createSkill(ctx context.Context, key string, spec map[string]
 	// writable subset. Skip the PUT when there are no overlay fields to
 	// avoid a wasted round-trip.
 	if hasOverlay(spec) {
-		if err := p.updateSkill(ctx, key, spec); err != nil {
+		if err := p.putSkillFields(ctx, key, spec); err != nil {
 			return fmt.Errorf("apply overlay to skill %s after upload: %w", key, err)
+		}
+	}
+	// Reconcile per-agent grants when the manifest declares any. Mirrors
+	// createMCPServer: on create we only add (no implicit revoke), since
+	// there can be no pre-existing state for a brand-new skill. The
+	// update path below handles declarative revokes.
+	if agents := extractGrantAgents(spec); len(agents) > 0 {
+		if err := p.applySkillGrants(ctx, key, agents); err != nil {
+			return fmt.Errorf("apply grants for skill %s: %w", key, err)
 		}
 	}
 	return nil
@@ -138,9 +157,18 @@ func (p *Provider) deleteSkill(ctx context.Context, key string) error {
 }
 
 // updateSkill updates an existing skill in GoClaw.
-// Sends only writable fields; observed-only fields (version, etc.) are
-// allowed through but goclaw will accept or ignore them.
+// Sends only writable fields, then reconciles per-agent grants.
 func (p *Provider) updateSkill(ctx context.Context, key string, spec map[string]any) error {
+	if err := p.putSkillFields(ctx, key, spec); err != nil {
+		return err
+	}
+	return p.applySkillGrants(ctx, key, extractGrantAgents(spec))
+}
+
+// putSkillFields PUTs the writable subset of spec to /v1/skills/{id}.
+// Observed-only fields (version, etc.) are allowed through but goclaw will
+// accept or ignore them. Returns an error if the skill does not exist.
+func (p *Provider) putSkillFields(ctx context.Context, key string, spec map[string]any) error {
 	current, err := p.observeSkill(ctx, key)
 	if err != nil {
 		return err
@@ -163,4 +191,147 @@ func (p *Provider) updateSkill(ctx context.Context, key string, spec map[string]
 	body := translateSpec(writable)
 	_, err = p.http.Put(ctx, "/v1/skills/"+id, body)
 	return err
+}
+
+// resolveSkillIDFromList returns the UUID of a skill by slug. Mirrors the
+// MCPServer helper so applySkillGrants stays symmetric with applyMCPGrants.
+func (p *Provider) resolveSkillIDFromList(ctx context.Context, slug string) (string, error) {
+	data, err := p.http.Get(ctx, "/v1/skills")
+	if err != nil {
+		return "", fmt.Errorf("list skills: %w", err)
+	}
+	var resp struct {
+		Skills []map[string]any `json:"skills"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return "", fmt.Errorf("parse skills response: %w", err)
+	}
+	for _, s := range resp.Skills {
+		if strVal(s, "slug") == slug && p.matchesTenant(ctx, s) {
+			if id := strVal(s, "id"); id != "" {
+				return id, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("skill %q not found", slug)
+}
+
+// applySkillGrants reconciles desired per-agent grants for a skill:
+// adds missing grants and removes extra ones. Symmetric with applyMCPGrants.
+//
+// Passing a nil/empty desiredAgents revokes all current grants — same
+// semantics as MCPServer so a manifest that drops a name actually unwires it.
+func (p *Provider) applySkillGrants(ctx context.Context, slug string, desiredAgents []string) error {
+	skillID, err := p.resolveSkillIDFromList(ctx, slug)
+	if err != nil {
+		return err
+	}
+
+	currentAgents, err := p.listSkillGrantAgentKeys(ctx, skillID)
+	if err != nil {
+		return fmt.Errorf("list current grants for skill %s: %w", slug, err)
+	}
+
+	currentIDs := make(map[string]string, len(currentAgents)) // agent_key → agent_id
+	for _, agentKey := range currentAgents {
+		agentID, err := p.resolveAgentID(ctx, agentKey)
+		if err != nil {
+			return fmt.Errorf("resolve current grant agent %q: %w", agentKey, err)
+		}
+		currentIDs[agentKey] = agentID
+	}
+
+	desiredIDs := make(map[string]string, len(desiredAgents))
+	for _, agentKey := range desiredAgents {
+		agentID, err := p.resolveAgentID(ctx, agentKey)
+		if err != nil {
+			return fmt.Errorf("resolve desired grant agent %q: %w", agentKey, err)
+		}
+		desiredIDs[agentKey] = agentID
+	}
+
+	// Add missing grants. version=0 lets goclaw default to 1 (handleGrantAgent).
+	for agentKey, agentID := range desiredIDs {
+		if _, exists := currentIDs[agentKey]; exists {
+			continue
+		}
+		body := map[string]any{"agent_id": agentID}
+		if _, err := p.http.Post(ctx, "/v1/skills/"+skillID+"/grants/agent", body); err != nil {
+			return fmt.Errorf("grant skill %s to agent %s: %w", slug, agentKey, err)
+		}
+	}
+
+	// Remove extra grants.
+	for agentKey, agentID := range currentIDs {
+		if _, wanted := desiredIDs[agentKey]; wanted {
+			continue
+		}
+		path := "/v1/skills/" + skillID + "/grants/agent/" + agentID
+		if err := p.http.Delete(ctx, path); err != nil && !errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("revoke skill %s from agent %s: %w", slug, agentKey, err)
+		}
+	}
+	return nil
+}
+
+// listSkillGrantAgentKeys returns the agent_keys that currently have this
+// skill granted. goclaw exposes grants per agent (GET /v1/agents/{id}/skills)
+// but not per skill, so we fan out across the tenant's agents and filter for
+// granted == true. Small tenants only; not optimised for hundreds of agents.
+func (p *Provider) listSkillGrantAgentKeys(ctx context.Context, skillID string) ([]string, error) {
+	agentData, err := p.http.Get(ctx, "/v1/agents")
+	if err != nil {
+		return nil, fmt.Errorf("list agents for skill-grant resolution: %w", err)
+	}
+	var agentResp struct {
+		Agents []map[string]any `json:"agents"`
+	}
+	if err := json.Unmarshal(agentData, &agentResp); err != nil {
+		return nil, fmt.Errorf("parse agents response: %w", err)
+	}
+
+	keys := make([]string, 0)
+	for _, a := range agentResp.Agents {
+		if !p.matchesTenant(ctx, a) {
+			continue
+		}
+		agentID := strVal(a, "id")
+		agentKey := strVal(a, "agent_key")
+		if agentID == "" || agentKey == "" {
+			continue
+		}
+		granted, err := p.agentHasSkillGrant(ctx, agentID, skillID)
+		if err != nil {
+			return nil, err
+		}
+		if granted {
+			keys = append(keys, agentKey)
+		}
+	}
+	return keys, nil
+}
+
+// agentHasSkillGrant returns true when GET /v1/agents/{agentID}/skills
+// reports skillID with granted=true.
+func (p *Provider) agentHasSkillGrant(ctx context.Context, agentID, skillID string) (bool, error) {
+	data, err := p.http.Get(ctx, "/v1/agents/"+agentID+"/skills")
+	if err != nil {
+		return false, fmt.Errorf("list skills for agent %s: %w", agentID, err)
+	}
+	var resp struct {
+		Skills []map[string]any `json:"skills"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return false, fmt.Errorf("parse agent skills response: %w", err)
+	}
+	for _, s := range resp.Skills {
+		if strVal(s, "id") != skillID {
+			continue
+		}
+		if g, ok := s["granted"].(bool); ok && g {
+			return true, nil
+		}
+		return false, nil
+	}
+	return false, nil
 }

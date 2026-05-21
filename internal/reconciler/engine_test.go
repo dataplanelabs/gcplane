@@ -589,9 +589,13 @@ func TestWarnBlindNoop_NoWarnOnCreate(t *testing.T) {
 }
 
 func TestWarnBlindNoop_GenericAcrossKinds(t *testing.T) {
-	// Provider with apiKey (blind field) — noop should warn
+	// MCPServer with grants (blind field) — kind NOT in kindsSupportingWriteOnlyHash
+	// allowlist, so goclaw side does not echo the writeOnlyHash. Reconciler cannot
+	// auto-heal → falls through to noop + blind-noop WARN. This is the legacy
+	// behavior preserved for kinds whose goclaw side has not yet been migrated to
+	// support the writeOnlyHash echo (only CronJob + Provider as of this PR).
 	provider := newMockProvider()
-	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
+	provider.observed["MCPServer/k8s"] = map[string]any{"transport": "stdio"}
 
 	var buf bytes.Buffer
 	engine := NewEngine(provider, newTestLogger(&buf))
@@ -599,11 +603,11 @@ func TestWarnBlindNoop_GenericAcrossKinds(t *testing.T) {
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{
-				Kind: manifest.KindProvider,
-				Name: "anthropic",
+				Kind: manifest.KindMCPServer,
+				Name: "k8s",
 				Spec: map[string]any{
-					"displayName": "Anthropic",
-					"apiKey":      "sk-secret-key",
+					"transport": "stdio",
+					"grants":    map[string]any{"alice": "ro"},
 				},
 			},
 		},
@@ -616,10 +620,10 @@ func TestWarnBlindNoop_GenericAcrossKinds(t *testing.T) {
 
 	out := buf.String()
 	if !strings.Contains(out, "no-op may hide drift") {
-		t.Errorf("expected blind-noop warning for Provider/apiKey, got:\n%s", out)
+		t.Errorf("expected blind-noop warning for MCPServer/grants, got:\n%s", out)
 	}
-	if !strings.Contains(out, "apiKey") {
-		t.Errorf("expected 'apiKey' in warning log, got:\n%s", out)
+	if !strings.Contains(out, "grants") {
+		t.Errorf("expected 'grants' in warning log, got:\n%s", out)
 	}
 }
 
@@ -661,9 +665,12 @@ func TestWarnBlindNoop_NoWarnOnHashConfirmedNoop(t *testing.T) {
 }
 
 func TestWarnBlindNoop_NoWarnWhenBlindFieldEmptyString(t *testing.T) {
-	// Provider with apiKey: "" — empty-string blind field → treat as trivial, no warn.
+	// MCPServer with empty/missing blind field "grants" → no value to apply,
+	// hash function skips missing-key entries, desiredHash="" → no drift to
+	// hide → no warn. Uses MCPServer (not in kindsSupportingWriteOnlyHash) so
+	// the empty-observed-hash path doesn't trigger an auto-heal update.
 	provider := newMockProvider()
-	provider.observed["Provider/anthropic"] = map[string]any{"displayName": "Anthropic"}
+	provider.observed["MCPServer/k8s"] = map[string]any{"transport": "stdio"}
 
 	var buf bytes.Buffer
 	engine := NewEngine(provider, newTestLogger(&buf))
@@ -671,11 +678,13 @@ func TestWarnBlindNoop_NoWarnWhenBlindFieldEmptyString(t *testing.T) {
 	m := &manifest.Manifest{
 		Resources: []manifest.Resource{
 			{
-				Kind: manifest.KindProvider,
-				Name: "anthropic",
+				Kind: manifest.KindMCPServer,
+				Name: "k8s",
 				Spec: map[string]any{
-					"displayName": "Anthropic",
-					"apiKey":      "",
+					"transport": "stdio",
+					// "grants" intentionally absent — manifest declares no
+					// access grants; hash builder ignores missing keys, so
+					// desiredHash is empty and warnBlindNoop is silent.
 				},
 			},
 		},
@@ -688,7 +697,7 @@ func TestWarnBlindNoop_NoWarnWhenBlindFieldEmptyString(t *testing.T) {
 
 	out := buf.String()
 	if strings.Contains(out, "no-op may hide drift") {
-		t.Errorf("unexpected blind-noop warning for empty-string apiKey:\n%s", out)
+		t.Errorf("unexpected blind-noop warning for absent blind field:\n%s", out)
 	}
 }
 
@@ -810,5 +819,110 @@ func TestReconcile_BuiltinToolConfig_BackwardCompat_NoSettings(t *testing.T) {
 	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
 	if plan.Noops != 1 {
 		t.Errorf("expected noop for enabled-only BuiltinToolConfig, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}
+
+// TestReconcile_EmptyObservedHash_AutoHealsSupportedKind verifies the
+// safety-net: when goclaw has the resource but never echoed a writeOnlyHash
+// (existing row before migration 000060 / 000059 ran), the reconciler
+// triggers a one-shot update to populate it. This fixes the production
+// "zai-coding 401" incident where rotated apiKeys never propagated because
+// the reconciler saw no drift on the masked api_key field.
+func TestReconcile_EmptyObservedHash_AutoHealsSupportedKind(t *testing.T) {
+	provider := newMockProvider()
+	// Provider exists in goclaw but writeOnlyHash is empty (legacy row).
+	provider.observed["Provider/zai-coding"] = map[string]any{
+		"displayName": "Z.ai Coding",
+		// no writeOnlyHash field
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindProvider,
+				Name: "zai-coding",
+				Spec: map[string]any{
+					"displayName": "Z.ai Coding",
+					"apiKey":      "sk-rotated-key",
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Updates != 1 {
+		t.Fatalf("expected 1 update (auto-heal for KindProvider), got updates=%d noops=%d", plan.Updates, plan.Noops)
+	}
+	for _, ch := range plan.Changes {
+		if ch.Action == ActionUpdate {
+			if _, ok := ch.Diff["writeOnlyHash"]; !ok {
+				t.Error("expected writeOnlyHash in auto-heal diff")
+			}
+		}
+	}
+}
+
+// TestReconcile_EmptyObservedHash_NoLoopForUnsupportedKind guards against the
+// failure mode the allowlist exists to prevent: for kinds whose goclaw side
+// does NOT echo writeOnlyHash (every kind except CronJob + Provider as of
+// migration 000060), treating empty observedHash as drift would cause an
+// infinite update loop. The allowlist ensures unsupported kinds stay on the
+// strict both-non-empty check, falling through to blind-noop WARN instead.
+func TestReconcile_EmptyObservedHash_NoLoopForUnsupportedKind(t *testing.T) {
+	provider := newMockProvider()
+	// MCPServer is not in kindsSupportingWriteOnlyHash. goclaw doesn't echo
+	// the hash for this kind, so the observed map never includes it.
+	provider.observed["MCPServer/k8s"] = map[string]any{"transport": "stdio"}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindMCPServer,
+				Name: "k8s",
+				Spec: map[string]any{
+					"transport": "stdio",
+					"grants":    map[string]any{"alice": "ro"},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Fatalf("expected noop (unsupported kind must not auto-heal), got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+}
+
+// TestReconcile_HashMatchesAfterAutoHeal verifies that once the first auto-heal
+// update populates the observed hash, the next reconcile converges to noop —
+// proving the safety-net is one-shot, not a perpetual update.
+func TestReconcile_HashMatchesAfterAutoHeal(t *testing.T) {
+	spec := map[string]any{
+		"displayName": "Z.ai Coding",
+		"apiKey":      "sk-stable-key",
+	}
+	woFields := manifest.WriteOnlyFields(manifest.KindProvider)
+	expectedHash := HashWriteOnlyFields(spec, woFields, nil)
+
+	provider := newMockProvider()
+	// Simulate the state AFTER the first auto-heal update applied: goclaw now
+	// echoes the writeOnlyHash matching the manifest.
+	provider.observed["Provider/zai-coding"] = map[string]any{
+		"displayName":   "Z.ai Coding",
+		"writeOnlyHash": expectedHash,
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindProvider, Name: "zai-coding", Spec: spec},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 {
+		t.Fatalf("expected noop on hash match (post-heal steady state), got noops=%d updates=%d", plan.Noops, plan.Updates)
 	}
 }
