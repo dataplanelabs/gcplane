@@ -508,3 +508,181 @@ func TestValidate_SkillSpec(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeSemver(t *testing.T) {
+	cases := map[string]string{
+		"2.71":        "v2.71",
+		"v2.71.0":     "v2.71.0",
+		"2.71.0-rc1":  "v2.71.0-rc1",
+		"":            "",
+		"  1.2.3  ":   "v1.2.3",
+		"V0.1":        "V0.1",
+	}
+	for in, want := range cases {
+		got := normalizeSemver(in)
+		if got != want {
+			t.Errorf("normalizeSemver(%q)=%q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestValidateCliConstraintShape(t *testing.T) {
+	ok := []string{">=2.50", ">=2.50.0", ">=v2.50", ">= 2.50", ">=2.50.0-rc1"}
+	for _, s := range ok {
+		if err := validateCliConstraintShape(s); err != nil {
+			t.Errorf("expected %q to validate, got: %v", s, err)
+		}
+	}
+	bad := []string{
+		"",
+		"^2.50",
+		"~2.50",
+		">=2.50, <3",
+		"2.50",
+		">=abc",
+		">=",
+	}
+	for _, s := range bad {
+		if err := validateCliConstraintShape(s); err == nil {
+			t.Errorf("expected %q to fail, got nil", s)
+		}
+	}
+}
+
+func TestValidateSkillSpec_RequiresCli_UnsupportedTilde(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{{
+			Kind: KindSkill, Name: "t", Spec: map[string]any{
+				"sourceDir": dir,
+				"requires":  map[string]any{"cli": map[string]any{"gh": "~2.50"}},
+			},
+		}},
+	}
+	errs := Validate(m)
+	joined := ""
+	for _, e := range errs {
+		joined += e.Error() + "\n"
+	}
+	if !strings.Contains(joined, "unsupported constraint shape") {
+		t.Errorf("expected unsupported-constraint error for ~2.50, got: %s", joined)
+	}
+}
+
+func TestValidateSkillSpec_RequiresCli_UnsupportedCaret(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{{
+			Kind: KindSkill, Name: "t", Spec: map[string]any{
+				"sourceDir": dir,
+				"requires":  map[string]any{"cli": map[string]any{"gh": "^2.50"}},
+			},
+		}},
+	}
+	errs := Validate(m)
+	joined := ""
+	for _, e := range errs {
+		joined += e.Error() + "\n"
+	}
+	if !strings.Contains(joined, "unsupported constraint shape") {
+		t.Errorf("expected unsupported-constraint error for ^2.50, got: %s", joined)
+	}
+}
+
+func TestValidateSkillSpec_RequiresCli_HappyPath(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{{
+			Kind: KindSkill, Name: "t", Spec: map[string]any{
+				"sourceDir": dir,
+				"requires":  map[string]any{"cli": map[string]any{"gh": ">=2.50", "kubectl": ">=1.30"}},
+			},
+		}},
+	}
+	errs := Validate(m)
+	for _, e := range errs {
+		if strings.Contains(e.Error(), "requires.cli") {
+			t.Errorf("unexpected requires.cli error: %v", e)
+		}
+	}
+}
+
+func TestCrossCheckRequiresCli_Match(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"gh": ">=2.50"},
+		},
+	}
+	installed := map[string]string{"gh": "2.71.0"}
+	warns, err := CrossCheckRequiresCli(spec, installed)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected warnings: %v", warns)
+	}
+}
+
+func TestCrossCheckRequiresCli_Mismatch(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"gh": ">=99.0"},
+		},
+	}
+	installed := map[string]string{"gh": "2.71.0"}
+	_, err := CrossCheckRequiresCli(spec, installed)
+	if err == nil || !strings.Contains(err.Error(), "does not satisfy") {
+		t.Fatalf("expected mismatch error, got: %v", err)
+	}
+}
+
+func TestCrossCheckRequiresCli_BinaryNotInstalled(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"foo": ">=1.0"},
+		},
+	}
+	installed := map[string]string{"gh": "2.71.0"}
+	warns, err := CrossCheckRequiresCli(spec, installed)
+	if err != nil {
+		t.Fatalf("expected nil error (warn-only), got: %v", err)
+	}
+	if len(warns) == 0 || !strings.Contains(warns[0], "not registered") {
+		t.Fatalf("expected 'not registered' warning, got: %v", warns)
+	}
+}
+
+func TestCrossCheckRequiresCli_NormalizedVersions(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"gh": ">=2.50"},
+		},
+	}
+	// Installed reported without 'v' prefix (real-world case from `gh --version`).
+	installed := map[string]string{"gh": "2.71"}
+	if _, err := CrossCheckRequiresCli(spec, installed); err != nil {
+		t.Fatalf("expected match with normalized versions, got: %v", err)
+	}
+}
+
+func TestCrossCheckRequiresCli_NoRequires(t *testing.T) {
+	if _, err := CrossCheckRequiresCli(nil, nil); err != nil {
+		t.Errorf("nil spec must not error: %v", err)
+	}
+	if _, err := CrossCheckRequiresCli(map[string]any{}, nil); err != nil {
+		t.Errorf("empty spec must not error: %v", err)
+	}
+	spec := map[string]any{"requires": map[string]any{"other": "thing"}}
+	if _, err := CrossCheckRequiresCli(spec, nil); err != nil {
+		t.Errorf("requires without cli must not error: %v", err)
+	}
+}
