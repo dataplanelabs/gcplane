@@ -615,3 +615,74 @@ func TestValidateSkillSpec_RequiresCli_HappyPath(t *testing.T) {
 		}
 	}
 }
+
+func TestCrossCheckRequiresCli_Match(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"gh": ">=2.50"},
+		},
+	}
+	installed := map[string]string{"gh": "2.71.0"}
+	warns, err := CrossCheckRequiresCli(spec, installed)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected warnings: %v", warns)
+	}
+}
+
+func TestCrossCheckRequiresCli_Mismatch(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"gh": ">=99.0"},
+		},
+	}
+	installed := map[string]string{"gh": "2.71.0"}
+	_, err := CrossCheckRequiresCli(spec, installed)
+	if err == nil || !strings.Contains(err.Error(), "does not satisfy") {
+		t.Fatalf("expected mismatch error, got: %v", err)
+	}
+}
+
+func TestCrossCheckRequiresCli_BinaryNotInstalled(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"foo": ">=1.0"},
+		},
+	}
+	installed := map[string]string{"gh": "2.71.0"}
+	warns, err := CrossCheckRequiresCli(spec, installed)
+	if err != nil {
+		t.Fatalf("expected nil error (warn-only), got: %v", err)
+	}
+	if len(warns) == 0 || !strings.Contains(warns[0], "not registered") {
+		t.Fatalf("expected 'not registered' warning, got: %v", warns)
+	}
+}
+
+func TestCrossCheckRequiresCli_NormalizedVersions(t *testing.T) {
+	spec := map[string]any{
+		"requires": map[string]any{
+			"cli": map[string]any{"gh": ">=2.50"},
+		},
+	}
+	// Installed reported without 'v' prefix (real-world case from `gh --version`).
+	installed := map[string]string{"gh": "2.71"}
+	if _, err := CrossCheckRequiresCli(spec, installed); err != nil {
+		t.Fatalf("expected match with normalized versions, got: %v", err)
+	}
+}
+
+func TestCrossCheckRequiresCli_NoRequires(t *testing.T) {
+	if _, err := CrossCheckRequiresCli(nil, nil); err != nil {
+		t.Errorf("nil spec must not error: %v", err)
+	}
+	if _, err := CrossCheckRequiresCli(map[string]any{}, nil); err != nil {
+		t.Errorf("empty spec must not error: %v", err)
+	}
+	spec := map[string]any{"requires": map[string]any{"other": "thing"}}
+	if _, err := CrossCheckRequiresCli(spec, nil); err != nil {
+		t.Errorf("requires without cli must not error: %v", err)
+	}
+}

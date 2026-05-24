@@ -192,3 +192,48 @@ func normalizeSemver(s string) string {
 	}
 	return "v" + s
 }
+
+// CrossCheckRequiresCli compares spec.requires.cli constraints against the
+// installed versions returned by the goclaw `/v1/system/cli-versions`
+// endpoint. Called at apply time (createSkill / updateSkill) so the
+// surface stays unit-testable without HTTP.
+//
+// Semantics:
+//   - constraint shape errors → returned as error (would have been caught
+//     by validateCliConstraintShape too, but defense-in-depth)
+//   - binary not in installed map → returned as warning string, not error
+//     (skill author may have asked for a future binary; warn don't block)
+//   - installed version older than constraint → returned as error
+//   - all checks pass → nil error, nil warnings
+func CrossCheckRequiresCli(spec map[string]any, installed map[string]string) (warnings []string, err error) {
+	if spec == nil {
+		return nil, nil
+	}
+	reqs, ok := spec["requires"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	cli, ok := reqs["cli"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	for binary, raw := range cli {
+		constraint, isStr := raw.(string)
+		if !isStr {
+			return warnings, fmt.Errorf("requires.cli.%s must be a string", binary)
+		}
+		if err := validateCliConstraintShape(constraint); err != nil {
+			return warnings, fmt.Errorf("requires.cli.%s: %w", binary, err)
+		}
+		want := normalizeSemver(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(constraint), ">=")))
+		got, ok := installed[binary]
+		if !ok {
+			warnings = append(warnings, fmt.Sprintf("requires.cli.%s: binary not registered on server — skipping version check", binary))
+			continue
+		}
+		if semver.Compare(normalizeSemver(got), want) < 0 {
+			return warnings, fmt.Errorf("requires.cli.%s: installed %s does not satisfy %s", binary, got, constraint)
+		}
+	}
+	return warnings, nil
+}

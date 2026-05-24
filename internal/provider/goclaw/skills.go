@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"mime/multipart"
 
+	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/skillpkg"
 )
 
@@ -80,6 +82,21 @@ func (p *Provider) createSkill(ctx context.Context, key string, spec map[string]
 	sourceDir, _ := spec["sourceDir"].(string)
 	if sourceDir == "" {
 		return fmt.Errorf("skill %s: %w", key, ErrSkillSourceMissing)
+	}
+
+	// requires.cli cross-check: fail apply pre-upload if the skill needs a
+	// CLI version that's not installed on the server. Network/lookup
+	// failures degrade to a warning — the rest of apply proceeds.
+	if installed, err := p.GetCLIVersions(ctx); err == nil {
+		warnings, mismatch := manifest.CrossCheckRequiresCli(spec, installed)
+		for _, w := range warnings {
+			slog.Warn("skill.requires_cli_warning", "skill", key, "warning", w)
+		}
+		if mismatch != nil {
+			return fmt.Errorf("skill %s: %w", key, mismatch)
+		}
+	} else {
+		slog.Warn("skill.requires_cli_lookup_failed", "skill", key, "error", err)
 	}
 
 	pkg, err := skillpkg.PackDir(sourceDir)
