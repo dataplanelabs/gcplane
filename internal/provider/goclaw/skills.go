@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"mime/multipart"
+	"path/filepath"
+	"strings"
 
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 	"github.com/dataplanelabs/gcplane/internal/skillpkg"
@@ -116,6 +118,15 @@ func (p *Provider) createSkill(ctx context.Context, key string, spec map[string]
 	// source=gcplane lets goclaw refuse non-gcplane overwrites unless force_imperative.
 	if err := mw.WriteField("source", "gcplane"); err != nil {
 		return fmt.Errorf("multipart write source: %w", err)
+	}
+	// is_system=true for skills under _system/ — closes the B1 manual DB
+	// backfill (issue dataplanelabs/gcplane#14). Detection: sourceDir path
+	// contains a /_system/ segment OR starts with _system/. Other tenants'
+	// skills land with is_system=false (the goclaw upload default).
+	if isSystemSourceDir(sourceDir) {
+		if err := mw.WriteField("is_system", "true"); err != nil {
+			return fmt.Errorf("multipart write is_system: %w", err)
+		}
 	}
 	if err := mw.Close(); err != nil {
 		return fmt.Errorf("multipart close: %w", err)
@@ -355,4 +366,16 @@ func (p *Provider) agentHasSkillGrant(ctx context.Context, agentID, skillID stri
 		return false, nil
 	}
 	return false, nil
+}
+
+// isSystemSourceDir reports whether the given filesystem path is under a
+// `_system/` directory anywhere in its ancestry. Used by createSkill to mark
+// uploads with is_system=true so goclaw exposes them cross-tenant without a
+// manual DB UPDATE. See dataplanelabs/gcplane#14.
+func isSystemSourceDir(sourceDir string) bool {
+	clean := filepath.ToSlash(filepath.Clean(sourceDir))
+	if clean == "_system" || strings.HasPrefix(clean, "_system/") {
+		return true
+	}
+	return strings.Contains(clean, "/_system/")
 }
