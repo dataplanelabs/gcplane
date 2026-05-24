@@ -3,6 +3,9 @@ package manifest
 import (
 	"fmt"
 	"regexp"
+	"strings"
+
+	"golang.org/x/mod/semver"
 
 	"github.com/dataplanelabs/gcplane/internal/skillpkg"
 )
@@ -128,5 +131,64 @@ func validateSkillSpec(prefix string, spec map[string]any) []error {
 			errs = append(errs, fmt.Errorf("%s: spec.sourceDir %q: %w", prefix, src, err))
 		}
 	}
+	// requires.cli: only `>=X.Y` shape supported in this release. Reject
+	// npm-style (^X.Y, ~X.Y) and ranges (>=X.Y, <Z) at validate time so
+	// the apply path doesn't have to handle unsupported syntax.
+	if reqs, ok := spec["requires"].(map[string]any); ok {
+		if cli, ok := reqs["cli"].(map[string]any); ok {
+			for binary, raw := range cli {
+				constraint, isStr := raw.(string)
+				if !isStr {
+					errs = append(errs, fmt.Errorf("%s: spec.requires.cli.%s must be a string", prefix, binary))
+					continue
+				}
+				if err := validateCliConstraintShape(constraint); err != nil {
+					errs = append(errs, fmt.Errorf("%s: spec.requires.cli.%s: %w", prefix, binary, err))
+				}
+			}
+		}
+	}
 	return errs
+}
+
+// validateCliConstraintShape enforces the MVP constraint syntax for
+// requires.cli: only `>=X.Y` is supported. npm-style `^` / `~`, ranges,
+// and exact-pinning are rejected with an actionable error message so
+// skill authors learn the supported shape early.
+func validateCliConstraintShape(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return fmt.Errorf("constraint must not be empty")
+	}
+	if strings.ContainsAny(s, "^~") {
+		return fmt.Errorf("unsupported constraint shape %q; only >=X.Y supported in this release", s)
+	}
+	if strings.ContainsAny(s, ",") {
+		return fmt.Errorf("unsupported constraint shape %q; only >=X.Y supported in this release", s)
+	}
+	if !strings.HasPrefix(s, ">=") {
+		return fmt.Errorf("unsupported constraint shape %q; only >=X.Y supported in this release", s)
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(s, ">="))
+	if rest == "" {
+		return fmt.Errorf("missing version after >= in %q", s)
+	}
+	if !semver.IsValid(normalizeSemver(rest)) {
+		return fmt.Errorf("invalid semver %q after >=", rest)
+	}
+	return nil
+}
+
+// normalizeSemver prepends 'v' to a bare semver string so golang.org/x/mod/semver
+// can compare it (its API requires the v-prefix). Idempotent — strings that
+// already start with 'v' are returned as-is.
+func normalizeSemver(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return s
+	}
+	if s[0] == 'v' || s[0] == 'V' {
+		return s
+	}
+	return "v" + s
 }

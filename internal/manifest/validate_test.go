@@ -508,3 +508,110 @@ func TestValidate_SkillSpec(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeSemver(t *testing.T) {
+	cases := map[string]string{
+		"2.71":        "v2.71",
+		"v2.71.0":     "v2.71.0",
+		"2.71.0-rc1":  "v2.71.0-rc1",
+		"":            "",
+		"  1.2.3  ":   "v1.2.3",
+		"V0.1":        "V0.1",
+	}
+	for in, want := range cases {
+		got := normalizeSemver(in)
+		if got != want {
+			t.Errorf("normalizeSemver(%q)=%q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestValidateCliConstraintShape(t *testing.T) {
+	ok := []string{">=2.50", ">=2.50.0", ">=v2.50", ">= 2.50", ">=2.50.0-rc1"}
+	for _, s := range ok {
+		if err := validateCliConstraintShape(s); err != nil {
+			t.Errorf("expected %q to validate, got: %v", s, err)
+		}
+	}
+	bad := []string{
+		"",
+		"^2.50",
+		"~2.50",
+		">=2.50, <3",
+		"2.50",
+		">=abc",
+		">=",
+	}
+	for _, s := range bad {
+		if err := validateCliConstraintShape(s); err == nil {
+			t.Errorf("expected %q to fail, got nil", s)
+		}
+	}
+}
+
+func TestValidateSkillSpec_RequiresCli_UnsupportedTilde(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{{
+			Kind: KindSkill, Name: "t", Spec: map[string]any{
+				"sourceDir": dir,
+				"requires":  map[string]any{"cli": map[string]any{"gh": "~2.50"}},
+			},
+		}},
+	}
+	errs := Validate(m)
+	joined := ""
+	for _, e := range errs {
+		joined += e.Error() + "\n"
+	}
+	if !strings.Contains(joined, "unsupported constraint shape") {
+		t.Errorf("expected unsupported-constraint error for ~2.50, got: %s", joined)
+	}
+}
+
+func TestValidateSkillSpec_RequiresCli_UnsupportedCaret(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{{
+			Kind: KindSkill, Name: "t", Spec: map[string]any{
+				"sourceDir": dir,
+				"requires":  map[string]any{"cli": map[string]any{"gh": "^2.50"}},
+			},
+		}},
+	}
+	errs := Validate(m)
+	joined := ""
+	for _, e := range errs {
+		joined += e.Error() + "\n"
+	}
+	if !strings.Contains(joined, "unsupported constraint shape") {
+		t.Errorf("expected unsupported-constraint error for ^2.50, got: %s", joined)
+	}
+}
+
+func TestValidateSkillSpec_RequiresCli_HappyPath(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{{
+			Kind: KindSkill, Name: "t", Spec: map[string]any{
+				"sourceDir": dir,
+				"requires":  map[string]any{"cli": map[string]any{"gh": ">=2.50", "kubectl": ">=1.30"}},
+			},
+		}},
+	}
+	errs := Validate(m)
+	for _, e := range errs {
+		if strings.Contains(e.Error(), "requires.cli") {
+			t.Errorf("unexpected requires.cli error: %v", e)
+		}
+	}
+}
