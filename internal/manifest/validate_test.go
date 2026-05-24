@@ -1,6 +1,8 @@
 package manifest
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -65,6 +67,123 @@ func TestValidate_DuplicateResource(t *testing.T) {
 	errs := Validate(m)
 	if len(errs) == 0 {
 		t.Error("expected error for duplicate resource")
+	}
+}
+
+func TestValidateSkillSpec_SourceDirMissing(t *testing.T) {
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindSkill, Name: "gh-read", Spec: map[string]any{
+				"sourceDir": "/nonexistent/path/skills/gh-read",
+			}},
+		},
+	}
+	errs := Validate(m)
+	if len(errs) == 0 {
+		t.Fatal("expected error for missing sourceDir")
+	}
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "sourceDir") && strings.Contains(err.Error(), "/nonexistent/path") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected sourceDir error citing path, got: %v", errs)
+	}
+}
+
+func TestValidateSkillSpec_SourceDirNoSkillMd(t *testing.T) {
+	dir := t.TempDir()
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindSkill, Name: "no-md", Spec: map[string]any{"sourceDir": dir}},
+		},
+	}
+	errs := Validate(m)
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "SKILL.md") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected SKILL.md error, got: %v", errs)
+	}
+}
+
+func TestValidateSkillSpec_OversizeFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	big := make([]byte, (4*1024*1024)+1)
+	if err := os.WriteFile(filepath.Join(dir, "big.bin"), big, 0o644); err != nil {
+		t.Fatalf("write big.bin: %v", err)
+	}
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindSkill, Name: "oversize", Spec: map[string]any{"sourceDir": dir}},
+		},
+	}
+	errs := Validate(m)
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "big.bin") && strings.Contains(err.Error(), "exceeds") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected oversize error for big.bin, got: %v", errs)
+	}
+}
+
+func TestValidateSkillSpec_SkipsHiddenAndGitFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".git", "objects", "pack"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+	bigPack := make([]byte, (4*1024*1024)+1)
+	if err := os.WriteFile(filepath.Join(dir, ".git", "objects", "pack", "pack.bin"), bigPack, 0o644); err != nil {
+		t.Fatalf("write pack: %v", err)
+	}
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindSkill, Name: "with-git", Spec: map[string]any{"sourceDir": dir}},
+		},
+	}
+	errs := Validate(m)
+	if len(errs) != 0 {
+		t.Errorf("expected no errors (validate must skip .git like skillpkg does), got: %v", errs)
+	}
+}
+
+func TestValidateSkillSpec_HappyPath(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: x\n---\nbody\n"), 0o644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	m := &Manifest{
+		APIVersion: "gcplane.io/v1",
+		Kind:       "Manifest",
+		Resources: []Resource{
+			{Kind: KindSkill, Name: "happy", Spec: map[string]any{"sourceDir": dir}},
+		},
+	}
+	errs := Validate(m)
+	if len(errs) != 0 {
+		t.Errorf("expected zero errors on happy path, got: %v", errs)
 	}
 }
 

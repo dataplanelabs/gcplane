@@ -96,6 +96,10 @@ func (p *Provider) createSkill(ctx context.Context, key string, spec map[string]
 	if _, err := fw.Write(pkg.ZIP); err != nil {
 		return fmt.Errorf("multipart write: %w", err)
 	}
+	// source=gcplane lets goclaw refuse non-gcplane overwrites unless force_imperative.
+	if err := mw.WriteField("source", "gcplane"); err != nil {
+		return fmt.Errorf("multipart write source: %w", err)
+	}
 	if err := mw.Close(); err != nil {
 		return fmt.Errorf("multipart close: %w", err)
 	}
