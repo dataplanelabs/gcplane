@@ -3,6 +3,8 @@ package manifest
 import (
 	"fmt"
 	"regexp"
+
+	"github.com/dataplanelabs/gcplane/internal/skillpkg"
 )
 
 var keyRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
@@ -119,6 +121,11 @@ func validateSkillSpec(prefix string, spec map[string]any) []error {
 				}
 				seen[s] = true
 			}
+		}
+	}
+	if src, ok := spec["sourceDir"].(string); ok && src != "" {
+		if _, err := skillpkg.PackDir(src); err != nil {
+			errs = append(errs, fmt.Errorf("%s: spec.sourceDir %q: %w", prefix, src, err))
 		}
 	}
 	return errs

@@ -215,6 +215,9 @@ func TestSkill_Create_UploadsZIP(t *testing.T) {
 			} else {
 				gotMultipart = true
 			}
+			if got := r.FormValue("source"); got != "gcplane" {
+				t.Errorf("expected source=gcplane form field, got %q", got)
+			}
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]any{"slug": "test-skill", "version": 1})
 			return
