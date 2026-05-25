@@ -37,6 +37,7 @@ type Controller struct {
 	triggerCh      chan struct{}
 	logger         *slog.Logger
 	lastHash       string
+	lastHasErrors  bool // true when the previous reconcile produced errors; gates the unchanged-manifest skip so transient failures self-heal
 	debounceWindow time.Duration
 	debounceTimer  *time.Timer
 	mu             sync.Mutex
@@ -171,8 +172,13 @@ func (c *Controller) reconcileOnce() {
 		return
 	}
 
-	// Skip if manifest unchanged
-	if hash == c.lastHash && hash != "" {
+	// Skip if manifest unchanged AND prior reconcile succeeded. If the previous
+	// reconcile had errors (e.g. transient WS broken pipe, observe failure), a
+	// hash-equality skip would latch Synced=False forever — /readyz never
+	// recovers until a manifest change forces another full reconcile. Retrying
+	// the engine when prior errors exist self-heals within one cycle and is
+	// bounded (one extra reconcile per error).
+	if hash == c.lastHash && hash != "" && !c.lastHasErrors {
 		display := hash
 		if len(display) > 12 {
 			display = display[:12]
@@ -181,6 +187,9 @@ func (c *Controller) reconcileOnce() {
 		// Notify waiters with a no-op result so TriggerAndWait doesn't block forever.
 		c.notifyWaiters(&SyncResult{})
 		return
+	}
+	if hash == c.lastHash && hash != "" && c.lastHasErrors {
+		c.logger.Info("manifest unchanged but prior reconcile errored — retrying to self-heal")
 	}
 
 	engine := reconciler.NewEngine(c.provider, c.logger)
@@ -198,6 +207,7 @@ func (c *Controller) reconcileOnce() {
 
 	hasErrors := result.Failed > 0 || len(plan.Errors) > 0
 	hasDrift := plan.Creates > 0 || plan.Updates > 0
+	c.lastHasErrors = hasErrors
 
 	if hasErrors {
 		c.tracker.SetCondition(Condition{Type: ConditionSynced, Status: "False"})

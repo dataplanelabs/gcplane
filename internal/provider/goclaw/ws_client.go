@@ -76,11 +76,25 @@ func (c *WSClient) SetEventHandler(h WSEventHandler) {
 	c.onEvent = h
 }
 
+// IsConnected reports whether the underlying socket is alive. Returns false
+// when never connected, when readLoop has exited (e.g., server-side close),
+// or when a write failure cleared the conn in Call().
+func (c *WSClient) IsConnected() bool {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return c.conn != nil
+}
+
 // Connect dials the WebSocket endpoint and performs the v3 connect handshake.
-// After a successful handshake, starts the background readLoop goroutine.
+// Idempotent: returns nil immediately if already connected. After a successful
+// handshake, starts the background readLoop goroutine.
 func (c *WSClient) Connect(ctx context.Context) error {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
+
+	if c.conn != nil {
+		return nil
+	}
 
 	wsURL := "ws://" + c.endpoint + "/ws"
 	if parsed, err := url.Parse(c.endpoint); err == nil && parsed.Scheme != "" {
@@ -147,6 +161,7 @@ func (c *WSClient) Connect(ctx context.Context) error {
 // Takes conn directly to avoid racing with Close() which nils c.conn.
 func (c *WSClient) readLoop(conn *websocket.Conn) {
 	defer close(c.done)
+	defer c.clearConnIfSame(conn) // mark WS dead so ensureWS reconnects on next call
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -193,6 +208,17 @@ func (c *WSClient) deliverResponse(resp responseFrame) {
 	if ok {
 		ch <- resp
 	}
+}
+
+// clearConnIfSame nils c.conn iff it still points at the supplied conn.
+// Guards against racing with a concurrent reconnect that may have already
+// replaced c.conn with a new socket.
+func (c *WSClient) clearConnIfSame(conn *websocket.Conn) {
+	c.connMu.Lock()
+	if c.conn == conn {
+		c.conn = nil
+	}
+	c.connMu.Unlock()
 }
 
 // cancelAllPending fails all pending Call() waiters with the given error.
@@ -248,6 +274,10 @@ func (c *WSClient) Call(ctx context.Context, method string, params any) (json.Ra
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
+		// Write failure on a WS conn (broken pipe, connection reset) means the
+		// socket is dead — clear it so the next ensureWS reconnects. Without
+		// this, every subsequent Call hits the same dead conn until pod restart.
+		c.clearConnIfSame(conn)
 		return nil, fmt.Errorf("ws write %s: %w", method, err)
 	}
 

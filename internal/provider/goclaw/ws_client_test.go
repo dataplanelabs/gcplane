@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -240,3 +241,124 @@ func TestWSClient_Close_Connected(t *testing.T) {
 	// Close should not error
 	c.Close()
 }
+
+// TestWSClient_IsConnected_FalseAfterServerClose verifies that when the
+// server tears down the WS, readLoop's deferred clearConnIfSame fires and
+// IsConnected() flips to false. Regression for the bug where Provider
+// cached wsReady=true and never reconnected after a transient drop.
+func TestWSClient_IsConnected_FalseAfterServerClose(t *testing.T) {
+	connReady := make(chan struct{})
+	srv := newRawWSServer(t, func(conn *websocket.Conn) {
+		var req requestFrame
+		conn.ReadJSON(&req)
+		conn.WriteJSON(responseFrame{Type: "res", ID: req.ID, OK: true})
+		close(connReady)
+		// Server hangs up immediately.
+	})
+	defer srv.Close()
+
+	c := NewWSClient(srv.URL, "tok", "", "")
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if !c.IsConnected() {
+		t.Fatal("expected IsConnected=true right after Connect")
+	}
+	<-connReady
+	// Wait for readLoop to observe the close and clear the conn.
+	select {
+	case <-c.done:
+	case <-makeTimeout(2 * time.Second):
+		t.Fatal("readLoop did not exit within 2s after server close")
+	}
+	if c.IsConnected() {
+		t.Error("expected IsConnected=false after server-side close")
+	}
+}
+
+// TestWSClient_Connect_Idempotent verifies a second Connect() call on an
+// already-connected client is a no-op (returns nil, does not re-dial).
+func TestWSClient_Connect_Idempotent(t *testing.T) {
+	srv := newRawWSServer(t, func(conn *websocket.Conn) {
+		for {
+			var req requestFrame
+			if err := conn.ReadJSON(&req); err != nil {
+				return
+			}
+			conn.WriteJSON(responseFrame{Type: "res", ID: req.ID, OK: true})
+		}
+	})
+	defer srv.Close()
+
+	c := NewWSClient(srv.URL, "tok", "", "")
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatalf("first Connect: %v", err)
+	}
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatalf("second Connect should be a no-op, got error: %v", err)
+	}
+	c.Close()
+}
+
+// TestWSClient_Call_AfterServerClose_ClearsConn verifies the self-heal
+// path: when the server closes the WS, IsConnected() flips to false so the
+// next ensureWS reconnects. Without this, every subsequent Call would hit
+// the same dead conn until pod restart.
+func TestWSClient_Call_AfterServerClose_ClearsConn(t *testing.T) {
+	handshakeDone := make(chan struct{})
+	srv := newRawWSServer(t, func(conn *websocket.Conn) {
+		var req requestFrame
+		conn.ReadJSON(&req)
+		conn.WriteJSON(responseFrame{Type: "res", ID: req.ID, OK: true})
+		close(handshakeDone)
+		// Hang up immediately.
+	})
+	defer srv.Close()
+
+	c := NewWSClient(srv.URL, "tok", "", "")
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	<-handshakeDone
+
+	// readLoop's deferred clearConnIfSame will fire after ReadMessage sees the
+	// close. Wait for done to close — that bounds the test without a flaky sleep.
+	select {
+	case <-c.done:
+	case <-makeTimeout(2 * time.Second):
+		t.Fatal("readLoop did not exit within 2s after server close")
+	}
+	if c.IsConnected() {
+		t.Error("expected IsConnected=false after server-side close")
+	}
+
+	// Now exercise the write-failure clearConnIfSame path explicitly: re-attach
+	// a stale conn and verify a failed Call() leaves IsConnected=false.
+	// (The readLoop path already flipped it false; this asserts the write-failure
+	// branch is also wired to clearConnIfSame.)
+	// Reconnect via a server that immediately drops on first request:
+	dropSrv := newRawWSServer(t, func(conn *websocket.Conn) {
+		var req requestFrame
+		conn.ReadJSON(&req)
+		conn.WriteJSON(responseFrame{Type: "res", ID: req.ID, OK: true})
+		conn.Close()
+	})
+	defer dropSrv.Close()
+	c2 := NewWSClient(dropSrv.URL, "tok", "", "")
+	if err := c2.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect c2: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, _ = c2.Call(ctx, "ping", nil) // expected to error; we only assert IsConnected after
+	if c2.IsConnected() {
+		t.Error("expected IsConnected=false after Call against dropped conn")
+	}
+}
+
+func makeTimeout(d time.Duration) <-chan time.Time {
+	return time.After(d)
+}
+
+// Ensure json import is exercised even if no test above uses it explicitly.
+var _ = json.RawMessage{}

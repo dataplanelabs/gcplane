@@ -50,8 +50,7 @@ type Provider struct {
 	logger     *slog.Logger
 	http       *HTTPClient
 	ws         *WSClient
-	wsMu       sync.Mutex
-	wsReady    bool
+	wsMu       sync.Mutex // serializes Connect attempts; per-call WS state lives on WSClient
 	tenantOnce sync.Once
 	tenantErr  error
 }
@@ -78,21 +77,24 @@ func New(endpoint, token string, opts ...Option) *Provider {
 	return p
 }
 
-// ensureWS lazily connects the WebSocket client, retrying on transient failures.
-// Unlike sync.Once, a failed connection does not permanently disable WS operations.
+// ensureWS connects the WebSocket client if not already connected, and
+// reconnects after a dropped connection. WSClient.IsConnected() reflects
+// real socket state (cleared by readLoop on exit and by Call() on write
+// failure), so this self-heals after broken pipe / connection reset without
+// requiring a pod restart.
 func (p *Provider) ensureWS(ctx context.Context) error {
-	p.wsMu.Lock()
-	defer p.wsMu.Unlock()
-
-	if p.wsReady {
+	if p.ws.IsConnected() {
 		return nil
 	}
 
-	if err := p.ws.Connect(ctx); err != nil {
-		return err
+	p.wsMu.Lock()
+	defer p.wsMu.Unlock()
+
+	// Double-check under lock: another goroutine may have reconnected.
+	if p.ws.IsConnected() {
+		return nil
 	}
-	p.wsReady = true
-	return nil
+	return p.ws.Connect(ctx)
 }
 
 // SetEventHandler registers a callback for WS push events on the underlying WSClient.
@@ -128,10 +130,6 @@ func (p *Provider) StopLogTail(ctx context.Context) error {
 
 // Close releases provider resources (WS connection).
 func (p *Provider) Close() error {
-	p.wsMu.Lock()
-	p.wsReady = false
-	p.wsMu.Unlock()
-
 	if p.ws != nil {
 		return p.ws.Close()
 	}
