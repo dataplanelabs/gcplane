@@ -470,3 +470,53 @@ func TestMetrics_Snapshot_ThreadSafe(t *testing.T) {
 	}
 	close(done)
 }
+
+// TestReconcileOnce_HashSkip_RetriesAfterPriorError verifies the self-heal
+// behavior: when a reconcile completes with errors, the next "manifest
+// unchanged" tick must NOT short-circuit — otherwise Synced=False latches
+// forever (readyz returns 503 until manifest changes). Regression for the
+// production bug where a transient observe broken-pipe left the pod
+// permanently NotReady.
+func TestReconcileOnce_HashSkip_RetriesAfterPriorError(t *testing.T) {
+	src := &mockSource{
+		manifest: &manifest.Manifest{
+			APIVersion: "gcplane.io/v1",
+			Kind:       "Manifest",
+			Metadata:   manifest.Metadata{Name: "test"},
+			Connection: manifest.Connection{Endpoint: "http://localhost:9999", Token: "tok"},
+			Resources: []manifest.Resource{
+				{Kind: manifest.KindAgent, Name: "bot", Spec: map[string]any{"model": "gpt-4"}},
+			},
+		},
+		hash: testHash,
+	}
+	// First reconcile: observe returns an error → plan.Errors populated → hasErrors=true.
+	prov := &mockProvider{observeErr: errors.New("ws write: broken pipe")}
+	ctrl := newTestController(src, prov)
+
+	ctrl.reconcileOnce()
+	if !ctrl.lastHasErrors {
+		t.Fatal("expected lastHasErrors=true after observe failure")
+	}
+
+	// Second reconcile with same hash: would normally skip, but lastHasErrors
+	// must force a retry. Heal the underlying error so the retry succeeds.
+	prov.observeErr = nil
+	prov.observeResult = nil // → ActionCreate path; createErr=nil → applied
+	beforeCalls := src.calls.Load()
+	ctrl.reconcileOnce()
+	if src.calls.Load() != beforeCalls+1 {
+		t.Errorf("expected Fetch called once more (retry), got delta %d", src.calls.Load()-beforeCalls)
+	}
+	if ctrl.lastHasErrors {
+		t.Error("expected lastHasErrors=false after successful retry")
+	}
+
+	// Third reconcile with same hash and no prior error: should now skip normally.
+	beforeSuccess := ctrl.metrics.Snapshot().SyncSuccess
+	ctrl.reconcileOnce()
+	if ctrl.metrics.Snapshot().SyncSuccess != beforeSuccess {
+		t.Errorf("expected third call to skip (no metrics delta), got SyncSuccess delta %d",
+			ctrl.metrics.Snapshot().SyncSuccess-beforeSuccess)
+	}
+}
