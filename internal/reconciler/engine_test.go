@@ -284,9 +284,12 @@ func TestReconcile_WriteOnlyHashDriftDetected(t *testing.T) {
 	}
 }
 
-func TestReconcile_WriteOnlyHashMissingIsNoop(t *testing.T) {
-	// Resource exists but GoClaw doesn't store/return writeOnlyHash.
-	// Without an observed hash, comparison is skipped to avoid permanent update drift.
+func TestReconcile_WriteOnlyHashMissingAutoHealsForSupportedKind(t *testing.T) {
+	// Resource exists but observed writeOnlyHash is empty. For kinds whose
+	// goclaw side echoes writeOnlyHash (CronJob, Provider, Agent), this is
+	// the first-reconcile-post-migration case: existing rows have empty
+	// default. The reconciler must treat empty observed as drift so the
+	// one-shot update populates observed; subsequent reconciles converge.
 	provider := newMockProvider()
 	provider.observed["Agent/bot"] = map[string]any{"model": "gpt-4"} // no writeOnlyHash
 
@@ -305,8 +308,8 @@ func TestReconcile_WriteOnlyHashMissingIsNoop(t *testing.T) {
 	}
 
 	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
-	if plan.Noops != 1 {
-		t.Errorf("expected noop (no observed hash to compare), got noops=%d updates=%d", plan.Noops, plan.Updates)
+	if plan.Updates != 1 {
+		t.Errorf("expected 1 auto-heal update (empty observed hash on supported kind), got updates=%d noops=%d", plan.Updates, plan.Noops)
 	}
 }
 
