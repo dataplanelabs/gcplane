@@ -56,9 +56,12 @@ func WriteOnlyFields(kind ResourceKind) []string {
 // Current support:
 //   - KindCronJob:  migration 000059 (goclaw)
 //   - KindProvider: migration 000060 (goclaw)
+//   - KindAgent:    migration 000076 (goclaw) — covers contextFiles + all
+//     write-only JSONB configs (toolsConfig, sandboxConfig, ...)
 var kindsSupportingWriteOnlyHash = map[ResourceKind]bool{
 	KindCronJob:  true,
 	KindProvider: true,
+	KindAgent:    true,
 }
 
 // SupportsWriteOnlyHash returns true if goclaw is known to persist + echo
