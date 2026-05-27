@@ -191,6 +191,9 @@ func (p *Provider) deleteSkill(ctx context.Context, key string) error {
 // updateSkill updates an existing skill in GoClaw.
 // Sends only writable fields, then reconciles per-agent grants.
 func (p *Provider) updateSkill(ctx context.Context, key string, spec map[string]any) error {
+	if sourceDir, _ := spec["sourceDir"].(string); sourceDir != "" {
+		return p.createSkill(ctx, key, spec)
+	}
 	if err := p.putSkillFields(ctx, key, spec); err != nil {
 		return err
 	}
