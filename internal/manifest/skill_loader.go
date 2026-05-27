@@ -12,7 +12,7 @@ import (
 
 // systemTenant is the directory name that marks global (cross-tenant) skills.
 // _system/skills/<slug>/ becomes visibility=public; any other tenant directory
-// produces visibility=tenant skills.
+// produces visibility=internal skills, with per-agent grants controlling use.
 const systemTenant = "_system"
 
 // skillsSubdir is the conventional subdirectory under a tenant root where skill
@@ -35,9 +35,9 @@ type skillFrontmatter struct {
 // SKILL.md. It carries fields gcplane needs at apply time but that don't fit
 // inside SKILL.md's frontmatter (e.g. tags, status, per-agent grants).
 type skillOverlay struct {
-	Tags   []string             `yaml:"tags,omitempty"`
-	Status string               `yaml:"status,omitempty"`
-	Grants *skillGrantsOverlay  `yaml:"grants,omitempty"`
+	Tags   []string            `yaml:"tags,omitempty"`
+	Status string              `yaml:"status,omitempty"`
+	Grants *skillGrantsOverlay `yaml:"grants,omitempty"`
 }
 
 // skillGrantsOverlay mirrors the MCPServer `grants.agents` shape so per-agent
@@ -63,7 +63,7 @@ type skillOverridesDoc struct {
 //	<dir>/skill-overrides.yaml            → KindSkillConfig per entry
 //
 // When the dir basename equals `_system`, synthesized skills are tagged
-// visibility=public; otherwise visibility=tenant.
+// visibility=public; otherwise visibility=internal.
 // Returns an empty slice (not nil) when no skills are found, for backward
 // compatibility with existing YAML-only deployments.
 func LoadSkillResources(dir string) ([]Resource, error) {
@@ -136,7 +136,7 @@ func loadSkillDir(skillDir, slug, scope string) (Resource, error) {
 		return Resource{}, fmt.Errorf("%s: frontmatter is missing required field 'name'", skillMDPath)
 	}
 
-	visibility := "tenant"
+	visibility := "internal"
 	if scope == "global" {
 		visibility = "public"
 	}
