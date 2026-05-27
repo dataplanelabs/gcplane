@@ -40,8 +40,8 @@ func TestLoadSkillResources_HappyPath(t *testing.T) {
 	if res[0].Kind != KindSkill || res[0].Name != "say-hello" {
 		t.Errorf("expected Skill say-hello first, got %s/%s", res[0].Kind, res[0].Name)
 	}
-	if res[0].Spec["visibility"] != "tenant" {
-		t.Errorf("expected visibility=tenant for non-system dir, got %v", res[0].Spec["visibility"])
+	if res[0].Spec["visibility"] != "internal" {
+		t.Errorf("expected visibility=internal for non-system dir, got %v", res[0].Spec["visibility"])
 	}
 	if res[0].Spec["description"] != "greets the user" {
 		t.Errorf("description not parsed: %v", res[0].Spec["description"])
