@@ -237,6 +237,49 @@ func TestSkill_Create_UploadsZIP(t *testing.T) {
 	}
 }
 
+func TestSkill_Update_WithSourceDirUploadsZIP(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: Test Skill\nslug: test-skill\ndescription: hi\n---\nbody\n"), 0o644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+
+	gotUpload := false
+	p, cleanup := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/skills/upload":
+			gotUpload = true
+			if err := r.ParseMultipartForm(8 << 20); err != nil {
+				t.Errorf("parse multipart: %v", err)
+			}
+			if got := r.FormValue("source"); got != "gcplane" {
+				t.Errorf("expected source=gcplane form field, got %q", got)
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{"slug": "test-skill", "status": "unchanged"})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/skills":
+			json.NewEncoder(w).Encode(map[string]any{
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "test-skill"}},
+			})
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/skills/skill-uuid":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents":
+			json.NewEncoder(w).Encode(map[string]any{"agents": []map[string]any{}})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer cleanup()
+
+	if err := p.Update(context.Background(), manifest.KindSkill, "test-skill", map[string]any{
+		"sourceDir": dir,
+	}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if !gotUpload {
+		t.Fatal("expected update with sourceDir to upload skill package")
+	}
+}
+
 // TestSkill_Update_ReconcilesGrants verifies update path: when spec declares
 // grants.agents=[van-anh], a currently-granted [old-bot] is revoked and
 // van-anh is granted.
