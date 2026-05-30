@@ -125,6 +125,12 @@ func toSlice(v any) ([]any, bool) {
 	switch s := v.(type) {
 	case []any:
 		return s, true
+	case []string:
+		out := make([]any, len(s))
+		for i, v := range s {
+			out[i] = v
+		}
+		return out, true
 	default:
 		return nil, false
 	}

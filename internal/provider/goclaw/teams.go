@@ -68,10 +68,8 @@ func (p *Provider) updateTeam(ctx context.Context, key string, spec map[string]a
 		teamID = strVal(current, "name")
 	}
 
-	params := map[string]any{
-		"teamId": teamID,
-		"patch":  translateSpec(spec),
-	}
+	params := translateSpec(spec)
+	params["teamId"] = teamID
 
 	_, err = p.ws.Call(ctx, "teams.update", params)
 	if err != nil {

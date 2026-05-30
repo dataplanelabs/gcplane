@@ -103,3 +103,19 @@ func TestCompareSpec_NumericTypeEquality(t *testing.T) {
 		t.Errorf("expected numeric types to match, got diffs: %v", diffs)
 	}
 }
+
+func TestCompareSpec_StringSliceTypeEquality(t *testing.T) {
+	// YAML/frontmatter overlays commonly become []any while provider-observed
+	// grant lists are native []string. They are semantically identical.
+	desired := map[string]any{
+		"grants": map[string]any{"agents": []any{"agent-a", "agent-b"}},
+	}
+	actual := map[string]any{
+		"grants": map[string]any{"agents": []string{"agent-a", "agent-b"}},
+	}
+
+	diffs := CompareSpec(desired, actual)
+	if len(diffs) != 0 {
+		t.Errorf("expected string slices with different concrete types to match, got diffs: %v", diffs)
+	}
+}

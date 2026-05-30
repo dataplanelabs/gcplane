@@ -11,9 +11,10 @@ import (
 
 // wsResponse describes one canned RPC response for the mock WS server.
 type wsResponse struct {
-	method  string
-	payload any
-	ok      bool
+	method       string
+	payload      any
+	ok           bool
+	assertParams func(*testing.T, any)
 }
 
 // newWSTestServer creates an httptest server with both HTTP routes and a WebSocket
@@ -67,6 +68,10 @@ func newWSTestServer(t *testing.T, responses []wsResponse, httpRoutes http.Handl
 					Error: &rpcError{Message: "method not found: " + req.Method},
 				})
 				continue
+			}
+
+			if rr.assertParams != nil {
+				rr.assertParams(t, req.Params)
 			}
 
 			payload, _ := json.Marshal(rr.payload)
@@ -149,4 +154,3 @@ func newWSTestServerSmart(t *testing.T, agents []map[string]any, linksByAgentID 
 	p := New(srv.URL, "test-token")
 	return p, srv.Close
 }
-
