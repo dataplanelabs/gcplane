@@ -136,20 +136,19 @@ func TestReconcileOnce_SuccessfulReconcile_IncrementsSuccess(t *testing.T) {
 	}
 }
 
-func TestReconcileOnce_HashSkip_NoSecondReconcile(t *testing.T) {
+func TestReconcileOnce_HashUnchanged_StillChecksDrift(t *testing.T) {
 	src := &mockSource{manifest: minimalManifest(), hash: "aabbccddeeff0011"} // ≥12 chars for hash[:12] in controller
 	ctrl := newTestController(src, &mockProvider{})
 
 	ctrl.reconcileOnce() // sets lastHash
-	ctrl.reconcileOnce() // should skip because hash unchanged
+	ctrl.reconcileOnce() // should still reconcile because provider state can drift
 
 	if src.calls.Load() != 2 {
 		t.Errorf("expected Fetch called twice, got %d", src.calls.Load())
 	}
-	// Only first call does real work; metrics should show 1 success
 	snap := ctrl.metrics.Snapshot()
-	if snap.SyncSuccess != 1 {
-		t.Errorf("expected SyncSuccess=1 (second call skipped), got %d", snap.SyncSuccess)
+	if snap.SyncSuccess != 2 {
+		t.Errorf("expected SyncSuccess=2 (same hash still reconciles), got %d", snap.SyncSuccess)
 	}
 }
 
@@ -471,13 +470,10 @@ func TestMetrics_Snapshot_ThreadSafe(t *testing.T) {
 	close(done)
 }
 
-// TestReconcileOnce_HashSkip_RetriesAfterPriorError verifies the self-heal
-// behavior: when a reconcile completes with errors, the next "manifest
-// unchanged" tick must NOT short-circuit — otherwise Synced=False latches
-// forever (readyz returns 503 until manifest changes). Regression for the
-// production bug where a transient observe broken-pipe left the pod
-// permanently NotReady.
-func TestReconcileOnce_HashSkip_RetriesAfterPriorError(t *testing.T) {
+// TestReconcileOnce_HashUnchanged_RunsAfterPriorError verifies the self-heal
+// behavior: provider drift checks run even when the source hash is unchanged,
+// so transient observe failures recover without a no-op config commit.
+func TestReconcileOnce_HashUnchanged_RunsAfterPriorError(t *testing.T) {
 	src := &mockSource{
 		manifest: &manifest.Manifest{
 			APIVersion: "gcplane.io/v1",
@@ -495,12 +491,12 @@ func TestReconcileOnce_HashSkip_RetriesAfterPriorError(t *testing.T) {
 	ctrl := newTestController(src, prov)
 
 	ctrl.reconcileOnce()
-	if !ctrl.lastHasErrors {
-		t.Fatal("expected lastHasErrors=true after observe failure")
+	if ctrl.metrics.Snapshot().SyncErrors != 1 {
+		t.Fatal("expected SyncErrors=1 after observe failure")
 	}
 
-	// Second reconcile with same hash: would normally skip, but lastHasErrors
-	// must force a retry. Heal the underlying error so the retry succeeds.
+	// Second reconcile with same hash still runs. Heal the underlying error so
+	// the retry succeeds.
 	prov.observeErr = nil
 	prov.observeResult = nil // → ActionCreate path; createErr=nil → applied
 	beforeCalls := src.calls.Load()
@@ -508,15 +504,15 @@ func TestReconcileOnce_HashSkip_RetriesAfterPriorError(t *testing.T) {
 	if src.calls.Load() != beforeCalls+1 {
 		t.Errorf("expected Fetch called once more (retry), got delta %d", src.calls.Load()-beforeCalls)
 	}
-	if ctrl.lastHasErrors {
-		t.Error("expected lastHasErrors=false after successful retry")
+	if ctrl.metrics.Snapshot().SyncSuccess != 1 {
+		t.Errorf("expected SyncSuccess=1 after successful retry, got %d", ctrl.metrics.Snapshot().SyncSuccess)
 	}
 
-	// Third reconcile with same hash and no prior error: should now skip normally.
+	// Third reconcile with same hash still checks provider drift.
 	beforeSuccess := ctrl.metrics.Snapshot().SyncSuccess
 	ctrl.reconcileOnce()
-	if ctrl.metrics.Snapshot().SyncSuccess != beforeSuccess {
-		t.Errorf("expected third call to skip (no metrics delta), got SyncSuccess delta %d",
+	if ctrl.metrics.Snapshot().SyncSuccess != beforeSuccess+1 {
+		t.Errorf("expected third call to reconcile, got SyncSuccess delta %d",
 			ctrl.metrics.Snapshot().SyncSuccess-beforeSuccess)
 	}
 }

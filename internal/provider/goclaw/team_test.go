@@ -65,7 +65,22 @@ func TestTeam_Update(t *testing.T) {
 				{"id": "t-uuid", "name": "alpha-team"},
 			},
 		}},
-		{method: "teams.update", ok: true, payload: map[string]any{"ok": true}},
+		{method: "teams.update", ok: true, payload: map[string]any{"ok": true}, assertParams: func(t *testing.T, params any) {
+			t.Helper()
+			got, ok := params.(map[string]any)
+			if !ok {
+				t.Fatalf("teams.update params = %T, want map[string]any", params)
+			}
+			if got["teamId"] != "t-uuid" {
+				t.Fatalf("teamId = %v, want t-uuid", got["teamId"])
+			}
+			if _, hasPatch := got["patch"]; hasPatch {
+				t.Fatalf("teams.update should send fields at top level, got nested patch: %#v", got)
+			}
+			if got["description"] != "Updated" {
+				t.Fatalf("description = %v, want Updated", got["description"])
+			}
+		}},
 	}, nil)
 	defer cleanup()
 
