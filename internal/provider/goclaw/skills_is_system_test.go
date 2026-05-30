@@ -11,7 +11,7 @@ func TestIsSystemSourceDir(t *testing.T) {
 		"/abs/path/_system/skills/bar":            true,
 		"goclaw-config/_system/skills/baz":        true,
 
-		"annhien/skills/sales-of-day":             false,
+		"tenant-a/skills/example-skill":           false,
 		"tenant/skills/_system_lookalike":         false,
 		"./skills/_system-fake/x":                 false,
 		"":                                        false,
