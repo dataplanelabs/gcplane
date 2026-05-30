@@ -281,8 +281,8 @@ func TestSkill_Update_WithSourceDirUploadsZIP(t *testing.T) {
 }
 
 // TestSkill_Update_ReconcilesGrants verifies update path: when spec declares
-// grants.agents=[van-anh], a currently-granted [old-bot] is revoked and
-// van-anh is granted.
+// grants.agents=[agent-alpha], a currently-granted [agent-beta] is revoked and
+// agent-alpha is granted.
 func TestSkill_Update_ReconcilesGrants(t *testing.T) {
 	var grantedAgentIDs []string
 	var revokedAgentIDs []string
@@ -291,26 +291,26 @@ func TestSkill_Update_ReconcilesGrants(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/skills":
 			json.NewEncoder(w).Encode(map[string]any{
-				"skills": []map[string]any{{"id": "skill-uuid", "slug": "sales-of-day"}},
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "example-skill"}},
 			})
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/skills/skill-uuid":
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents":
 			json.NewEncoder(w).Encode(map[string]any{
 				"agents": []map[string]any{
-					{"id": "agent-van-anh", "agent_key": "van-anh"},
-					{"id": "agent-old-bot", "agent_key": "old-bot"},
+					{"id": "agent-alpha-id", "agent_key": "agent-alpha"},
+					{"id": "agent-beta-id", "agent_key": "agent-beta"},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent-van-anh/skills":
-			// van-anh: not yet granted
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent-alpha-id/skills":
+			// agent-alpha: not yet granted
 			json.NewEncoder(w).Encode(map[string]any{
-				"skills": []map[string]any{{"id": "skill-uuid", "slug": "sales-of-day", "granted": false}},
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "example-skill", "granted": false}},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent-old-bot/skills":
-			// old-bot: currently granted, must be revoked
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/agent-beta-id/skills":
+			// agent-beta: currently granted, must be revoked
 			json.NewEncoder(w).Encode(map[string]any{
-				"skills": []map[string]any{{"id": "skill-uuid", "slug": "sales-of-day", "granted": true}},
+				"skills": []map[string]any{{"id": "skill-uuid", "slug": "example-skill", "granted": true}},
 			})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/skills/skill-uuid/grants/agent":
 			var body map[string]any
@@ -329,18 +329,18 @@ func TestSkill_Update_ReconcilesGrants(t *testing.T) {
 	defer cleanup()
 
 	spec := map[string]any{
-		"description": "daily sales summary",
-		"grants":      map[string]any{"agents": []any{"van-anh"}},
+		"description": "example skill",
+		"grants":      map[string]any{"agents": []any{"agent-alpha"}},
 	}
-	if err := p.Update(context.Background(), manifest.KindSkill, "sales-of-day", spec); err != nil {
+	if err := p.Update(context.Background(), manifest.KindSkill, "example-skill", spec); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
-	if len(grantedAgentIDs) != 1 || grantedAgentIDs[0] != "agent-van-anh" {
-		t.Errorf("expected grant for agent-van-anh, got %v", grantedAgentIDs)
+	if len(grantedAgentIDs) != 1 || grantedAgentIDs[0] != "agent-alpha-id" {
+		t.Errorf("expected grant for agent-alpha-id, got %v", grantedAgentIDs)
 	}
-	if len(revokedAgentIDs) != 1 || revokedAgentIDs[0] != "agent-old-bot" {
-		t.Errorf("expected revoke for agent-old-bot, got %v", revokedAgentIDs)
+	if len(revokedAgentIDs) != 1 || revokedAgentIDs[0] != "agent-beta-id" {
+		t.Errorf("expected revoke for agent-beta-id, got %v", revokedAgentIDs)
 	}
 }
 

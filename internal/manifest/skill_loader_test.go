@@ -127,7 +127,7 @@ func TestLoadSkillResources_GrantsOverlay(t *testing.T) {
 	dir := t.TempDir()
 	writeSkill(t, dir, "with-grants", "---\nname: With Grants\n---\n")
 
-	overlay := []byte("grants:\n  agents:\n    - van-anh\n    - assistant\n")
+	overlay := []byte("grants:\n  agents:\n    - agent-alpha\n    - agent-beta\n")
 	if err := os.WriteFile(filepath.Join(dir, "skills", "with-grants", "frontmatter.yaml"), overlay, 0o644); err != nil {
 		t.Fatalf("write overlay: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestLoadSkillResources_GrantsOverlay(t *testing.T) {
 		t.Fatalf("expected grants map, got %v", res[0].Spec["grants"])
 	}
 	agents, _ := grants["agents"].([]any)
-	if len(agents) != 2 || agents[0] != "van-anh" || agents[1] != "assistant" {
+	if len(agents) != 2 || agents[0] != "agent-alpha" || agents[1] != "agent-beta" {
 		t.Errorf("grants.agents overlay not applied: %v", agents)
 	}
 }
