@@ -324,7 +324,7 @@ func TestReconcile_WriteOnlyHashMatchesNoop(t *testing.T) {
 
 	provider := newMockProvider()
 	provider.observed["Agent/bot"] = map[string]any{
-		"model":        "gpt-4",
+		"model":         "gpt-4",
 		"writeOnlyHash": expectedHash,
 	}
 
@@ -573,7 +573,7 @@ func TestWarnBlindNoop_NoWarnOnCreate(t *testing.T) {
 				Kind: manifest.KindBuiltinToolConfig,
 				Name: "create-image",
 				Spec: map[string]any{
-					"enabled": true,
+					"enabled":  true,
 					"settings": map[string]any{"providers": []any{"dashscope"}},
 				},
 			},
@@ -627,6 +627,40 @@ func TestWarnBlindNoop_GenericAcrossKinds(t *testing.T) {
 	}
 	if !strings.Contains(out, "grants") {
 		t.Errorf("expected 'grants' in warning log, got:\n%s", out)
+	}
+}
+
+func TestReconcile_MCPServerHeadersAreBlindNoop(t *testing.T) {
+	provider := newMockProvider()
+	provider.observed["MCPServer/search"] = map[string]any{
+		"transport": "http",
+		"url":       "http://search-mcp.local",
+	}
+
+	var buf bytes.Buffer
+	engine := NewEngine(provider, newTestLogger(&buf))
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{
+				Kind: manifest.KindMCPServer,
+				Name: "search",
+				Spec: map[string]any{
+					"transport": "http",
+					"url":       "http://search-mcp.local",
+					"headers":   map[string]any{"Authorization": "Bearer token"},
+				},
+			},
+		},
+	}
+
+	plan, _ := engine.Reconcile(context.Background(), m, ReconcileOpts{DryRun: true})
+	if plan.Noops != 1 || plan.Updates != 0 {
+		t.Fatalf("expected blind noop for unobservable headers, got noops=%d updates=%d", plan.Noops, plan.Updates)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "no-op may hide drift") || !strings.Contains(out, "headers") {
+		t.Errorf("expected blind-noop warning for MCPServer headers, got:\n%s", out)
 	}
 }
 

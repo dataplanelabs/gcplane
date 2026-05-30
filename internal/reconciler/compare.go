@@ -55,6 +55,13 @@ func compareRecursiveExcluding(prefix string, desired, actual map[string]any, di
 			continue
 		}
 
+		if unorderedStringSetPath(path) {
+			if !stringSetEqual(dVal, aVal) {
+				diffs[path] = FieldDiff{Old: aVal, New: dVal}
+			}
+			continue
+		}
+
 		// Compare values
 		if !valuesEqual(dVal, aVal) {
 			diffs[path] = FieldDiff{Old: aVal, New: dVal}
@@ -134,6 +141,45 @@ func toSlice(v any) ([]any, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func unorderedStringSetPath(path string) bool {
+	switch path {
+	case "grants.agents", "grants.users":
+		return true
+	default:
+		return false
+	}
+}
+
+func stringSetEqual(a, b any) bool {
+	aStrings, aOK := toStringSet(a)
+	bStrings, bOK := toStringSet(b)
+	if !aOK || !bOK || len(aStrings) != len(bStrings) {
+		return false
+	}
+	for s := range aStrings {
+		if !bStrings[s] {
+			return false
+		}
+	}
+	return true
+}
+
+func toStringSet(v any) (map[string]bool, bool) {
+	slice, ok := toSlice(v)
+	if !ok {
+		return nil, false
+	}
+	out := make(map[string]bool, len(slice))
+	for _, item := range slice {
+		s, ok := item.(string)
+		if !ok {
+			return nil, false
+		}
+		out[s] = true
+	}
+	return out, true
 }
 
 func toFloat64(v any) (float64, bool) {

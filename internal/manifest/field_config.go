@@ -4,8 +4,8 @@ package manifest
 // by the GoClaw API (secrets, UUIDs, grants managed separately).
 // These fields are excluded from comparison during reconciliation.
 var writeOnlyFields = map[ResourceKind][]string{
-	KindTenant:            {},
-	KindProvider:          {"apiKey"},
+	KindTenant:   {},
+	KindProvider: {"apiKey"},
 	KindAgent: {
 		"contextFiles", "systemPrompt",
 		// Complex JSONB configs — sent on create/update but not compared
@@ -16,10 +16,10 @@ var writeOnlyFields = map[ResourceKind][]string{
 		"reasoningConfig", "workspaceSharing", "chatgptOauthRouting",
 		"shellDenyGroups", "kgDedupConfig",
 	},
-	KindChannel:           {"agentKey", "credentials", "config"},
-	KindMCPServer:         {"grants"},
-	KindCronJob:           {"agentKey", "message"},
-	KindAgentTeam:         {"lead", "members", "displayName"},
+	KindChannel:   {"agentKey", "credentials", "config"},
+	KindMCPServer: {"grants", "headers"},
+	KindCronJob:   {"agentKey", "message"},
+	KindAgentTeam: {"lead", "members", "displayName"},
 	KindSkill: {
 		// sourceDir is the local filesystem path used by gcplane to build the
 		// upload ZIP; goclaw never returns it.
@@ -31,8 +31,8 @@ var writeOnlyFields = map[ResourceKind][]string{
 	KindBuiltinToolConfig: {}, // settings are observable via tenant_settings in list response
 	KindSkillConfig:       {},
 	KindSystemConfig:      {},
-	KindMCPCredentials:    {"credentials"},      // credentials are write-only (encrypted)
-	KindSecureCLI:         {"env"},              // encrypted env vars are write-only
+	KindMCPCredentials:    {"credentials"},            // credentials are write-only (encrypted)
+	KindSecureCLI:         {"env"},                    // encrypted env vars are write-only
 	KindSecureCLIGrant:    {"agentKey", "binaryName"}, // manifest references, not in API response
 	KindAgentLink: {
 		"sourceAgent", "targetAgent", // manifest references resolved to UUIDs at create time
