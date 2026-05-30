@@ -119,3 +119,34 @@ func TestCompareSpec_StringSliceTypeEquality(t *testing.T) {
 		t.Errorf("expected string slices with different concrete types to match, got diffs: %v", diffs)
 	}
 }
+
+func TestCompareSpec_GrantAgentOrderIgnored(t *testing.T) {
+	desired := map[string]any{
+		"grants": map[string]any{"agents": []any{"agent-a", "agent-b", "agent-c"}},
+	}
+	actual := map[string]any{
+		"grants": map[string]any{"agents": []string{"agent-c", "agent-a", "agent-b"}},
+	}
+
+	diffs := CompareSpec(desired, actual)
+	if len(diffs) != 0 {
+		t.Errorf("expected grant agent order to be ignored, got diffs: %v", diffs)
+	}
+}
+
+func TestCompareSpec_GrantAgentSetDriftDetected(t *testing.T) {
+	desired := map[string]any{
+		"grants": map[string]any{"agents": []any{"agent-a", "agent-b"}},
+	}
+	actual := map[string]any{
+		"grants": map[string]any{"agents": []string{"agent-a", "agent-c"}},
+	}
+
+	diffs := CompareSpec(desired, actual)
+	if len(diffs) != 1 {
+		t.Fatalf("expected one grant set diff, got %d: %v", len(diffs), diffs)
+	}
+	if _, ok := diffs["grants.agents"]; !ok {
+		t.Errorf("expected grants.agents diff, got %v", diffs)
+	}
+}
