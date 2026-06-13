@@ -9,6 +9,42 @@ import (
 	"github.com/dataplanelabs/gcplane/internal/manifest"
 )
 
+// Regression: a disabled cron must still be observed. cron.list omits disabled
+// jobs unless includeDisabled=true; without it the reconciler never sees an
+// enabled=false manifest cron and re-issues CREATE every cycle (duplicate key).
+func TestCronJob_Observe_DisabledIncluded(t *testing.T) {
+	p, cleanup := newWSTestServer(t, []wsResponse{
+		{method: "cron.list", ok: true,
+			assertParams: func(t *testing.T, params any) {
+				t.Helper()
+				got, ok := params.(map[string]any)
+				if !ok {
+					t.Fatalf("cron.list params = %T, want map[string]any (includeDisabled must be sent)", params)
+				}
+				if got["includeDisabled"] != true {
+					t.Fatalf("cron.list includeDisabled = %v, want true", got["includeDisabled"])
+				}
+			},
+			payload: map[string]any{
+				"jobs": []map[string]any{
+					{"id": "j9", "name": "kpi-weekly-report", "enabled": false, "schedule": "0 8 * * 1"},
+				},
+			}},
+	}, nil)
+	defer cleanup()
+
+	result, err := p.Observe(context.Background(), manifest.KindCronJob, "kpi-weekly-report")
+	if err != nil {
+		t.Fatalf("observe: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected disabled cron to be observed, got nil (would trigger spurious CREATE)")
+	}
+	if result["name"] != "kpi-weekly-report" {
+		t.Errorf("name = %v, want kpi-weekly-report", result["name"])
+	}
+}
+
 func TestCronJob_Observe_Found(t *testing.T) {
 	p, cleanup := newWSTestServer(t, []wsResponse{
 		{method: "cron.list", ok: true, payload: map[string]any{
