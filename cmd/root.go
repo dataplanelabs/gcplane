@@ -87,6 +87,7 @@ func init() {
 	rootCmd.AddCommand(destroyCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(exportCmd)
+	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(topCmd)

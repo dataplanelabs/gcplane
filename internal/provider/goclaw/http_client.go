@@ -80,6 +80,12 @@ func (c *HTTPClient) Delete(ctx context.Context, path string) error {
 	return err
 }
 
+// GetRaw performs an authenticated GET and returns the raw response body bytes.
+// Used for non-JSON responses: tar.gz archives and ?raw=true file downloads.
+func (c *HTTPClient) GetRaw(ctx context.Context, path string) ([]byte, error) {
+	return c.doRaw(ctx, http.MethodGet, path, nil, "")
+}
+
 // PostMultipart performs an authenticated POST with a multipart body.
 // Used for skill ZIP uploads. The default Content-Type set by do() (application/json)
 // is overridden via the contentType argument.

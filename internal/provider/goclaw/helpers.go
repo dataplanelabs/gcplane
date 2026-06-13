@@ -108,6 +108,12 @@ func strVal(m map[string]any, key string) string {
 	return s
 }
 
+// boolVal safely extracts a bool value from a map.
+func boolVal(m map[string]any, key string) bool {
+	b, _ := m[key].(bool)
+	return b
+}
+
 // copyMap creates a shallow copy of a map.
 func copyMap(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))
