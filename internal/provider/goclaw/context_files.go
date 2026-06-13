@@ -9,8 +9,12 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 )
+
+// maxContextFileSize caps a single decompressed context-file tar entry (gzip-bomb guard).
+const maxContextFileSize = 8 << 20
 
 // syncContextFiles upserts agent context files via the merge import API.
 // Builds a tar.gz archive with context_files/{name} entries and POSTs it
@@ -65,6 +69,66 @@ func (p *Provider) syncContextFiles(ctx context.Context, agentID string, files [
 		"files", len(files))
 
 	return nil
+}
+
+// DownloadAgentContextFiles fetches context files for an agent from goclaw.
+// Calls GET /v1/agents/{id}/export?sections=context_files&stream=false
+// and untars the returned gzip archive into [{name, content}] pairs.
+func (p *Provider) DownloadAgentContextFiles(ctx context.Context, agentKey string) ([]map[string]string, error) {
+	id, err := p.resolveAgentID(ctx, agentKey)
+	if err != nil {
+		return nil, err
+	}
+
+	gz, err := p.http.GetRaw(ctx, "/v1/agents/"+id+"/export?sections=context_files&stream=false")
+	if err != nil {
+		return nil, fmt.Errorf("export context files for agent %s: %w", agentKey, err)
+	}
+
+	return parseContextFilesArchive(gz)
+}
+
+// parseContextFilesArchive untars a gzip archive and returns entries under
+// the "context_files/" prefix as [{name, content}] pairs.
+func parseContextFilesArchive(gz []byte) ([]map[string]string, error) {
+	gr, err := gzip.NewReader(bytes.NewReader(gz))
+	if err != nil {
+		return nil, fmt.Errorf("gzip open: %w", err)
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	const prefix = "context_files/"
+	var out []map[string]string
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("tar read: %w", err)
+		}
+		if hdr.FileInfo().IsDir() {
+			continue
+		}
+		name := hdr.Name
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		name = strings.TrimPrefix(name, prefix)
+		if name == "" {
+			continue
+		}
+		data, err := io.ReadAll(io.LimitReader(tr, maxContextFileSize+1))
+		if err != nil {
+			return nil, fmt.Errorf("read tar entry %s: %w", hdr.Name, err)
+		}
+		if int64(len(data)) > maxContextFileSize {
+			return nil, fmt.Errorf("context file %s exceeds %d bytes", name, maxContextFileSize)
+		}
+		out = append(out, map[string]string{"name": name, "content": string(data)})
+	}
+	return out, nil
 }
 
 // buildContextFilesArchive creates a tar.gz archive with context_files/{name} entries.

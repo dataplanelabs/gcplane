@@ -134,6 +134,8 @@ func (p *Provider) listAllSkills(ctx context.Context) ([]reconciler.ResourceInfo
 			Kind:      manifest.KindSkill,
 			Name:      strVal(s, "slug"),
 			CreatedBy: strVal(s, "created_by"),
+			Source:    strVal(s, "source"),
+			IsSystem:  boolVal(s, "is_system"),
 		})
 	}
 	return infos, nil

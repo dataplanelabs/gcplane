@@ -371,6 +371,63 @@ func (p *Provider) agentHasSkillGrant(ctx context.Context, agentID, skillID stri
 	return false, nil
 }
 
+// DownloadSkill fetches the full file tree for a skill from goclaw.
+// Uses GET /v1/skills/{id}/files for the tree, then per-file
+// GET /v1/skills/{id}/files/{path}?raw=true for raw bytes.
+func (p *Provider) DownloadSkill(ctx context.Context, slug string) ([]skillpkg.SkillFile, error) {
+	id, err := p.resolveSkillIDFromList(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	treeData, err := p.http.Get(ctx, "/v1/skills/"+id+"/files")
+	if err != nil {
+		return nil, fmt.Errorf("list skill files %s: %w", slug, err)
+	}
+	var treeResp struct {
+		Files []struct {
+			Path  string `json:"path"`
+			IsDir bool   `json:"isDir"`
+		} `json:"files"`
+	}
+	if err := json.Unmarshal(treeData, &treeResp); err != nil {
+		return nil, fmt.Errorf("parse skill file tree %s: %w", slug, err)
+	}
+
+	var out []skillpkg.SkillFile
+	for _, entry := range treeResp.Files {
+		if entry.IsDir || entry.Path == "" {
+			continue
+		}
+		raw, err := p.http.GetRaw(ctx, "/v1/skills/"+id+"/files/"+entry.Path+"?raw=true")
+		if err != nil {
+			return nil, fmt.Errorf("download skill file %s/%s: %w", slug, entry.Path, err)
+		}
+		out = append(out, skillpkg.SkillFile{Path: entry.Path, Data: raw})
+	}
+	return out, nil
+}
+
+// DownloadSkillSource fetches skill files plus the grants overlay.
+// Returns files and a sorted list of grantee agent keys for frontmatter.yaml.
+func (p *Provider) DownloadSkillSource(ctx context.Context, slug string) ([]skillpkg.SkillFile, []string, error) {
+	files, err := p.DownloadSkill(ctx, slug)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	id, err := p.resolveSkillIDFromList(ctx, slug)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	grantees, err := p.listSkillGrantAgentKeys(ctx, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list skill grants %s: %w", slug, err)
+	}
+	return files, grantees, nil
+}
+
 // isSystemSourceDir reports whether the given filesystem path is under a
 // `_system/` directory anywhere in its ancestry. Used by createSkill to mark
 // uploads with is_system=true so goclaw exposes them cross-tenant without a
