@@ -144,7 +144,8 @@ func (p *Provider) listAllCronJobs(ctx context.Context) ([]reconciler.ResourceIn
 	if err := p.ensureWS(ctx); err != nil {
 		return nil, fmt.Errorf("ws connect for cron: %w", err)
 	}
-	payload, err := p.ws.Call(ctx, "cron.list", nil)
+	// includeDisabled so prune/diff sees disabled crons too (matches observeCronJob).
+	payload, err := p.ws.Call(ctx, "cron.list", map[string]any{"includeDisabled": true})
 	if err != nil {
 		return nil, fmt.Errorf("cron.list: %w", err)
 	}

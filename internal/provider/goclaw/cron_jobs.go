@@ -21,7 +21,10 @@ func (p *Provider) observeCronJob(ctx context.Context, key string) (map[string]a
 		return nil, fmt.Errorf("ws connect for cron: %w", err)
 	}
 
-	payload, err := p.ws.Call(ctx, "cron.list", nil)
+	// includeDisabled: cron.list omits disabled jobs by default. Without this,
+	// a manifest cron with enabled=false is never observed, so the reconciler
+	// re-issues CREATE every cycle and hits the (agent,tenant,name) unique key.
+	payload, err := p.ws.Call(ctx, "cron.list", map[string]any{"includeDisabled": true})
 	if err != nil {
 		return nil, fmt.Errorf("cron.list: %w", err)
 	}
