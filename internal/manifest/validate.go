@@ -32,6 +32,7 @@ var validKinds = map[ResourceKind]bool{
 	KindSecureCLI:         true,
 	KindSecureCLIGrant:    true,
 	KindAgentLink:         true,
+	KindWorkstation:       true,
 }
 
 // Validate checks the manifest for structural errors.

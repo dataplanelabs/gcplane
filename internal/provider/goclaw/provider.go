@@ -169,6 +169,8 @@ func (p *Provider) Observe(ctx context.Context, kind manifest.ResourceKind, key 
 		return p.observeSecureCLIGrant(ctx, key)
 	case manifest.KindAgentLink:
 		return p.observeAgentLink(ctx, key)
+	case manifest.KindWorkstation:
+		return p.observeWorkstation(ctx, key)
 	default:
 		return nil, fmt.Errorf("observe not implemented for kind %s", kind)
 	}
@@ -242,6 +244,8 @@ func (p *Provider) Create(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.createSecureCLIGrant(ctx, key, spec)
 	case manifest.KindAgentLink:
 		return p.createAgentLink(ctx, key, spec)
+	case manifest.KindWorkstation:
+		return p.createWorkstation(ctx, key, spec)
 	default:
 		return fmt.Errorf("create not implemented for kind %s", kind)
 	}
@@ -280,6 +284,8 @@ func (p *Provider) Update(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.updateSecureCLIGrant(ctx, key, spec)
 	case manifest.KindAgentLink:
 		return p.updateAgentLink(ctx, key, spec)
+	case manifest.KindWorkstation:
+		return p.updateWorkstation(ctx, key, spec)
 	default:
 		return fmt.Errorf("update not implemented for kind %s", kind)
 	}
@@ -318,6 +324,8 @@ func (p *Provider) Delete(ctx context.Context, kind manifest.ResourceKind, key s
 		return p.deleteAgentLink(ctx, key)
 	case manifest.KindSkill:
 		return p.deleteSkill(ctx, key)
+	case manifest.KindWorkstation:
+		return p.deleteWorkstation(ctx, key)
 	default:
 		return fmt.Errorf("delete not implemented for kind %s", kind)
 	}
@@ -346,6 +354,8 @@ func (p *Provider) ListAll(ctx context.Context, kind manifest.ResourceKind) ([]r
 		return p.listAllSecureCLIs(ctx)
 	case manifest.KindAgentLink:
 		return p.listAllAgentLinks(ctx)
+	case manifest.KindWorkstation:
+		return p.listAllWorkstations(ctx)
 	case manifest.KindBuiltinToolConfig, manifest.KindSkillConfig, manifest.KindSystemConfig, manifest.KindMCPCredentials, manifest.KindSecureCLIGrant:
 		return nil, nil // per-tenant configs and child resources not enumerable for prune
 	default:

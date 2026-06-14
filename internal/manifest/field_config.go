@@ -38,6 +38,12 @@ var writeOnlyFields = map[ResourceKind][]string{
 		"sourceAgent", "targetAgent", // manifest references resolved to UUIDs at create time
 		"settings", // per-user grants and rate limits — JSONB write-only
 	},
+	KindWorkstation: {
+		// SSH credential fields — stored AES-256-GCM encrypted, never returned by API.
+		"privateKey", "knownHostsFingerprint", "host", "port", "user", "connectTimeoutSec",
+		// Manifest-only orchestration fields managed via side-effects (permissions.add, linkAgent).
+		"allowlist", "agents",
+	},
 }
 
 // WriteOnlyFields returns the write-only fields for a resource kind.

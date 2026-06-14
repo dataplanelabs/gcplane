@@ -963,3 +963,84 @@ func TestReconcile_HashMatchesAfterAutoHeal(t *testing.T) {
 		t.Fatalf("expected noop on hash match (post-heal steady state), got noops=%d updates=%d", plan.Noops, plan.Updates)
 	}
 }
+
+// pruneMockProvider extends mockProvider with ListAll results and delete tracking.
+type pruneMockProvider struct {
+	mockProvider
+	listAllByKind map[manifest.ResourceKind][]ResourceInfo
+	deleted       []string
+}
+
+func (p *pruneMockProvider) ListAll(_ context.Context, kind manifest.ResourceKind) ([]ResourceInfo, error) {
+	return p.listAllByKind[kind], nil
+}
+
+func (p *pruneMockProvider) Delete(_ context.Context, kind manifest.ResourceKind, key string) error {
+	p.deleted = append(p.deleted, string(kind)+"/"+key)
+	return nil
+}
+
+// TestReconcile_Prune_SkipsNonGcplaneOwned verifies that prune never deletes a
+// resource whose CreatedBy != "gcplane", even when it is absent from the manifest.
+func TestReconcile_Prune_SkipsNonGcplaneOwned(t *testing.T) {
+	mp := &pruneMockProvider{
+		mockProvider:  *newMockProvider(),
+		listAllByKind: map[manifest.ResourceKind][]ResourceInfo{
+			manifest.KindWorkstation: {
+				{Kind: manifest.KindWorkstation, Name: "coding-agent", CreatedBy: "vanducng"},
+				{Kind: manifest.KindWorkstation, Name: "gcplane-ws", CreatedBy: "gcplane"},
+			},
+		},
+	}
+	// gcplane-ws is in manifest; coding-agent is not — but must not be deleted.
+	mp.observed["Workstation/gcplane-ws"] = map[string]any{"name": "GCPlane WS", "backendType": "ssh"}
+
+	engine := NewEngine(mp, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindWorkstation, Name: "gcplane-ws", Spec: map[string]any{
+				"name": "GCPlane WS", "backendType": "ssh",
+			}},
+		},
+	}
+
+	_, _ = engine.Reconcile(context.Background(), m, ReconcileOpts{Prune: true})
+
+	for _, d := range mp.deleted {
+		if d == "Workstation/coding-agent" {
+			t.Fatal("prune must not delete non-gcplane-owned workstation coding-agent")
+		}
+	}
+}
+
+// TestReconcile_Workstation_AdoptExisting verifies that a workstation created
+// imperatively (created_by != gcplane) is adopted (Update path) when it appears
+// in the manifest — no duplicate Create is issued.
+func TestReconcile_Workstation_AdoptExisting(t *testing.T) {
+	provider := newMockProvider()
+	// Simulate an existing imperatively-created workstation.
+	provider.observed["Workstation/coding-agent"] = map[string]any{
+		"workstationKey": "coding-agent",
+		"name":           "Coding Agent",
+		"backendType":    "ssh",
+		"defaultCwd":     "/workspace",
+	}
+
+	engine := NewEngine(provider, nil)
+	m := &manifest.Manifest{
+		Resources: []manifest.Resource{
+			{Kind: manifest.KindWorkstation, Name: "coding-agent", Spec: map[string]any{
+				"displayName": "Coding Agent Updated",
+				"backendType": "ssh",
+				"defaultCwd":  "/workspace",
+			}},
+		},
+	}
+
+	plan, result := engine.Reconcile(context.Background(), m, ReconcileOpts{})
+	if len(provider.created) > 0 {
+		t.Fatalf("must not Create an already-existing workstation, got creates: %v", provider.created)
+	}
+	_ = plan
+	_ = result
+}
