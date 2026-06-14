@@ -18,11 +18,31 @@ func SnakeToCamel(m map[string]any) map[string]any {
 	return transformKeys(m, snakeToCamel)
 }
 
+// passthroughKey reports whether a field's VALUE is a user-defined key/value map
+// (env var names, HTTP header names) whose nested keys are data — not gcplane
+// field names — and must be preserved verbatim. Converting them corrupts the
+// keys: camelToSnake("GH_TOKEN") = "gh_token", which the gh CLI never reads, and
+// likewise mangles MCP header names and workstation defaultEnv keys.
+func passthroughKey(k string) bool {
+	switch k {
+	case "env", "encrypted_env", "encryptedEnv", "headers", "defaultEnv", "default_env":
+		return true
+	}
+	return false
+}
+
 // transformKeys recursively applies a key transformation function to all map keys.
+// The KEY of a passthrough field is still converted (e.g. encryptedEnv↔encrypted_env),
+// but its VALUE map's keys are left verbatim.
 func transformKeys(m map[string]any, fn func(string) string) map[string]any {
 	out := make(map[string]any, len(m))
 	for k, v := range m {
-		out[fn(k)] = transformValue(v, fn)
+		nk := fn(k)
+		if passthroughKey(k) || passthroughKey(nk) {
+			out[nk] = v
+		} else {
+			out[nk] = transformValue(v, fn)
+		}
 	}
 	return out
 }

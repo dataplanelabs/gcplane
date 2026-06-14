@@ -170,3 +170,40 @@ func TestRoundTrip(t *testing.T) {
 		t.Errorf("round-trip failed: got %v, want %v", roundTripped, original)
 	}
 }
+
+// Env var names, HTTP header names, and defaultEnv keys are user data, not field
+// names — they must survive conversion verbatim (regression: GH_TOKEN was
+// snake-cased to gh_token, which the gh CLI never reads).
+func TestKeyConv_PreservesPassthroughMapKeys(t *testing.T) {
+	in := map[string]any{
+		"binaryName":   "gh",
+		"env":          map[string]any{"GH_TOKEN": "x", "GITHUB_API_URL": "y"},
+		"encryptedEnv": map[string]any{"SECRET_KEY": "z"},
+		"headers":      map[string]any{"Authorization": "Bearer t", "X-API-Key": "k"},
+		"defaultEnv":   map[string]any{"MY_SECRET": "s"},
+	}
+	out := CamelToSnake(in)
+
+	if _, ok := out["binary_name"]; !ok {
+		t.Error("binaryName should convert to binary_name")
+	}
+	check := func(field, key string) {
+		m, ok := out[field].(map[string]any)
+		if !ok {
+			t.Fatalf("%s missing/not a map: %v", field, out[field])
+		}
+		if _, ok := m[key]; !ok {
+			t.Errorf("%s key %q must be preserved verbatim, got %v", field, key, m)
+		}
+	}
+	check("env", "GH_TOKEN")
+	check("env", "GITHUB_API_URL")
+	check("encrypted_env", "SECRET_KEY") // field name converts; nested keys don't
+	check("headers", "Authorization")
+	check("headers", "X-API-Key")
+	check("default_env", "MY_SECRET")
+
+	if env := SnakeToCamel(out)["env"].(map[string]any); env["GH_TOKEN"] == nil {
+		t.Errorf("round-trip lost env GH_TOKEN: %v", env)
+	}
+}
