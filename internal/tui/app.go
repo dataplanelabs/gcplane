@@ -721,6 +721,8 @@ var kindAliases = map[string]manifest.ResourceKind{
 	"securecli":    manifest.KindSecureCLI,
 	"link":         manifest.KindAgentLink,
 	"agentlink":    manifest.KindAgentLink,
+	"workstation":  manifest.KindWorkstation,
+	"ws":           manifest.KindWorkstation,
 }
 
 // executeCommand processes : commands (kind switching, quit, etc.)

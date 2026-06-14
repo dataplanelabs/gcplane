@@ -43,6 +43,7 @@ const (
 	KindSecureCLI         ResourceKind = "SecureCLI"
 	KindSecureCLIGrant    ResourceKind = "SecureCLIGrant"
 	KindAgentLink         ResourceKind = "AgentLink"
+	KindWorkstation       ResourceKind = "Workstation"
 )
 
 // Resource is a generic managed resource with kind + name + arbitrary spec.
@@ -75,5 +76,6 @@ func ApplyOrder() []ResourceKind {
 		KindSecureCLIGrant,    // depends on SecureCLI + Agent
 		KindAgentTeam,         // no strict deps
 		KindAgentLink,         // depends on Agent (source + target); placed after AgentTeam to coexist with team-managed links
+		KindWorkstation,       // depends on Agent (for links); after AgentLink so agents exist
 	}
 }

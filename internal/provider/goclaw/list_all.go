@@ -309,6 +309,32 @@ func (p *Provider) listAllAgentLinks(ctx context.Context) ([]reconciler.Resource
 	return infos, nil
 }
 
+// listAllWorkstations returns ResourceInfo for every workstation in GoClaw via WS RPC.
+func (p *Provider) listAllWorkstations(ctx context.Context) ([]reconciler.ResourceInfo, error) {
+	if err := p.ensureWS(ctx); err != nil {
+		return nil, fmt.Errorf("ws connect for workstations: %w", err)
+	}
+	payload, err := p.ws.Call(ctx, "workstations.list", nil)
+	if err != nil {
+		return nil, fmt.Errorf("workstations.list: %w", err)
+	}
+	var resp struct {
+		Workstations []map[string]any `json:"workstations"`
+	}
+	if err := json.Unmarshal(payload, &resp); err != nil {
+		return nil, fmt.Errorf("parse workstations.list response: %w", err)
+	}
+	infos := make([]reconciler.ResourceInfo, 0, len(resp.Workstations))
+	for _, ws := range resp.Workstations {
+		infos = append(infos, reconciler.ResourceInfo{
+			Kind:      manifest.KindWorkstation,
+			Name:      strVal(ws, "workstationKey"),
+			CreatedBy: strVal(ws, "createdBy"),
+		})
+	}
+	return infos, nil
+}
+
 // listAllTenants returns ResourceInfo for every tenant in GoClaw.
 func (p *Provider) listAllTenants(ctx context.Context) ([]reconciler.ResourceInfo, error) {
 	data, err := p.http.Get(ctx, "/v1/tenants")
