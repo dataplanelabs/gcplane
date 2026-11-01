@@ -1,6 +1,6 @@
 module github.com/dataplanelabs/gcplane
 
-go 1.25.11
+go 1.26.10
 
 require (
 	github.com/gdamore/tcell/v2 v2.8.1
